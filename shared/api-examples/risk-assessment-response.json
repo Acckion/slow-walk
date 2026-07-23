@@ -1,0 +1,25 @@
+{
+  "requestID": "10000000-0000-4000-8000-000000000101",
+  "assessment": {
+    "level": "green",
+    "reasons": [],
+    "recommendedActions": [
+      "follow_verified_source_information"
+    ],
+    "assessedAt": "2026-01-15T10:00:00.000Z",
+    "requiresProfessionalAdvice": false,
+    "requiresFamilyAttention": false,
+    "evidenceCompleteness": "complete"
+  },
+  "sourceReferences": [
+    {
+      "sourceName": "SlowWalk Demo Reference",
+      "documentTitle": "Verified Demo Medicine Leaflet",
+      "optionalURL": "https://example.invalid/slowwalk/demo/acetaminophen",
+      "retrievedAt": "2026-01-10T00:00:00.000Z",
+      "versionOrDate": "demo-2026-01-10"
+    }
+  ],
+  "generatedAt": "2026-01-15T10:00:01.000Z",
+  "apiVersion": "v1"
+}

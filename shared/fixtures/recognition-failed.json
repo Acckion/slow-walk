@@ -1,0 +1,70 @@
+{
+  "request": {
+    "medicine": {
+      "id": "unconfirmed-medicine",
+      "canonicalName": "Unconfirmed Demo Medicine",
+      "aliases": [],
+      "activeIngredientIDs": [],
+      "medicineCategory": "other",
+      "sourceReferences": [],
+      "contraindicationTags": []
+    },
+    "userProfile": {
+      "id": "20000000-0000-4000-8000-000000000005",
+      "age": 73,
+      "allergies": [],
+      "diagnosedConditions": [],
+      "currentMedicineIngredientIDs": [],
+      "bodyMetrics": {
+        "systolicBloodPressure": 121,
+        "diastolicBloodPressure": 75,
+        "heartRate": 71,
+        "measuredAt": "2026-01-15T08:00:00.000Z"
+      },
+      "updatedAt": "2026-01-15T08:00:00.000Z"
+    },
+    "recentRecords": [],
+    "scanEvent": {
+      "id": "30000000-0000-4000-8000-000000000005",
+      "recognizedText": "",
+      "confidence": 0,
+      "scannedAt": "2026-01-15T10:00:00.000Z",
+      "recognitionStatus": "failed"
+    },
+    "requestID": "10000000-0000-4000-8000-000000000005",
+    "apiVersion": "v1"
+  },
+  "expectedResponse": {
+    "requestID": "10000000-0000-4000-8000-000000000005",
+    "assessment": {
+      "level": "yellow",
+      "reasons": [
+        {
+          "code": "missing_evidence",
+          "message": "药品来源信息不足，请先核对可靠来源。",
+          "evidence": "sourceReferences is empty",
+          "ruleIdentifier": "missing-evidence"
+        },
+        {
+          "code": "recognition_failed",
+          "message": "无法可靠确认药品，确认药品前不要服用。",
+          "evidence": "recognitionStatus=failed, confidence=0",
+          "ruleIdentifier": "recognition-failure"
+        }
+      ],
+      "recommendedActions": [
+        "consult_healthcare_professional",
+        "do_not_take_until_medicine_confirmed",
+        "retake_medicine_photo",
+        "review_medicine_sources"
+      ],
+      "assessedAt": "2026-01-15T10:00:00.000Z",
+      "requiresProfessionalAdvice": true,
+      "requiresFamilyAttention": false,
+      "evidenceCompleteness": "insufficient"
+    },
+    "sourceReferences": [],
+    "generatedAt": "2026-01-15T10:00:01.000Z",
+    "apiVersion": "v1"
+  }
+}

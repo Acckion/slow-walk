@@ -1,0 +1,12 @@
+{
+  "code": "validation_error",
+  "message": "请求字段验证失败。",
+  "requestID": "10000000-0000-4000-8000-000000000102",
+  "details": [
+    {
+      "field": "scanEvent.confidence",
+      "code": "out_of_range",
+      "message": "confidence 必须位于 0 到 1。"
+    }
+  ]
+}

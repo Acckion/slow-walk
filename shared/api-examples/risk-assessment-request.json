@@ -1,0 +1,48 @@
+{
+  "medicine": {
+    "id": "demo-acetaminophen",
+    "canonicalName": "Demo Acetaminophen",
+    "aliases": [
+      "Demo Pain Relief"
+    ],
+    "activeIngredientIDs": [
+      "acetaminophen"
+    ],
+    "medicineCategory": "analgesic",
+    "sourceReferences": [
+      {
+        "sourceName": "SlowWalk Demo Reference",
+        "documentTitle": "Verified Demo Medicine Leaflet",
+        "optionalURL": "https://example.invalid/slowwalk/demo/acetaminophen",
+        "retrievedAt": "2026-01-10T00:00:00.000Z",
+        "versionOrDate": "demo-2026-01-10"
+      }
+    ],
+    "contraindicationTags": []
+  },
+  "userProfile": {
+    "id": "20000000-0000-4000-8000-000000000101",
+    "age": 70,
+    "allergies": [],
+    "diagnosedConditions": [],
+    "currentMedicineIngredientIDs": [],
+    "bodyMetrics": {
+      "systolicBloodPressure": 120,
+      "diastolicBloodPressure": 75,
+      "heartRate": 68,
+      "measuredAt": "2026-01-15T09:00:00.000Z"
+    },
+    "updatedAt": "2026-01-15T09:00:00.000Z"
+  },
+  "recentRecords": [],
+  "scanEvent": {
+    "id": "30000000-0000-4000-8000-000000000101",
+    "recognizedText": "Demo Acetaminophen",
+    "candidateMedicineID": "demo-acetaminophen",
+    "confidence": 0.99,
+    "scannedAt": "2026-01-15T10:00:00.000Z",
+    "recognitionStatus": "recognized"
+  },
+  "requestID": "10000000-0000-4000-8000-000000000101",
+  "apiVersion": "v1"
+}

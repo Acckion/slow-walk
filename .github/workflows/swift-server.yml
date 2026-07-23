@@ -1,0 +1,40 @@
+name: Swift Server
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Ubuntu Hummingbird
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: swift:6.3.3-noble
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Resolve dependencies
+        run: swift package --package-path server resolve
+
+      - name: Build server
+        run: swift build --package-path server
+
+      - name: Test server
+        run: swift test --package-path server

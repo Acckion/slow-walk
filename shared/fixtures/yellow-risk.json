@@ -1,0 +1,65 @@
+{
+  "request": {
+    "medicine": {
+      "id": "demo-antihistamine",
+      "canonicalName": "Demo Antihistamine",
+      "aliases": [],
+      "activeIngredientIDs": [
+        "demo-antihistamine-ingredient"
+      ],
+      "medicineCategory": "antihistamine",
+      "sourceReferences": [],
+      "contraindicationTags": []
+    },
+    "userProfile": {
+      "id": "20000000-0000-4000-8000-000000000002",
+      "age": 72,
+      "allergies": [],
+      "diagnosedConditions": [],
+      "currentMedicineIngredientIDs": [],
+      "bodyMetrics": {
+        "systolicBloodPressure": 118,
+        "diastolicBloodPressure": 74,
+        "heartRate": 70,
+        "measuredAt": "2026-01-15T08:00:00.000Z"
+      },
+      "updatedAt": "2026-01-15T08:00:00.000Z"
+    },
+    "recentRecords": [],
+    "scanEvent": {
+      "id": "30000000-0000-4000-8000-000000000002",
+      "recognizedText": "Demo Antihistamine",
+      "candidateMedicineID": "demo-antihistamine",
+      "confidence": 0.91,
+      "scannedAt": "2026-01-15T10:00:00.000Z",
+      "recognitionStatus": "recognized"
+    },
+    "requestID": "10000000-0000-4000-8000-000000000002",
+    "apiVersion": "v1"
+  },
+  "expectedResponse": {
+    "requestID": "10000000-0000-4000-8000-000000000002",
+    "assessment": {
+      "level": "yellow",
+      "reasons": [
+        {
+          "code": "missing_evidence",
+          "message": "药品来源信息不足，请先核对可靠来源。",
+          "evidence": "sourceReferences is empty",
+          "ruleIdentifier": "missing-evidence"
+        }
+      ],
+      "recommendedActions": [
+        "consult_healthcare_professional",
+        "review_medicine_sources"
+      ],
+      "assessedAt": "2026-01-15T10:00:00.000Z",
+      "requiresProfessionalAdvice": true,
+      "requiresFamilyAttention": false,
+      "evidenceCompleteness": "insufficient"
+    },
+    "sourceReferences": [],
+    "generatedAt": "2026-01-15T10:00:01.000Z",
+    "apiVersion": "v1"
+  }
+}
