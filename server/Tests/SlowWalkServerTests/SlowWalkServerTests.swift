@@ -1,4 +1,5 @@
 import Foundation
+import Hummingbird
 import HummingbirdTesting
 import SlowWalkAPIContracts
 import SlowWalkDataInterfaces

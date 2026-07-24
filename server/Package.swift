@@ -41,6 +41,7 @@ let package = Package(
             name: "SlowWalkServerTests",
             dependencies: [
                 "SlowWalkServer",
+                .product(name: "Hummingbird", package: "hummingbird"),
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
                 .product(name: "SlowWalkDomain", package: "SlowWalkCore"),
                 .product(name: "SlowWalkAPIContracts", package: "SlowWalkCore"),
