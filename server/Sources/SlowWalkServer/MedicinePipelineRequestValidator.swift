@@ -19,19 +19,7 @@ public struct MedicinePipelineRequestValidator: Sendable {
     public func validate(
         _ request: MedicineAssessmentRequestDTO
     ) -> [APIErrorDetailDTO] {
-        var details = validateRecognitionConfidence(request.input)
-
-        if !(1 ... 130).contains(request.userProfile.age) {
-            details.append(
-                APIErrorDetailDTO(
-                    field: "userProfile.age",
-                    code: "out_of_range",
-                    message: "Age must be between 1 and 130."
-                )
-            )
-        }
-
-        return details
+        validateRecognitionConfidence(request.input)
     }
 
     private func validateRecognitionConfidence(

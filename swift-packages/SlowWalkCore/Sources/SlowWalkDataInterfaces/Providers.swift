@@ -1,9 +1,8 @@
 import Foundation
+import SlowWalkDomain
 
 /// Injectable wall-clock date source.
-public protocol DateProviding: Sendable {
-    func now() -> Date
-}
+public protocol DateProviding: Clock {}
 
 /// The single production boundary at which the current wall-clock date is read.
 public struct SystemDateProvider: DateProviding, Sendable {

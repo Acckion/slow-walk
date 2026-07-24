@@ -8,14 +8,16 @@ public struct ActionCardFactory: Sendable {
     public func makeCard(
         resolution: MedicineResolution,
         assessment: RiskAssessment?,
-        generatedAt: Date
+        generatedAt: Date,
+        healthContextWarnings: [HealthContextValidationIssue] = []
     ) -> ActionCard {
         guard resolution.status == .resolved,
               let medicine = resolution.selectedMedicine,
               let assessment else {
             return confirmationCard(
                 resolution: resolution,
-                generatedAt: generatedAt
+                generatedAt: generatedAt,
+                healthContextWarnings: healthContextWarnings
             )
         }
 
@@ -44,7 +46,9 @@ public struct ActionCardFactory: Sendable {
                 for: effectiveLevel
             ),
             warnings: unique(
-                medicine.warnings + assessment.reasons.map(\.message)
+                medicine.warnings
+                    + healthContextWarnings.map(\.message)
+                    + assessment.reasons.map(\.message)
             ),
             recommendedActions: stableActions(actions),
             riskLevel: effectiveLevel,
@@ -56,7 +60,8 @@ public struct ActionCardFactory: Sendable {
 
     private func confirmationCard(
         resolution: MedicineResolution,
-        generatedAt: Date
+        generatedAt: Date,
+        healthContextWarnings: [HealthContextValidationIssue]
     ) -> ActionCard {
         ActionCard(
             title: "Unable to confirm the medicine",
@@ -65,7 +70,7 @@ public struct ActionCardFactory: Sendable {
             warnings: [
                 "Do not take this medicine until its identity is confirmed.",
                 resolutionWarning(for: resolution.status),
-            ],
+            ] + healthContextWarnings.map(\.message),
             recommendedActions: stableActions([
                 .doNotTakeUntilMedicineConfirmed,
                 .retakeMedicinePhoto,

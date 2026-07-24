@@ -34,6 +34,7 @@ public struct MedicinePipelineAssessmentResult: Sendable, Equatable {
     public let scanEvent: MedicineScanEvent
     public let assessment: RiskAssessment?
     public let actionCard: ActionCard
+    public let healthContextValidation: HealthContextValidation
 
     public init(
         resolution: MedicineResolution,
@@ -43,7 +44,8 @@ public struct MedicinePipelineAssessmentResult: Sendable, Equatable {
         cacheHit: Bool,
         scanEvent: MedicineScanEvent,
         assessment: RiskAssessment?,
-        actionCard: ActionCard
+        actionCard: ActionCard,
+        healthContextValidation: HealthContextValidation
     ) {
         self.resolution = resolution
         self.cacheStatus = cacheStatus
@@ -53,6 +55,7 @@ public struct MedicinePipelineAssessmentResult: Sendable, Equatable {
         self.scanEvent = scanEvent
         self.assessment = assessment
         self.actionCard = actionCard
+        self.healthContextValidation = healthContextValidation
     }
 }
 
@@ -69,6 +72,7 @@ public struct MedicinePipeline: Sendable {
     private let resolver: any MedicineResolving
     private let riskAssessor: any RiskAssessing
     private let actionCardFactory: ActionCardFactory
+    private let contextBuilder: any MedicationRiskContextBuilding
 
     public init(
         catalogLoader: any MedicineCatalogLoading =
@@ -80,7 +84,8 @@ public struct MedicinePipeline: Sendable {
             MedicineNameNormalizer(),
         resolver: any MedicineResolving = MedicineResolver(),
         riskAssessor: any RiskAssessing = MedicationRiskEngine(),
-        actionCardFactory: ActionCardFactory = ActionCardFactory()
+        actionCardFactory: ActionCardFactory = ActionCardFactory(),
+        contextBuilder: (any MedicationRiskContextBuilding)? = nil
     ) {
         self.catalogLoader = catalogLoader
         self.cache = cache
@@ -90,6 +95,8 @@ public struct MedicinePipeline: Sendable {
         self.resolver = resolver
         self.riskAssessor = riskAssessor
         self.actionCardFactory = actionCardFactory
+        self.contextBuilder = contextBuilder
+            ?? MedicationRiskContextBuilder(clock: dateProvider)
     }
 
     public func resolve(
@@ -107,6 +114,11 @@ public struct MedicinePipeline: Sendable {
         userProfile: UserHealthProfile,
         recentRecords: [MedicationRecord]
     ) async throws -> MedicinePipelineAssessmentResult {
+        let preflight = try contextBuilder.validate(
+            userProfile: userProfile,
+            bodyMetrics: userProfile.bodyMetrics,
+            medicationRecords: recentRecords
+        )
         let generatedAt = dateProvider.now()
         let resolutionResult = try await resolve(
             input: input,
@@ -118,29 +130,31 @@ public struct MedicinePipeline: Sendable {
         )
 
         let assessment: RiskAssessment?
+        let healthContextValidation: HealthContextValidation
         if resolutionResult.resolution.status == .resolved,
            let medicine =
             resolutionResult.resolution.selectedMedicine {
-            assessment = riskAssessor.assess(
-                context: MedicationRiskContext(
-                    medicine: medicine,
-                    userProfile: userProfile,
-                    recentRecords: recentRecords,
-                    scanEvent: scanEvent,
-                    assessedAt: generatedAt,
-                    evidenceCompleteness:
-                        medicine.sourceReferences.isEmpty
-                        ? .insufficient
-                        : .complete
-                )
+            let buildResult = try contextBuilder.build(
+                medicine: medicine,
+                resolution: resolutionResult.resolution,
+                preflight: preflight,
+                scanEvent: scanEvent,
+                sourceReferences: medicine.sourceReferences
             )
+            assessment = riskAssessor.assess(
+                context: buildResult.context
+            )
+            healthContextValidation = buildResult.validation
         } else {
             assessment = nil
+            healthContextValidation = preflight.validation
         }
         let actionCard = actionCardFactory.makeCard(
             resolution: resolutionResult.resolution,
             assessment: assessment,
-            generatedAt: generatedAt
+            generatedAt: generatedAt,
+            healthContextWarnings:
+                healthContextValidation.issues
         )
 
         return MedicinePipelineAssessmentResult(
@@ -152,7 +166,8 @@ public struct MedicinePipeline: Sendable {
             cacheHit: resolutionResult.cacheHit,
             scanEvent: scanEvent,
             assessment: assessment,
-            actionCard: actionCard
+            actionCard: actionCard,
+            healthContextValidation: healthContextValidation
         )
     }
 
