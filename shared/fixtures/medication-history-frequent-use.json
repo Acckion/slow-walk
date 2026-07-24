@@ -1,0 +1,36 @@
+{
+  "demoNotice": "DEMO DATA — NOT FOR CLINICAL USE",
+  "schemaVersion": 1,
+  "records": [
+    {
+      "id": "20000000-0000-0000-0000-000000000001",
+      "medicineID": "synthetic-medicine-a",
+      "activeIngredientIDs": [
+        "synthetic-ingredient-a"
+      ],
+      "recordedAt": "2025-07-22T08:00:00Z",
+      "eventType": "confirmed_intake",
+      "source": "demo_data"
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000002",
+      "medicineID": "synthetic-medicine-a",
+      "activeIngredientIDs": [
+        "synthetic-ingredient-a"
+      ],
+      "recordedAt": "2025-07-23T08:00:00Z",
+      "eventType": "confirmed_intake",
+      "source": "demo_data"
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000003",
+      "medicineID": "synthetic-medicine-a",
+      "activeIngredientIDs": [
+        "synthetic-ingredient-a"
+      ],
+      "recordedAt": "2025-07-24T00:00:00Z",
+      "eventType": "confirmed_intake",
+      "source": "demo_data"
+    }
+  ]
+}

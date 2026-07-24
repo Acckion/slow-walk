@@ -1,0 +1,25 @@
+{
+  "demoNotice": "DEMO DATA — NOT FOR CLINICAL USE",
+  "id": "10000000-0000-0000-0000-000000000001",
+  "age": 72,
+  "allergies": [
+    "synthetic-pollen"
+  ],
+  "diagnosedConditions": [
+    "synthetic-condition-a"
+  ],
+  "currentMedicineIngredientIDs": [
+    "synthetic-ingredient-b"
+  ],
+  "bodyMetrics": {
+    "systolicBloodPressure": 120,
+    "diastolicBloodPressure": 80,
+    "heartRate": 70,
+    "measuredAt": "2025-07-23T23:55:00Z",
+    "source": "demo_data",
+    "deviceIdentifier": "synthetic-device-01"
+  },
+  "createdAt": "2025-07-20T00:00:00Z",
+  "updatedAt": "2025-07-23T23:55:00Z",
+  "schemaVersion": 1
+}
