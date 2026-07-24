@@ -13,6 +13,10 @@ let package = Package(
             name: "SlowWalkMedicinePipeline",
             targets: ["SlowWalkMedicinePipeline"]
         ),
+        .library(
+            name: "SlowWalkMedicineKnowledge",
+            targets: ["SlowWalkMedicineKnowledge"]
+        ),
     ],
     targets: [
         .target(name: "SlowWalkDomain"),
@@ -30,11 +34,19 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(
+            name: "SlowWalkMedicineKnowledge",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkDataInterfaces",
+            ]
+        ),
+        .target(
             name: "SlowWalkMedicinePipeline",
             dependencies: [
                 "SlowWalkDomain",
                 "SlowWalkRiskEngine",
                 "SlowWalkDataInterfaces",
+                "SlowWalkMedicineKnowledge",
             ]
         ),
         .testTarget(
@@ -52,6 +64,14 @@ let package = Package(
         .testTarget(
             name: "SlowWalkDataInterfacesTests",
             dependencies: ["SlowWalkDomain", "SlowWalkDataInterfaces"]
+        ),
+        .testTarget(
+            name: "SlowWalkMedicineKnowledgeTests",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkDataInterfaces",
+                "SlowWalkMedicineKnowledge",
+            ]
         ),
         .testTarget(
             name: "SlowWalkMedicinePipelineTests",
