@@ -57,6 +57,36 @@
 
 完整请求与响应示例位于 `shared/api-examples/`。
 
+## 药品知识检索
+
+### `POST /api/v1/medicine/search`
+
+请求体为 `MedicineKnowledgeSearchRequestDTO`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `normalizedQuery` | String | 是 | 已 trim、lowercase 的药品查询，最多 256 字符 |
+| `requestID` | UUID | 是 | 客户端关联 ID |
+| `apiVersion` | String | 是 | 固定为 `v1` |
+
+成功返回 `MedicineKnowledgeSearchResponseDTO`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `candidates` | `[MedicineKnowledgeCandidate]` | 结构化候选与逐候选冲突证据 |
+| `sourceStatus` | String enum | authoritative/corroborated/partial/conflicting/stale_offline/unavailable |
+| `cacheStatus` | String enum | miss/hit/expired/revalidated/stale_offline/source_version_changed/not_stored |
+| `completeness` | Number, 0...1 | 合并与冲突惩罚后的完整度 |
+| `sourceReferences` | `[SourceReference]` | 可追溯来源 |
+| `warnings` | `[MedicineKnowledgeWarning]` | 稳定 code 与 source identifiers |
+| `sourceVersions` | `[String: String]` | source identifier 到数据版本 |
+| `generatedAt` | Date | 结果生成时间 |
+| `isOffline` | Boolean | 是否使用 stale/offline cache |
+
+当前运行时只连接 mock HTTP source，响应中的
+`DEMO DATA — NOT FOR CLINICAL USE` 不是临床数据声明。联网成功不等于来源通过
+医学可信校验；白名单、版本和引用验证由 `SourcePolicy` 独立执行。
+
 ## 药品解析
 
 ### `POST /api/v1/medicine/resolve`
@@ -116,6 +146,7 @@
 | `requestID` | UUID | 是 | 与请求一致 |
 | `apiVersion` | String | 是 | 固定为 `v1` |
 | `healthContextValidation` | `HealthContextValidationDTO` | 是 | 档案、历史和身体指标的数据质量结果 |
+| `medicineKnowledge` | `MedicineKnowledgeSearchResult` | 否 | 本次知识源、缓存、冲突与版本证据 |
 
 无法确认药品不是传输错误：此端点返回 `200` 和保守 `ActionCard`，其
 `mustConfirmMedicine` 为 true，且必须要求重拍药盒正面和确认前不要服用。
@@ -277,6 +308,7 @@ API v1 fixture 的兼容值。只有 `confirmed_intake` 和旧 `taken` 参与已
 - `body_metrics_stale`
 - `body_metrics_invalid`
 - `health_context_warning`
+- `knowledge_source_warning`
 
 消息面向用户，证据说明来源或命中数据，`ruleIdentifier` 稳定标识产生原因的规则。
 
@@ -312,6 +344,20 @@ API v1 fixture 的兼容值。只有 `confirmed_intake` 和旧 `taken` 参与已
 | 422 | `medicine_recognition_failed` | 没有可用识别文字 |
 | 422 | `medicine_insufficient_evidence` | 置信度或匹配分数不足 |
 | 500 | `internal_error` | 未预期服务端错误 |
+
+`POST /api/v1/medicine/search` 以及接入知识源后的 medicine pipeline 使用以下
+稳定错误：
+
+| HTTP | `code` | 场景 |
+| --- | --- | --- |
+| 400/422 | `MALFORMED_REQUEST` | JSON、字段、normalized query 或 API version 无效 |
+| 404 | `MEDICINE_NOT_FOUND` | 白名单来源均未找到候选 |
+| 409 | `SOURCE_CONFLICT` | source adapter 明确返回不可聚合冲突 |
+| 502 | `INVALID_SOURCE_RESPONSE` | JSON、Content-Type、空 body 或大小验证失败 |
+| 502 | `SOURCE_VERSION_UNSUPPORTED` | source data version 不受支持 |
+| 503 | `KNOWLEDGE_SOURCE_UNAVAILABLE` | 来源不可用或请求被取消 |
+| 503 | `OFFLINE_CACHE_UNAVAILABLE` | 联网失败且无可用 offline grace cache |
+| 504 | `KNOWLEDGE_SOURCE_TIMEOUT` | 来源请求超时 |
 
 `POST /api/v1/medicine/assess` 在上述通用 transport 错误之外使用以下稳定
 大写 code，以便客户端区分健康上下文输入阶段：
