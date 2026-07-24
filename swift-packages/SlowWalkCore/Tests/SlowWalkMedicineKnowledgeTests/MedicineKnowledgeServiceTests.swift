@@ -152,6 +152,48 @@ final class MedicineKnowledgeServiceTests:
         )
     }
 
+    func testPrimaryTimeoutFallsBackToAvailableSecondary()
+        async throws
+    {
+        let primary = makeFailingSource(
+            identifier: primaryID,
+            priority: 100,
+            authoritative: true,
+            version: "primary-v1",
+            error: .knowledgeSourceTimeout(
+                sourceIdentifier: primaryID
+            )
+        )
+        let secondary = makeSource(
+            identifier: secondaryID,
+            priority: 10,
+            authoritative: false,
+            response: makeResponse(
+                sourceIdentifier: secondaryID,
+                version: "secondary-v1"
+            )
+        )
+        let service = try makeService(
+            sources: [primary, secondary]
+        )
+
+        let result = try await service.search(
+            query: .init(
+                normalizedQuery: "acetaminophen"
+            )
+        )
+
+        XCTAssertEqual(result.sourceStatus, .partial)
+        XCTAssertEqual(result.candidates.count, 1)
+        XCTAssertTrue(
+            result.warnings.contains {
+                $0.code == .sourceTimeout
+                    && $0.sourceIdentifiers == [primaryID]
+            }
+        )
+        XCTAssertTrue(result.requiresConservativeAction)
+    }
+
     func testStaleSourceProducesWarningAndPartialStatus()
         async throws
     {
