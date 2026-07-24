@@ -86,34 +86,19 @@ struct JSONRepositoryFile<Value: Codable & Sendable>: Sendable {
             ".\(fileName).\(token).tmp",
             isDirectory: false
         )
-        let backupName = ".\(fileName).\(token).backup"
         defer {
             if manager.fileExists(atPath: temporaryURL.path) {
                 try? manager.removeItem(at: temporaryURL)
-            }
-            let backupURL = baseDirectory.appendingPathComponent(
-                backupName,
-                isDirectory: false
-            )
-            if manager.fileExists(atPath: backupURL.path) {
-                try? manager.removeItem(at: backupURL)
             }
         }
 
         do {
             try data.write(to: temporaryURL, options: .withoutOverwriting)
-            if manager.fileExists(atPath: fileURL.path) {
-                _ = try manager.replaceItemAt(
-                    fileURL,
-                    withItemAt: temporaryURL,
-                    backupItemName: backupName
-                )
-            } else {
-                try manager.moveItem(
-                    at: temporaryURL,
-                    to: fileURL
-                )
-            }
+            let stagedData = try Data(contentsOf: temporaryURL)
+            // Foundation implements `.atomic` by writing an auxiliary file
+            // in the destination directory and renaming it over the target.
+            // This is the portable replacement path on Darwin and Linux.
+            try stagedData.write(to: fileURL, options: .atomic)
         } catch {
             throw JSONRepositoryError.atomicWriteFailed
         }

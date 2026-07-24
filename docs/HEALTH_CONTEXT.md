@@ -78,8 +78,9 @@ warning 会同时进入结构化 response 与 risk reason。缺少来源时 comp
 - `FileMedicationHistoryRepository`
 
 基础目录由 initializer 注入，不包含绝对用户目录。文件 envelope 包含
-`schemaVersion` 和 `records`。保存时先编码到同目录临时文件，再通过
-`FileManager.replaceItemAt` 原子替换已有文件；失败时旧文件不被直接覆盖。
+`schemaVersion` 和 `records`。保存时先编码到同目录 staging 文件，再使用
+Foundation 的 `.atomic` 写入策略替换已有文件；失败时旧文件不被直接覆盖。该
+路径同时适用于 Darwin 与 Linux Foundation。
 
 typed error 区分 `fileNotFound`、`emptyFile`、`corruptedJSON`、
 `unsupportedSchemaVersion`、目录创建失败和原子写入失败。日志和错误不包含完整

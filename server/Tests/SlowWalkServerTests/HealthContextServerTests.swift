@@ -7,7 +7,10 @@ import SlowWalkDomain
 import XCTest
 @testable import SlowWalkServer
 
-final class HealthContextServerTests: XCTestCase {
+final class HealthContextServerTests:
+    XCTestCase,
+    @unchecked Sendable
+{
     private let now = Date(timeIntervalSince1970: 1_753_315_200)
 
     func testCompleteHealthContextAssessmentSucceeds() async throws {
