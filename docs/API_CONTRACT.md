@@ -115,11 +115,19 @@
 | `generatedAt` | Date | 是 | 服务端生成时间 |
 | `requestID` | UUID | 是 | 与请求一致 |
 | `apiVersion` | String | 是 | 固定为 `v1` |
+| `healthContextValidation` | `HealthContextValidationDTO` | 是 | 档案、历史和身体指标的数据质量结果 |
 
 无法确认药品不是传输错误：此端点返回 `200` 和保守 `ActionCard`，其
 `mustConfirmMedicine` 为 true，且必须要求重拍药盒正面和确认前不要服用。
 `assessment` 此时为空，不输出剂量或频次。缓存命中后仍使用当前档案、近期记录和
 本次识别置信度重新运行安全判断。
+
+`healthContextValidation.status` 的稳定值为 `valid`、
+`valid_with_warnings`、`invalid`。成功响应只会出现前两种；`warnings` 中每项
+包含稳定 `code`、可选 `field`、`message`、`severity` 和
+`ruleIdentifier`。warning 会保留在响应和行动卡中，但不一定导致 HTTP 失败。
+`configurationNotices` 必须包含 `NOT FOR CLINICAL USE`，身体指标演示配置还包含
+`DEMO DATA QUALITY CONFIGURATION — NOT A CLINICAL DIAGNOSTIC STANDARD`。
 
 ## 领域对象
 
@@ -164,7 +172,12 @@
 | `diagnosedConditions` | `[String]` | 是 |
 | `currentMedicineIngredientIDs` | `[String]` | 是 |
 | `bodyMetrics` | `BodyMetrics` | 否 |
+| `createdAt` | Date | 是 |
 | `updatedAt` | Date | 是 |
+| `schemaVersion` | Integer | 是 |
+
+API v1 为旧请求提供兼容默认：缺少 `createdAt` 时使用 `updatedAt`，缺少
+`schemaVersion` 时使用 `1`。新客户端必须显式发送两者。
 
 ### BodyMetrics
 
@@ -176,6 +189,11 @@
 | `diastolicBloodPressure` | Integer |
 | `heartRate` | Integer |
 | `measuredAt` | Date |
+| `source` | String |
+| `deviceIdentifier` | String |
+
+`source` 缺失属于数据质量 warning；`deviceIdentifier` 始终可选。以上字段只做
+缺失、格式、时间、过期和明显字段关系检查，不用于疾病诊断。
 
 ### MedicationRecord
 
@@ -188,7 +206,9 @@
 | `eventType` | String enum | 是 |
 | `source` | String enum | 是 |
 
-`eventType`：`scanned`、`taken`、`reported`。
+`eventType`：`scanned`、`confirmed_intake`、`reported`。`taken` 是保留给旧
+API v1 fixture 的兼容值。只有 `confirmed_intake` 和旧 `taken` 参与已确认服药
+统计；`scanned` 绝不自动等同服药。
 
 `source`：`manual_entry`、`medicine_scan`、`demo_data`。
 
@@ -256,6 +276,7 @@
 - `body_metrics_missing`
 - `body_metrics_stale`
 - `body_metrics_invalid`
+- `health_context_warning`
 
 消息面向用户，证据说明来源或命中数据，`ruleIdentifier` 稳定标识产生原因的规则。
 
@@ -292,12 +313,25 @@
 | 422 | `medicine_insufficient_evidence` | 置信度或匹配分数不足 |
 | 500 | `internal_error` | 未预期服务端错误 |
 
+`POST /api/v1/medicine/assess` 在上述通用 transport 错误之外使用以下稳定
+大写 code，以便客户端区分健康上下文输入阶段：
+
+| HTTP | `code` | 场景 |
+| --- | --- | --- |
+| 400 | `MALFORMED_REQUEST` | 无法识别为有效 assessment DTO 的 JSON |
+| 400 | `UNSUPPORTED_API_VERSION` | `apiVersion` 不受支持 |
+| 422 | `INVALID_USER_PROFILE` | 档案 ID、年龄或时间关系无效 |
+| 422 | `UNSUPPORTED_PROFILE_SCHEMA` | 档案 schemaVersion 不受支持 |
+| 422 | `INVALID_MEDICATION_RECORD` | 历史记录字段无效 |
+| 422 | `FUTURE_MEDICATION_RECORD` | 历史记录时间在未来 |
+| 422 | `INVALID_BODY_METRICS` | 身体指标存在明显无效数据 |
+
 错误响应也必须带 `application/json`。如果无法从请求读取合法 ID，服务端生成新的
 request ID 并用于日志和响应；不得在响应中暴露调用栈、文件路径或内部秘密。
 
 ## Fixtures
 
-`shared/fixtures/*.json` 使用测试专用 envelope：
+原有风险 fixtures 使用测试专用 envelope：
 
 ```json
 {
@@ -314,6 +348,20 @@ request ID 并用于日志和响应；不得在响应中暴露调用栈、文件
 - `orange-risk.json`
 - `red-risk.json`
 - `recognition-failed.json`
+
+健康上下文 fixtures 可直接表示档案、身体指标、历史 envelope 或
+`MedicineAssessmentRequestDTO`，包括：
+
+- `profile-complete.json`
+- `profile-missing-evidence.json`
+- `body-metrics-current.json`
+- `body-metrics-stale.json`
+- `medication-history-empty.json`
+- `medication-history-frequent-use.json`
+- `medication-history-duplicate-ingredient.json`
+- `health-context-valid.json`
+- `health-context-warning.json`
+- `health-context-invalid.json`
 
 所有内容均为演示数据，不得用于临床决策。
 
