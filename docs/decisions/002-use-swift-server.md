@@ -33,8 +33,8 @@
 
 ## 后果
 
-- Windows 无法解析或运行 Hummingbird 时，`SlowWalkCore` 仍必须独立构建和测试。
-- 服务端必须在受支持的 Windows 环境或 Linux CI 中完成真实构建与测试。
+- `SlowWalkCore` 必须在不依赖 Hummingbird 的 GitHub Actions 作业中独立构建测试。
+- 服务端必须在 GitHub Actions Linux 容器中完成真实构建与测试。
 - 不允许为绕过框架或工具链问题而改用其他运行语言。
 - 不手写不可靠的 HTTP 协议实现来伪装服务端完成。
 
@@ -42,4 +42,3 @@
 
 仓库曾预留 FastAPI/Python 空模板，但其中没有有效代码或合同。该路线已经终止；
 历史说明不构成当前技术选型。
-

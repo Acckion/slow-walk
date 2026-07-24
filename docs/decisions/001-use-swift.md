@@ -21,7 +21,8 @@ SwiftData 等 Apple 平台实现只位于 `ios/`，不能进入跨平台核心 P
 
 ## 后果
 
-- Windows 只构建和测试跨平台 SwiftPM 模块，不能用来验证 Apple 平台 API。
+- Windows 只做编辑、Git 与静态审查；跨平台 SwiftPM 模块由 GitHub Actions
+  Ubuntu 容器构建测试，不能据此验证 Apple 平台 API。
 - iOS 源码必须在 Mac/Xcode 中补充工程、签名、权限、模拟器和真机验证。
 - 核心业务逻辑不得写入 SwiftUI View、OCR 服务或网络实现。
 - Flutter 与 Kotlin 只作为已放弃路线的历史背景，不是当前开发目标。

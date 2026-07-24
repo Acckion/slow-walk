@@ -5,6 +5,10 @@ Swift 6 + Hummingbird 2 的最小 API 服务，业务风险判断复用本地
 
 ## 运行
 
+以下命令仅供具备受支持 Swift 工具链的 Linux/macOS 环境使用；当前 Windows
+工作区不执行它们。仓库的真实构建与测试结果以 `Swift Server` GitHub Actions
+工作流为准。
+
 ```bash
 swift run SlowWalkServer
 ```

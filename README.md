@@ -15,7 +15,7 @@
 - 可替换的 Repository、缓存、Clock 与 UUID 接口及内存实现。
 - Swift 服务端最小健康检查和风险评估接口。
 - iOS 源码边界与平台服务协议骨架。
-- Windows 核心构建脚本以及 Windows/Ubuntu CI。
+- GitHub Actions 中的 Ubuntu Swift 核心与服务端 CI。
 
 ## 技术栈
 
@@ -32,8 +32,9 @@
 ## 目标平台
 
 - iOS 客户端。
-- Windows 上的跨平台核心开发与测试。
-- Linux 上的 Swift 服务端构建与部署。
+- Windows 上的源码编辑、Git 管理、静态审查与测试生成。
+- GitHub Actions Ubuntu 容器中的 Swift 核心与服务端编译测试。
+- Linux 上的 Swift 服务端部署。
 
 所有业务、客户端运行和服务端运行代码均使用 Swift。iOS 平台 API 与跨平台核心
 Package 分离，服务端框架也不能进入领域层或风险引擎。
@@ -46,7 +47,7 @@ Package 分离，服务端框架也不能进入领域层或风险引擎。
 - `shared/fixtures/`：可由测试读取的跨场景 JSON fixtures。
 - `shared/api-examples/`：API 请求、响应和错误示例。
 - `docs/`：范围、架构、合同、计划、演示脚本和 ADR。
-- `scripts/`：Windows 验证与服务端启动脚本。
+- `scripts/`：历史本地辅助脚本；当前 Windows 验证路线不调用它们。
 - `.github/workflows/`：核心和服务端持续集成。
 
 详细依赖方向见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)，API 字段定义见
@@ -54,44 +55,23 @@ Package 分离，服务端框架也不能进入领域层或风险引擎。
 
 ## 构建与测试
 
-需要稳定版 Swift 6 工具链。Windows 原生工具链还需要 MSVC 与 Windows SDK。
+当前 Windows 工作区不调用本机 `swift`、`swiftc`、`swift build` 或
+`swift test`。提交到 `feature/**` 或 `develop` 后，由以下 GitHub Actions
+工作流在 `ubuntu-latest` 和官方 `swift:6.3.2-jammy` 容器中执行真实验证：
 
-核心 Package：
+- [`.github/workflows/swift-core.yml`](.github/workflows/swift-core.yml)：
+  对 `swift-packages/SlowWalkCore` 执行依赖解析、构建和测试。
+- [`.github/workflows/swift-server.yml`](.github/workflows/swift-server.yml)：
+  对 `server` 执行依赖解析、构建和测试。
 
-```powershell
-swift package --package-path .\swift-packages\SlowWalkCore resolve
-swift build --package-path .\swift-packages\SlowWalkCore
-swift test --package-path .\swift-packages\SlowWalkCore
-```
-
-服务端：
-
-```powershell
-swift package --package-path .\server resolve
-swift build --package-path .\server
-swift test --package-path .\server
-pwsh -File .\scripts\run-server.ps1
-```
-
-Windows 一键验证：
-
-```powershell
-pwsh -File .\scripts\verify-windows.ps1
-```
-
-脚本默认把 SwiftPM scratch 数据放在仓库内被忽略的 `.local/`。如需显式使用 D 盘
-缓存，可在运行前设置：
-
-```powershell
-$env:SLOWWALK_SCRATCH_ROOT = "D:\DevTools\SlowWalk\scratch"
-pwsh -File .\scripts\verify-windows.ps1
-```
+两个工作流也支持从 GitHub Actions 页面手动触发。任何命令返回非零状态都会让
+对应作业失败，不使用本机工具链结果替代远程日志。
 
 ## 平台验证边界
 
-Windows 可以真实构建和测试 `SlowWalkCore`，并在 Swift 服务端依赖受支持时构建
-`server/`。这不代表 Windows 已验证 SwiftUI、Vision、CoreLocation、AVFoundation、
-SwiftData 或 ActivityKit。
+Windows 只负责编辑源码、Git 管理、静态审查和生成测试。GitHub Ubuntu CI 真实
+构建和测试 `SlowWalkCore` 与 `server/`，但这不代表 Ubuntu 或 Windows 已验证
+SwiftUI、Vision、CoreLocation、AVFoundation、SwiftData 或 ActivityKit。
 
 进入 Mac/Xcode 后仍需：
 
@@ -123,5 +103,5 @@ SwiftData 或 ActivityKit。
 ## 协作
 
 不要直接在 `main` 上开发。从 `develop` 创建 `feature/*`、`fix/*` 或 `docs/*`
-分支；提交前运行可执行的构建和测试，并在 PR 中如实记录无法验证的 Apple 平台
-范围。更多约定见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+分支；推送后等待适用的 GitHub Actions 构建和测试，并在 PR 中如实记录无法验证
+的 Apple 平台范围。更多约定见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。

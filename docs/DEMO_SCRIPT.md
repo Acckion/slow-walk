@@ -12,20 +12,12 @@
 
 ## 准备
 
-1. 使用稳定 Swift 6 环境完成：
-
-   ```powershell
-   pwsh -File .\scripts\verify-windows.ps1
-   ```
-
-2. 启动服务端：
-
-   ```powershell
-   pwsh -File .\scripts\run-server.ps1
-   ```
-
+1. 确认演示提交对应的 `Swift Core` GitHub Actions 运行已经通过，并保留运行链接。
+2. 只有在另一个已验证环境提供真实运行的 Swift 服务端时才演示 HTTP；当前 Windows
+   不调用本机 Swift 或启动服务端。
 3. 准备 `shared/api-examples/risk-assessment-request.json` 和五个 fixtures。
-4. 若服务端因环境无法启动，只展示已经真实通过的核心测试；不要伪造 HTTP 结果。
+4. 若没有真实运行的服务端，只展示 GitHub Actions 日志、源码和 fixtures；不要
+   伪造 HTTP 结果。
 
 ## 流程
 
@@ -83,12 +75,12 @@
 
 ### 7. 平台边界与下一步（30 秒）
 
-说明 Windows 已验证的是跨平台 Swift Package；SwiftUI、Vision、CoreLocation、
-AVFoundation 和 SwiftData 必须进入 Mac/Xcode 后测试。下一阶段是 iOS 集成和真实
-来源治理，不是扩大未经验证的医疗结论。
+说明 GitHub Ubuntu CI 已验证的是跨平台 Swift Package；Windows 只完成静态审查。
+SwiftUI、Vision、CoreLocation、AVFoundation 和 SwiftData 必须进入 Mac/Xcode 后
+测试。下一阶段是 iOS 集成和真实来源治理，不是扩大未经验证的医疗结论。
 
 ## 失败处理
 
-- 服务端不可用：展示命令和真实错误，转为核心测试演示。
+- 服务端不可用：展示远程运行链接和真实错误，转为核心测试演示。
 - fixture 解码失败：停止使用该场景并记录缺陷，不现场修改数据掩盖问题。
 - 网络或 OCR 失败：展示安全降级路径，不使用预制“成功截图”冒充实时结果。

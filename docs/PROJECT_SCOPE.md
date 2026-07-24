@@ -17,7 +17,7 @@ Swift 架构，通过确定性规则给出风险提示和下一步行动，不�
 - Repository、缓存、Clock 与 UUID 接口，以及演示/测试内存实现。
 - Swift/Hummingbird 最小服务端：健康检查和风险评估。
 - iOS 目录、SwiftUI app shell 与平台服务协议边界。
-- XCTest、Windows 验证脚本和 Windows/Linux CI。
+- XCTest 与 GitHub Actions Ubuntu 核心/服务端 CI。
 - 架构、范围、API、开发计划、演示和决策文档。
 
 ## 本阶段不完成
@@ -42,15 +42,18 @@ Swift 架构，通过确定性规则给出风险提示和下一步行动，不�
 ## 验收标准
 
 1. 运行代码全部为 Swift；配置与文档可以使用项目允许的文本格式。
-2. `SlowWalkCore` 在 Windows 上通过 `swift build` 与 `swift test`。
+2. `SlowWalkCore` 在 GitHub Actions 的 Ubuntu Swift 6.3.2 容器中通过
+   `swift build` 与 `swift test`。
 3. 风险引擎不依赖 UI、网络、数据库、服务端框架或大语言模型。
 4. 绿、黄、橙、红四级风险均有具体测试。
 5. 多规则同时命中时取最高等级，并保留稳定排序的全部原因。
 6. API DTO 与五个 fixtures 能成功编解码。
-7. 服务端在受支持环境中通过构建和测试。
+7. 服务端在 GitHub Actions Ubuntu 容器中通过构建和测试，或如实报告依赖及
+   编译失败。
 8. README/架构/API 文档与实际代码一致。
 9. 仓库不包含密钥、个人隐私、构建产物或真实健康数据。
-10. 报告如实区分 Windows 已验证范围和待 Mac/Xcode 验证范围。
+10. 报告如实区分 Windows 静态审查、GitHub Ubuntu 已验证范围和待 Mac/Xcode
+    验证范围。
 
 ## 范围变更原则
 

@@ -5,7 +5,8 @@
 - 先稳定跨平台核心，再接入 HTTP 和 Apple 平台能力。
 - 每个阶段都有可执行验收，不以目录或空文件数量衡量完成度。
 - 医疗安全、来源追溯和证据不足降级行为先于界面美化。
-- Windows 构建结果只覆盖 SwiftPM；iOS 结论必须来自 Mac/Xcode。
+- Windows 只做编辑、Git、静态审查与测试生成；SwiftPM 构建测试由 GitHub
+  Actions Ubuntu 容器执行，iOS 结论必须来自 Mac/Xcode。
 
 ## 阶段 1：基础架构
 
@@ -18,7 +19,7 @@
 
 验收：
 
-- Windows `swift build`、`swift test`。
+- GitHub Actions Ubuntu 容器中的 `swift build`、`swift test`。
 - 无循环依赖、无 Apple 平台 API 泄露到核心。
 
 ## 阶段 2：确定性风险引擎

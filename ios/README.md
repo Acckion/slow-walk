@@ -33,7 +33,7 @@ SlowWalkApp/
   `SlowWalkAPIContracts` 和 `SlowWalkDataInterfaces` 的公开 API。
 - `Services/` 实现 OCR、网络、持久化、语音和定位协议。
 - Feature/View 不直接创建 URLSession、Repository、Clock 或定位对象。
-- 任何 Apple 平台类型都不得加入 `SlowWalkCore` 的 Windows target。
+- 任何 Apple 平台类型都不得加入 `SlowWalkCore` 的跨平台 SwiftPM target。
 - 风险等级由核心引擎或服务端计算，View 只显示结果，不复制规则。
 
 ## Mac/Xcode 集成清单

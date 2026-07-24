@@ -2,9 +2,10 @@
 
 ## 目标
 
-SlowWalk 将可测试的业务核心、HTTP 适配和 Apple 平台能力分开。风险引擎应能在
-Windows 与 Linux 上独立构建和测试；iOS 代码在 Mac/Xcode 中集成；服务端可以
-替换 HTTP 或持久化实现而不改变风险规则。
+SlowWalk 将可测试的业务核心、HTTP 适配和 Apple 平台能力分开。风险引擎和服务端
+在 GitHub Actions Linux 容器中独立构建和测试；Windows 只做编辑、Git 与静态
+审查；iOS 代码在 Mac/Xcode 中集成。服务端可以替换 HTTP 或持久化实现而不改变
+风险规则。
 
 ## 模块依赖
 
@@ -104,7 +105,7 @@ iOS 层负责：
 - 调用 Swift 服务端并显示可解释的风险行动卡。
 
 iOS 可以依赖核心公开模块；核心模块不能反向依赖 iOS。Apple 平台文件只放在
-`ios/`，不加入 Windows SwiftPM target。
+`ios/`，不加入跨平台 SwiftPM target。
 
 ## 数据流
 
@@ -130,11 +131,11 @@ iOS 可以依赖核心公开模块；核心模块不能反向依赖 iOS。Apple 
 
 ## 为什么分离 iOS 与跨平台 Package
 
-Windows 能运行 SwiftPM/XCTest，但不能编译 SwiftUI、Vision 或 CoreLocation。
-若把平台 API 混入 Domain 或 RiskEngine，就无法在 Windows CI 中验证核心，也会
-迫使服务端链接无关框架。分离后：
+GitHub Actions Linux 容器能运行 SwiftPM/XCTest，但不能编译 SwiftUI、Vision
+或 CoreLocation。若把平台 API 混入 Domain 或 RiskEngine，就无法在跨平台 CI
+中验证核心，也会迫使服务端链接无关框架。分离后：
 
-- 核心规则可以在 Windows/Linux 快速测试。
+- 核心规则可以在 GitHub Actions Linux 容器中快速测试。
 - iOS 集成可以在 Mac/Xcode 独立演进。
 - 服务端和客户端共享同一组领域语义与 DTO。
 - 平台权限、生命周期和持久化变化不会污染业务规则。

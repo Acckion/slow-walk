@@ -22,32 +22,18 @@ SlowWalk 是面向银发族出行与用药风险提示的原型。提交代码�
 - 共享 DTO 只放在 `SlowWalkAPIContracts`，不能把 Swift 类型名当作外部协议。
 - 时间、UUID、Repository 和缓存通过初始化器注入；禁止业务全局单例。
 
-## 本地验证
+## 远程验证
 
-在 Windows PowerShell 中运行：
+当前 Windows 工作区只做编辑、Git 管理、静态审查和测试生成，不调用本机 Swift
+工具链。推送 `feature/**` 或 `develop` 后，必须确认以下 GitHub Actions 工作流：
 
-```powershell
-pwsh -File .\scripts\verify-windows.ps1
-```
+- `Swift Core`：在 Ubuntu 官方 Swift 6.3.2 容器中解析、构建并测试
+  `swift-packages/SlowWalkCore`。
+- `Swift Server`：在相同环境中解析、构建并测试 `server`。
 
-或单独验证核心 Package：
-
-```powershell
-swift package --package-path .\swift-packages\SlowWalkCore resolve
-swift build --package-path .\swift-packages\SlowWalkCore
-swift test --package-path .\swift-packages\SlowWalkCore
-```
-
-服务端验证：
-
-```powershell
-swift package --package-path .\server resolve
-swift build --package-path .\server
-swift test --package-path .\server
-```
-
-iOS 源码必须在 Mac/Xcode 中另行验证。Windows 上通过的 SwiftPM 构建不能证明
-SwiftUI、Vision、CoreLocation 或其他 Apple 平台能力可用。
+不得用跳过步骤、忽略退出码或删除失败测试的方式让检查变绿。iOS 源码必须在
+Mac/Xcode 中另行验证；Ubuntu SwiftPM 构建不能证明 SwiftUI、Vision、
+CoreLocation 或其他 Apple 平台能力可用。
 
 ## 测试要求
 
