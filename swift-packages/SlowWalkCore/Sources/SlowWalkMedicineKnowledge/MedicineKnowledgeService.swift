@@ -93,6 +93,26 @@ public struct MedicineKnowledgeService:
                         warnings.append(warning(for: error))
                         continue
                     }
+                    do {
+                        warnings.append(
+                            contentsOf: try policy.validate(
+                                response: response,
+                                from: source,
+                                now: now
+                            )
+                        )
+                    } catch let error as SourcePolicyError {
+                        let knowledgeError = map(
+                            policyError: error,
+                            sourceIdentifier:
+                                source.identifier
+                        )
+                        failures.append(knowledgeError)
+                        warnings.append(
+                            warning(for: knowledgeError)
+                        )
+                        continue
+                    }
                     responses[source.identifier] =
                         cachedResponse
                     usedNotModified = true

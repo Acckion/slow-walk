@@ -268,6 +268,35 @@ final class MedicineKnowledgeServiceTests:
         XCTAssertNil(lookup.entry)
     }
 
+    func testMismatchedValidationMetadataVersionIsRejected()
+        async throws
+    {
+        let source = makeSource(
+            identifier: primaryID,
+            priority: 100,
+            authoritative: true,
+            response: makeResponse(
+                sourceIdentifier: primaryID,
+                version: "primary-v1",
+                metadataVersion: "unexpected-v2"
+            )
+        )
+        let service = try makeService(sources: [source])
+
+        await assertThrows(
+            .sourceVersionUnsupported(
+                sourceIdentifier: primaryID,
+                version: "unexpected-v2"
+            )
+        ) {
+            try await service.search(
+                query: .init(
+                    normalizedQuery: "acetaminophen"
+                )
+            )
+        }
+    }
+
     func testETagRevalidationUses304CachedResponse()
         async throws
     {
@@ -600,7 +629,8 @@ final class MedicineKnowledgeServiceTests:
         activeIngredientIDs: [String] = [
             "acetaminophen",
         ],
-        fetchedAt: Date = serviceTestDate
+        fetchedAt: Date = serviceTestDate,
+        metadataVersion: String? = nil
     ) -> MedicineKnowledgeSourceResponse {
         let reference = SourceReference(
             sourceName: sourceIdentifier,
@@ -642,7 +672,8 @@ final class MedicineKnowledgeServiceTests:
                     etag: #""\#(version)""#,
                     lastModified:
                         "Thu, 24 Jul 2025 00:00:00 GMT",
-                    dataVersion: version
+                    dataVersion:
+                        metadataVersion ?? version
                 )
         )
     }

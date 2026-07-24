@@ -96,6 +96,20 @@ public struct SourcePolicy:
                 version: response.sourceDocumentVersion
             )
         }
+        if let metadataVersion =
+            response.validationMetadata.dataVersion
+        {
+            guard metadataVersion
+                == response.sourceDocumentVersion
+            else {
+                throw SourcePolicyError
+                    .unsupportedDataVersion(
+                        sourceIdentifier:
+                            source.identifier,
+                        version: metadataVersion
+                    )
+            }
+        }
         guard response.validationStatus != .invalid else {
             throw SourcePolicyError.invalidValidationStatus(
                 source.identifier
