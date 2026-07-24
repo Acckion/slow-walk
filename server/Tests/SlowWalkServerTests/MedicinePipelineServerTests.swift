@@ -472,7 +472,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertTrue(
                     error.details?.contains {
-                        $0.field == "userProfile.age"
+                        $0.field == "age"
                             && $0.code == "INVALID_AGE"
                     } == true
                 )
