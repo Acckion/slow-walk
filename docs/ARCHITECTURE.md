@@ -10,24 +10,17 @@ SlowWalk 将可测试的业务核心、HTTP 适配和 Apple 平台能力分开�
 ## 模块依赖
 
 ```text
-                        ┌─────────────────────┐
-                        │   SlowWalkDomain    │
-                        └──────────▲──────────┘
-                                   │
-              ┌────────────────────┼────────────────────┐
-              │                    │                    │
-┌─────────────┴──────────┐ ┌───────┴───────────┐ ┌─────┴────────────────┐
-│ SlowWalkRiskEngine     │ │ SlowWalkAPIContracts│ │ SlowWalkDataInterfaces│
-└─────────────▲──────────┘ └────────▲──────────┘ └──────────▲───────────┘
-              │                     │                       │
-              └─────────────────────┼───────────────────────┘
-                                    │
-                   ┌────────────────┴───────────────┐
-                   │                                │
-           ┌───────┴────────┐              ┌────────┴────────┐
-           │ SlowWalkServer │              │     iOS App     │
-           │ + Hummingbird  │              │ + Apple APIs    │
-           └────────────────┘              └─────────────────┘
+SlowWalkServer
+  ├──→ SlowWalkAPIContracts ──→ SlowWalkDomain
+  └──→ SlowWalkMedicinePipeline
+         ├──→ SlowWalkRiskEngine ──→ SlowWalkDomain
+         ├──→ SlowWalkDataInterfaces ──→ SlowWalkDomain
+         └──→ SlowWalkDomain
+
+iOS App
+  ├──→ SlowWalkAPIContracts
+  ├──→ SlowWalkDomain
+  └──→ Apple platform adapters (outside SlowWalkCore)
 ```
 
 箭头只指向被依赖模块。核心模块之间禁止循环依赖；Server 和 iOS 是外层适配器，
@@ -81,13 +74,26 @@ Apple 平台专属 API。领域值优先使用不可变 struct/enum，并在跨�
 仅依赖 `SlowWalkDomain` 与 Foundation。协议不泄露具体数据库、HTTP 客户端或
 Apple 持久化类型；具体实现由 Server 或 iOS 组合根提供。
 
+### SlowWalkMedicinePipeline
+
+职责：
+
+- 对模拟 OCR 多段文字进行 Unicode、规格、剂型和药厂噪声归一化。
+- 按精确 canonical、精确 alias、归一化名称和保守近似顺序稳定产生候选。
+- 编排带版本和过期语义的解析缓存；缓存命中仍重验本次置信度。
+- 只在药品可靠解析后调用 `MedicationRiskEngine`，并生成结构化 `ActionCard`。
+
+依赖 `SlowWalkDomain`、`SlowWalkDataInterfaces` 和 `SlowWalkRiskEngine`。它不依赖
+API DTO、Hummingbird、UI、Vision 或其他 Apple 平台框架。
+
 ## 外层适配器
 
 ### SlowWalkServer
 
 服务端负责：
 
-- `GET /health` 和 `POST /api/v1/risk/assess` 路由。
+- `GET /health`、`POST /api/v1/risk/assess`、`POST
+  /api/v1/medicine/resolve` 和 `POST /api/v1/medicine/assess` 路由。
 - JSON 解码、必要字段验证、DTO/领域映射和统一错误。
 - 注入风险引擎、Repository、Clock、UUID 和演示配置。
 - request ID、基础结构化日志、Content-Type 和 HTTP 状态码。

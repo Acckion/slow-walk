@@ -57,6 +57,70 @@
 
 完整请求与响应示例位于 `shared/api-examples/`。
 
+## 药品解析
+
+### `POST /api/v1/medicine/resolve`
+
+请求体为 `MedicineResolutionRequestDTO`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `input` | `MedicineRecognitionInput` | 是 | 模拟 OCR 文字和证据 |
+| `requestID` | UUID | 是 | 客户端关联 ID |
+| `apiVersion` | String | 是 | 固定为 `v1` |
+
+`MedicineRecognitionInput`：
+
+| 字段 | 类型 | 必填 |
+| --- | --- | --- |
+| `recognizedTexts` | `[String]` | 是 |
+| `capturedAt` | Date | 是 |
+| `languageCode` | String | 否 |
+| `rawConfidence` | Number, 0...1 | 否 |
+
+只有唯一、达到自动确认阈值且识别置信度充足时返回 `200` 和
+`MedicineResolutionResponseDTO`。响应包含 `resolution`、`cacheHit`、
+`cacheStatus`、`sourceDataVersion`、`generatedAt`、`requestID` 和
+`apiVersion`。
+
+`resolution.status` 的稳定值为 `resolved`、`ambiguous`、
+`insufficient_evidence`、`not_found`、`recognition_failed`。歧义、未找到、
+识别失败和证据不足由此端点映射为结构化 HTTP 错误；候选解析本身仍保留在核心
+模型中供完整管线使用。
+
+## 药品解析与风险行动卡
+
+### `POST /api/v1/medicine/assess`
+
+请求体为 `MedicineAssessmentRequestDTO`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `input` | `MedicineRecognitionInput` | 是 | 模拟 OCR 输入 |
+| `userProfile` | `UserHealthProfile` | 是 | 本次使用的当前档案 |
+| `recentRecords` | `[MedicationRecord]` | 是 | 本次使用的近期记录 |
+| `requestID` | UUID | 是 | 客户端关联 ID |
+| `apiVersion` | String | 是 | 固定为 `v1` |
+
+响应为 `MedicineAssessmentResponseDTO`，包含：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `resolution` | `MedicineResolution` | 是 | 解析状态、候选和证据 |
+| `assessment` | `RiskAssessment` | 否 | 仅可靠解析后存在 |
+| `actionCard` | `ActionCard` | 是 | 所有解析状态均存在 |
+| `cacheHit` | Boolean | 是 | 只表示技术缓存命中 |
+| `cacheStatus` | String enum | 是 | hit/miss/expired/source_version_changed |
+| `sourceDataVersion` | String | 是 | 服务端演示目录版本 |
+| `generatedAt` | Date | 是 | 服务端生成时间 |
+| `requestID` | UUID | 是 | 与请求一致 |
+| `apiVersion` | String | 是 | 固定为 `v1` |
+
+无法确认药品不是传输错误：此端点返回 `200` 和保守 `ActionCard`，其
+`mustConfirmMedicine` 为 true，且必须要求重拍药盒正面和确认前不要服用。
+`assessment` 此时为空，不输出剂量或频次。缓存命中后仍使用当前档案、近期记录和
+本次识别置信度重新运行安全判断。
+
 ## 领域对象
 
 ### Medicine
@@ -71,9 +135,12 @@
 | `sourceReferences` | `[SourceReference]` | 是 |
 | `dosageTextFromSource` | String | 否 |
 | `contraindicationTags` | `[String]` | 是 |
+| `warnings` | `[String]` | 是 |
+| `dataVersion` | String | 是 |
 
 `medicineCategory` 可选值：`analgesic`、`antipyretic`、`cold_and_flu`、
-`antihistamine`、`other`。
+`antihistamine`、`antihypertensive`、`antidiabetic`、`gastrointestinal`、
+`other`。
 
 `dosageTextFromSource` 只能转录经过验证的来源文本，风险引擎不得自行生成或修改。
 
@@ -219,6 +286,10 @@
 | 400 | `unsupported_media_type` | Content-Type 缺失或不是 JSON |
 | 400 | `unsupported_api_version` | `apiVersion` 不是 `v1` |
 | 422 | `validation_error` | 字段缺失、类型、枚举或范围无效 |
+| 404 | `medicine_not_found` | 解析目录中没有可靠候选 |
+| 409 | `medicine_ambiguous` | 多个候选过于接近，禁止自动选择 |
+| 422 | `medicine_recognition_failed` | 没有可用识别文字 |
+| 422 | `medicine_insufficient_evidence` | 置信度或匹配分数不足 |
 | 500 | `internal_error` | 未预期服务端错误 |
 
 错误响应也必须带 `application/json`。如果无法从请求读取合法 ID，服务端生成新的

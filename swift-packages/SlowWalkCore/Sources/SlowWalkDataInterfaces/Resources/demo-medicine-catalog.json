@@ -1,0 +1,248 @@
+{
+  "schemaVersion": 1,
+  "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "sourceDataVersion": "slowwalk-demo-catalog-v1",
+  "medicines": [
+    {
+      "id": "demo-acetaminophen",
+      "canonicalName": "Acetaminophen",
+      "aliases": ["Paracetamol", "对乙酰氨基酚"],
+      "activeIngredientIDs": ["acetaminophen"],
+      "medicineCategory": "antipyretic",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-ibuprofen",
+      "canonicalName": "Ibuprofen",
+      "aliases": ["布洛芬"],
+      "activeIngredientIDs": ["ibuprofen"],
+      "medicineCategory": "analgesic",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-dextromethorphan",
+      "canonicalName": "Dextromethorphan",
+      "aliases": ["右美沙芬", "Cold Relief"],
+      "activeIngredientIDs": ["dextromethorphan"],
+      "medicineCategory": "cold_and_flu",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-chlorpheniramine",
+      "canonicalName": "Chlorpheniramine",
+      "aliases": ["Chlorphenamine", "氯苯那敏", "扑尔敏", "Cold Relief"],
+      "activeIngredientIDs": ["chlorpheniramine"],
+      "medicineCategory": "cold_and_flu",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-amlodipine",
+      "canonicalName": "Amlodipine",
+      "aliases": ["氨氯地平"],
+      "activeIngredientIDs": ["amlodipine"],
+      "medicineCategory": "antihypertensive",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-losartan",
+      "canonicalName": "Losartan",
+      "aliases": ["氯沙坦"],
+      "activeIngredientIDs": ["losartan"],
+      "medicineCategory": "antihypertensive",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-metformin",
+      "canonicalName": "Metformin",
+      "aliases": ["二甲双胍"],
+      "activeIngredientIDs": ["metformin"],
+      "medicineCategory": "antidiabetic",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-gliclazide",
+      "canonicalName": "Gliclazide",
+      "aliases": ["格列齐特"],
+      "activeIngredientIDs": ["gliclazide"],
+      "medicineCategory": "antidiabetic",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-cetirizine",
+      "canonicalName": "Cetirizine",
+      "aliases": ["西替利嗪"],
+      "activeIngredientIDs": ["cetirizine"],
+      "medicineCategory": "antihistamine",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-loratadine",
+      "canonicalName": "Loratadine",
+      "aliases": ["氯雷他定"],
+      "activeIngredientIDs": ["loratadine"],
+      "medicineCategory": "antihistamine",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-omeprazole",
+      "canonicalName": "Omeprazole",
+      "aliases": ["奥美拉唑"],
+      "activeIngredientIDs": ["omeprazole"],
+      "medicineCategory": "gastrointestinal",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    },
+    {
+      "id": "demo-famotidine",
+      "canonicalName": "Famotidine",
+      "aliases": ["法莫替丁"],
+      "activeIngredientIDs": ["famotidine"],
+      "medicineCategory": "gastrointestinal",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "dosageTextFromSource": null,
+      "contraindicationTags": [],
+      "warnings": ["DEMO DATA — NOT FOR CLINICAL USE"],
+      "dataVersion": "slowwalk-demo-catalog-v1"
+    }
+  ]
+}

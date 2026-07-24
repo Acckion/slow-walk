@@ -12,7 +12,7 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
 
     func testHealthReturnsContractJSON() async throws {
         let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
-        let application = makeTestApplication(fallbackID: fallbackID)
+        let application = try makeTestApplication(fallbackID: fallbackID)
 
         try await application.test(.router) { client in
             try await client.execute(
@@ -44,7 +44,7 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
         let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
         let request = try makeValidRequest()
         let body = try encode(request)
-        let application = makeTestApplication(fallbackID: fallbackID)
+        let application = try makeTestApplication(fallbackID: fallbackID)
 
         try await application.test(.router) { client in
             try await client.execute(
@@ -89,7 +89,7 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
 
     func testMalformedJSONReturnsTypedError() async throws {
         let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
-        let application = makeTestApplication(fallbackID: fallbackID)
+        let application = try makeTestApplication(fallbackID: fallbackID)
 
         try await application.test(.router) { client in
             try await client.execute(
@@ -114,7 +114,7 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
         let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
         let validRequest = try makeValidRequest()
         let request = RequestWithoutAPIVersion(validRequest)
-        let application = makeTestApplication(fallbackID: fallbackID)
+        let application = try makeTestApplication(fallbackID: fallbackID)
 
         try await application.test(.router) { client in
             try await client.execute(
@@ -142,7 +142,7 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
     func testSemanticValidationReturnsFieldDetails() async throws {
         let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
         let invalidRequest = try makeRequest(age: 0)
-        let application = makeTestApplication(fallbackID: fallbackID)
+        let application = try makeTestApplication(fallbackID: fallbackID)
 
         try await application.test(.router) { client in
             try await client.execute(
@@ -170,8 +170,8 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
 
     private func makeTestApplication(
         fallbackID: UUID
-    ) -> some ApplicationProtocol {
-        makeSlowWalkApplication(
+    ) throws -> some ApplicationProtocol {
+        try makeSlowWalkApplication(
             configuration: .init(port: 0),
             dateProvider: FixedDateProvider(fixedDate: now),
             uuidProvider: FixedUUIDProvider(fixedUUID: fallbackID)

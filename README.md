@@ -12,8 +12,9 @@
 - 纯 Swift 领域模型与四级风险体系：绿、黄、橙、红。
 - 确定性用药风险引擎，保留每条命中原因、证据与建议动作。
 - 客户端与服务端共享的 API v1 DTO 和 JSON fixtures。
-- 可替换的 Repository、缓存、Clock 与 UUID 接口及内存实现。
-- Swift 服务端最小健康检查和风险评估接口。
+- 模拟 OCR 文字归一化、保守候选解析和结构化 `ActionCard` 管线。
+- 12 条无剂量演示药品目录，以及带版本/过期语义的 actor 解析缓存。
+- Swift 服务端健康检查、药品解析和完整风险评估接口。
 - iOS 源码边界与平台服务协议骨架。
 - GitHub Actions 中的 Ubuntu Swift 核心与服务端 CI。
 
@@ -41,7 +42,7 @@ Package 分离，服务端框架也不能进入领域层或风险引擎。
 
 ## 项目结构
 
-- `swift-packages/SlowWalkCore/`：领域、风险引擎、API 合同与数据接口。
+- `swift-packages/SlowWalkCore/`：领域、风险引擎、API 合同、数据接口与药品管线。
 - `server/`：Hummingbird Swift 服务端及演示数据适配。
 - `ios/`：SwiftUI 客户端和 Apple 平台服务边界。
 - `shared/fixtures/`：可由测试读取的跨场景 JSON fixtures。
@@ -51,7 +52,8 @@ Package 分离，服务端框架也不能进入领域层或风险引擎。
 - `.github/workflows/`：核心和服务端持续集成。
 
 详细依赖方向见 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)，API 字段定义见
-[`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)。
+[`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)，药品 MVP 的安全设计见
+[`docs/MEDICINE_PIPELINE.md`](docs/MEDICINE_PIPELINE.md)。
 
 ## 构建与测试
 
