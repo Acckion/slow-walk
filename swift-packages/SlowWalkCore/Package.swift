@@ -78,7 +78,8 @@ let package = Package(
                 "SlowWalkDomain",
                 "SlowWalkDataInterfaces",
                 "SlowWalkMedicineKnowledge",
-            ]
+            ],
+            resources: [.process("Fixtures")]
         ),
         .testTarget(
             name: "SlowWalkMedicinePipelineTests",

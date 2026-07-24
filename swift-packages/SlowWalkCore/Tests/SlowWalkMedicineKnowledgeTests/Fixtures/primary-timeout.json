@@ -1,0 +1,8 @@
+{
+  "scenario": "primary_source_timeout",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "expectedSourceStatus": "partial",
+  "expectedCacheStatus": "miss",
+  "expectedErrorCode": "KNOWLEDGE_SOURCE_TIMEOUT",
+  "sourceDataVersion": "demo-timeout-v1"
+}

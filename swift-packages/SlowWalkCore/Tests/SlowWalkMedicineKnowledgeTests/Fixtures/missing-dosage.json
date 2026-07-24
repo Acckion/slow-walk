@@ -1,0 +1,8 @@
+{
+  "scenario": "missing_source_dosage",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "httpStatus": 200,
+  "expectedSourceStatus": "authoritative",
+  "expectedCacheStatus": "miss",
+  "sourceDataVersion": "demo-missing-dosage-v1"
+}
