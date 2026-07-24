@@ -3,6 +3,8 @@ import Foundation
 /// Kind of user medication-history event.
 public enum MedicationEventType: String, Codable, Sendable, CaseIterable, Hashable {
     case scanned
+    case confirmedIntake = "confirmed_intake"
+    /// Legacy API v1 value retained for backward compatibility.
     case taken
     case reported
 }

@@ -44,7 +44,8 @@ func makePipelineProfile(
             systolicBloodPressure: 120,
             diastolicBloodPressure: 75,
             heartRate: 68,
-            measuredAt: pipelineTestDate.addingTimeInterval(-60)
+            measuredAt: pipelineTestDate.addingTimeInterval(-60),
+            source: "demo_data"
         ),
         updatedAt: pipelineTestDate.addingTimeInterval(-60)
     )

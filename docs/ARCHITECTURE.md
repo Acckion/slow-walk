@@ -35,6 +35,7 @@ iOS App
 - `RiskLevel`、`RiskReason`、`RiskAssessment` 等风险语义。
 - `UserHealthProfile`、`BodyMetrics`、`Medicine`、`MedicationRecord`。
 - `MedicineScanEvent` 与 `SourceReference`。
+- 档案规范化、身体指标数据质量结果和共享 `Clock` 边界。
 
 允许依赖 Foundation，不允许依赖其他项目模块、UI、网络、数据库、服务端框架或
 Apple 平台专属 API。领域值优先使用不可变 struct/enum，并在跨任务传递时满足
@@ -48,6 +49,8 @@ Apple 平台专属 API。领域值优先使用不可变 struct/enum，并在跨�
 - 执行过敏、重复成分、频繁使用、持续使用、证据不足、识别失败和身体指标数据
   质量规则。
 - 合并最高风险、稳定排序原因并去重建议动作。
+- `MedicationHistoryAnalyzer` 和 `MedicationRiskContextBuilder`，在进入规则引擎
+  前统一完成历史去重、时区边界计算和健康上下文验证。
 
 仅依赖 `SlowWalkDomain` 与 Foundation。规则阈值、时间和 UUID 等外部变化通过
 配置或接口注入，不允许网络、数据库、UI、Hummingbird、Vision 或随机判断。
@@ -70,6 +73,8 @@ Apple 平台专属 API。领域值优先使用不可变 struct/enum，并在跨�
 - Medicine、用户档案、用药历史和缓存协议。
 - 药品搜索、Clock/Date 和 UUID 抽象。
 - 演示及测试使用的线程安全内存实现。
+- actor 隔离的跨平台 JSON 文件 Repository；基础目录由组合根注入，写入使用
+  临时文件与原子替换，不依赖 SwiftData、CoreData 或 SQLite。
 
 仅依赖 `SlowWalkDomain` 与 Foundation。协议不泄露具体数据库、HTTP 客户端或
 Apple 持久化类型；具体实现由 Server 或 iOS 组合根提供。
@@ -82,6 +87,8 @@ Apple 持久化类型；具体实现由 Server 或 iOS 组合根提供。
 - 按精确 canonical、精确 alias、归一化名称和保守近似顺序稳定产生候选。
 - 编排带版本和过期语义的解析缓存；缓存命中仍重验本次置信度。
 - 只在药品可靠解析后调用 `MedicationRiskEngine`，并生成结构化 `ActionCard`。
+- 每次 assessment（包括解析缓存命中）都使用当前档案、当前历史和当前身体指标
+  重新执行 preflight 与 `MedicationRiskContext` 构造。
 
 依赖 `SlowWalkDomain`、`SlowWalkDataInterfaces` 和 `SlowWalkRiskEngine`。它不依赖
 API DTO、Hummingbird、UI、Vision 或其他 Apple 平台框架。

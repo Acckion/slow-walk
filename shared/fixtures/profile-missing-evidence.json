@@ -1,0 +1,12 @@
+{
+  "demoNotice": "DEMO DATA — NOT FOR CLINICAL USE",
+  "id": "10000000-0000-0000-0000-000000000002",
+  "age": 68,
+  "allergies": [],
+  "diagnosedConditions": [],
+  "currentMedicineIngredientIDs": [],
+  "bodyMetrics": null,
+  "createdAt": "2025-07-20T00:00:00Z",
+  "updatedAt": "2025-07-23T23:55:00Z",
+  "schemaVersion": 1
+}

@@ -468,12 +468,12 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "validation_error")
+                XCTAssertEqual(error.code, "INVALID_USER_PROFILE")
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertTrue(
                     error.details?.contains {
-                        $0.field == "userProfile.age"
-                            && $0.code == "out_of_range"
+                        $0.field == "age"
+                            && $0.code == "INVALID_AGE"
                     } == true
                 )
             }
@@ -622,7 +622,8 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                 systolicBloodPressure: 120,
                 diastolicBloodPressure: 80,
                 heartRate: 70,
-                measuredAt: now.addingTimeInterval(-300)
+                measuredAt: now.addingTimeInterval(-300),
+                source: "demo_data"
             ),
             updatedAt: now.addingTimeInterval(-300)
         )

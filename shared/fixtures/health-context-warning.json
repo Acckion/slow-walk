@@ -1,0 +1,32 @@
+{
+  "demoNotice": "DEMO DATA — NOT FOR CLINICAL USE",
+  "input": {
+    "recognizedTexts": [
+      "Acetaminophen"
+    ],
+    "capturedAt": "2025-07-23T23:59:00Z",
+    "languageCode": "en",
+    "rawConfidence": 0.98
+  },
+  "userProfile": {
+    "id": "50000000-0000-0000-0000-000000000001",
+    "age": 72,
+    "allergies": [],
+    "diagnosedConditions": [],
+    "currentMedicineIngredientIDs": [],
+    "bodyMetrics": {
+      "systolicBloodPressure": 120,
+      "diastolicBloodPressure": 80,
+      "heartRate": 70,
+      "measuredAt": "2025-05-01T08:00:00Z",
+      "source": "demo_data",
+      "deviceIdentifier": "synthetic-device-04"
+    },
+    "createdAt": "2025-05-01T08:00:00Z",
+    "updatedAt": "2025-07-23T23:55:00Z",
+    "schemaVersion": 1
+  },
+  "recentRecords": [],
+  "requestID": "50000000-0000-0000-0000-000000000010",
+  "apiVersion": "v1"
+}

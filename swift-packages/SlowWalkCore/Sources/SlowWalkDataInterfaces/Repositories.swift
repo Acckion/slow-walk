@@ -10,17 +10,23 @@ public protocol MedicineRepository: Sendable {
 
 /// Read/write boundary for user health profiles.
 public protocol UserHealthProfileRepository: Sendable {
-    func profile(id: UUID) async throws -> UserHealthProfile?
-    func allProfiles() async throws -> [UserHealthProfile]
+    func fetch(id: UUID) async throws -> UserHealthProfile?
+    func fetchAll() async throws -> [UserHealthProfile]
     func save(_ profile: UserHealthProfile) async throws
+    func update(_ profile: UserHealthProfile) async throws
+    func delete(id: UUID) async throws
 }
 
 /// Read/write boundary for medication history.
 public protocol MedicationHistoryRepository: Sendable {
-    func record(id: UUID) async throws -> MedicationRecord?
-    func records(from startDate: Date?, through endDate: Date?) async throws
+    func fetch(id: UUID) async throws -> MedicationRecord?
+    func fetchAll() async throws -> [MedicationRecord]
+    func fetch(within interval: DateInterval) async throws
         -> [MedicationRecord]
-    func save(_ record: MedicationRecord) async throws
+    func append(_ record: MedicationRecord) async throws
+    func delete(id: UUID) async throws
+    @discardableResult
+    func removeDuplicates() async throws -> Int
 }
 
 /// Cache boundary kept separate from the source-of-truth repository.
@@ -63,4 +69,55 @@ public enum DataInterfaceError: Error, Sendable, Equatable {
     case invalidDateRange(start: Date, end: Date)
     case invalidNormalizedQuery
     case invalidSourceDataVersion
+    case profileNotFound(id: UUID)
+    case medicationRecordNotFound(id: UUID)
+}
+
+public extension UserHealthProfileRepository {
+    func profile(id: UUID) async throws -> UserHealthProfile? {
+        try await fetch(id: id)
+    }
+
+    func allProfiles() async throws -> [UserHealthProfile] {
+        try await fetchAll()
+    }
+}
+
+public extension MedicationHistoryRepository {
+    func record(id: UUID) async throws -> MedicationRecord? {
+        try await fetch(id: id)
+    }
+
+    func records(
+        from startDate: Date?,
+        through endDate: Date?
+    ) async throws -> [MedicationRecord] {
+        if let startDate, let endDate {
+            guard startDate <= endDate else {
+                throw DataInterfaceError.invalidDateRange(
+                    start: startDate,
+                    end: endDate
+                )
+            }
+            return try await fetch(
+                within: DateInterval(
+                    start: startDate,
+                    end: endDate
+                )
+            )
+        }
+        return try await fetchAll().filter { record in
+            let afterStart = startDate.map {
+                record.recordedAt >= $0
+            } ?? true
+            let beforeEnd = endDate.map {
+                record.recordedAt <= $0
+            } ?? true
+            return afterStart && beforeEnd
+        }
+    }
+
+    func save(_ record: MedicationRecord) async throws {
+        try await append(record)
+    }
 }

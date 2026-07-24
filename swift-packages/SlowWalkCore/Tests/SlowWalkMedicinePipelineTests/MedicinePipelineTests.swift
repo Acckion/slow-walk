@@ -1,3 +1,4 @@
+import Foundation
 import SlowWalkDataInterfaces
 import SlowWalkDomain
 import SlowWalkMedicinePipeline
@@ -93,6 +94,45 @@ final class MedicinePipelineTests: XCTestCase {
         XCTAssertEqual(second.cacheStatus, .hit)
         XCTAssertEqual(second.assessment?.level, .red)
         XCTAssertEqual(second.actionCard.riskLevel, .red)
+    }
+
+    func testCacheHitRebuildsContextFromCurrentHistory() async throws {
+        let cache = InMemoryMedicineCache()
+        let pipeline = makePipeline(cache: cache)
+        let input = makeRecognitionInput(["Acetaminophen"])
+        let record = MedicationRecord(
+            id: UUID(
+                uuid: (
+                    0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 43
+                )
+            ),
+            medicineID: "another-acetaminophen-product",
+            activeIngredientIDs: ["acetaminophen"],
+            recordedAt: pipelineTestDate.addingTimeInterval(-60),
+            eventType: .confirmedIntake,
+            source: .demoData
+        )
+
+        let first = try await pipeline.assess(
+            input: input,
+            userProfile: makePipelineProfile(),
+            recentRecords: []
+        )
+        let second = try await pipeline.assess(
+            input: input,
+            userProfile: makePipelineProfile(),
+            recentRecords: [record]
+        )
+
+        XCTAssertEqual(first.assessment?.level, .green)
+        XCTAssertEqual(second.cacheStatus, .hit)
+        XCTAssertEqual(second.assessment?.level, .red)
+        XCTAssertTrue(
+            second.assessment?.reasons.map(\.code).contains(
+                .duplicateActiveIngredient
+            ) == true
+        )
     }
 
     func testResolvedAssessmentUsesInjectedDateAndUUID() async throws {

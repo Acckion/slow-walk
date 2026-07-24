@@ -13,6 +13,7 @@ public struct MedicationRiskEngine: RiskAssessing, Sendable {
             MissingEvidenceRule(configuration: configuration),
             RecognitionFailureRule(),
             BodyMetricsDataQualityRule(configuration: configuration),
+            HealthContextValidationRule(),
         ]
     }
 
