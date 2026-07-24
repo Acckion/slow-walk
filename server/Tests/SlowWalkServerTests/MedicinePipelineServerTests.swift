@@ -45,7 +45,15 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                 XCTAssertFalse(output.cacheHit)
                 XCTAssertEqual(
                     output.sourceDataVersion,
-                    "slowwalk-demo-catalog-v1"
+                    "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
+                )
+                XCTAssertEqual(
+                    output.medicineKnowledge?.sourceStatus,
+                    .corroborated
+                )
+                XCTAssertEqual(
+                    output.medicineKnowledge?.cacheStatus,
+                    .miss
                 )
                 XCTAssertEqual(output.generatedAt, self.now)
                 XCTAssertEqual(output.apiVersion, SlowWalkAPI.version)

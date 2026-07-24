@@ -223,13 +223,28 @@ public struct MedicinePipeline: Sendable {
         }
 
         if let knowledgeSearcher {
-            let knowledgeResult = try await knowledgeSearcher
-                .search(
+            let knowledgeResult: MedicineKnowledgeSearchResult
+            do {
+                knowledgeResult = try await knowledgeSearcher.search(
                     query: MedicineKnowledgeQuery(
                         normalizedQuery:
                             normalizedName.normalizedQuery
                     )
                 )
+            } catch MedicineKnowledgeError.medicineNotFound {
+                let resolution = resolver.resolve(
+                    input: input,
+                    normalizedName: normalizedName,
+                    medicines: []
+                )
+                return MedicinePipelineResolutionResult(
+                    resolution: resolution,
+                    cacheStatus: .miss,
+                    sourceDataVersion: "unavailable",
+                    generatedAt: generatedAt,
+                    cacheHit: false
+                )
+            }
             let resolution = resolver.resolve(
                 input: input,
                 normalizedName: normalizedName,
