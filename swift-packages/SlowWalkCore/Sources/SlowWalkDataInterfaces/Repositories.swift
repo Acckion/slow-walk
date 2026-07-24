@@ -29,6 +29,28 @@ public protocol MedicineCache: Sendable {
     func store(_ medicine: Medicine) async throws
     func removeMedicine(id: String) async throws
     func removeAll() async throws
+
+    /// Looks up a name-resolution result for the current source-data version.
+    ///
+    /// A `.hit` reuses only medicine-name resolution. Callers must still build
+    /// a fresh risk context and run the risk engine for every request.
+    func cachedResolution(
+        normalizedQuery: String,
+        sourceDataVersion: String,
+        now: Date
+    ) async throws -> MedicineResolutionCacheLookup
+
+    /// Stores a resolution using the cache actor's configured TTL policy.
+    ///
+    /// `normalizedQuery` must represent every normalized OCR query variant
+    /// that contributed to the resolution. The actor computes `expiresAt`
+    /// from `now` and its policy.
+    func storeResolution(
+        _ resolution: MedicineResolution,
+        normalizedQuery: String,
+        sourceDataVersion: String,
+        now: Date
+    ) async throws
 }
 
 /// Search boundary for canonical medicine data.
@@ -39,4 +61,6 @@ public protocol MedicineSearching: Sendable {
 /// Typed repository failures with actionable context.
 public enum DataInterfaceError: Error, Sendable, Equatable {
     case invalidDateRange(start: Date, end: Date)
+    case invalidNormalizedQuery
+    case invalidSourceDataVersion
 }
