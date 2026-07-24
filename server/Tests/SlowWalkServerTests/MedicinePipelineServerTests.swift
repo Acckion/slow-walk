@@ -255,7 +255,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "INVALID_USER_PROFILE")
+                XCTAssertEqual(error.code, "validation_error")
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertTrue(
                     error.details?.contains {
@@ -468,7 +468,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "validation_error")
+                XCTAssertEqual(error.code, "INVALID_USER_PROFILE")
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertTrue(
                     error.details?.contains {
