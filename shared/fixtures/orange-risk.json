@@ -1,0 +1,124 @@
+{
+  "request": {
+    "medicine": {
+      "id": "demo-cold-relief",
+      "canonicalName": "Demo Cold Relief",
+      "aliases": [
+        "Demo Cold Tablets"
+      ],
+      "activeIngredientIDs": [
+        "demo-cold-ingredient"
+      ],
+      "medicineCategory": "cold_and_flu",
+      "sourceReferences": [
+        {
+          "sourceName": "SlowWalk Demo Reference",
+          "documentTitle": "Verified Demo Cold Relief Leaflet",
+          "optionalURL": "https://example.invalid/slowwalk/demo/cold-relief",
+          "retrievedAt": "2026-01-10T00:00:00.000Z",
+          "versionOrDate": "demo-2026-01-10"
+        }
+      ],
+      "contraindicationTags": []
+    },
+    "userProfile": {
+      "id": "20000000-0000-4000-8000-000000000003",
+      "age": 68,
+      "allergies": [],
+      "diagnosedConditions": [],
+      "currentMedicineIngredientIDs": [],
+      "bodyMetrics": {
+        "systolicBloodPressure": 122,
+        "diastolicBloodPressure": 76,
+        "heartRate": 72,
+        "measuredAt": "2026-01-15T08:00:00.000Z"
+      },
+      "updatedAt": "2026-01-15T08:00:00.000Z"
+    },
+    "recentRecords": [
+      {
+        "id": "40000000-0000-4000-8000-000000000031",
+        "medicineID": "demo-cold-relief",
+        "activeIngredientIDs": [
+          "demo-cold-ingredient"
+        ],
+        "recordedAt": "2026-01-10T09:00:00.000Z",
+        "eventType": "taken",
+        "source": "demo_data"
+      },
+      {
+        "id": "40000000-0000-4000-8000-000000000032",
+        "medicineID": "demo-cold-relief",
+        "activeIngredientIDs": [
+          "demo-cold-ingredient"
+        ],
+        "recordedAt": "2026-01-12T09:00:00.000Z",
+        "eventType": "taken",
+        "source": "demo_data"
+      },
+      {
+        "id": "40000000-0000-4000-8000-000000000033",
+        "medicineID": "demo-cold-relief",
+        "activeIngredientIDs": [
+          "demo-cold-ingredient"
+        ],
+        "recordedAt": "2026-01-14T09:00:00.000Z",
+        "eventType": "taken",
+        "source": "demo_data"
+      },
+      {
+        "id": "40000000-0000-4000-8000-000000000034",
+        "medicineID": "demo-cold-relief",
+        "activeIngredientIDs": [
+          "demo-cold-ingredient"
+        ],
+        "recordedAt": "2026-01-15T08:30:00.000Z",
+        "eventType": "taken",
+        "source": "demo_data"
+      }
+    ],
+    "scanEvent": {
+      "id": "30000000-0000-4000-8000-000000000003",
+      "recognizedText": "Demo Cold Relief",
+      "candidateMedicineID": "demo-cold-relief",
+      "confidence": 0.97,
+      "scannedAt": "2026-01-15T10:00:00.000Z",
+      "recognitionStatus": "recognized"
+    },
+    "requestID": "10000000-0000-4000-8000-000000000003",
+    "apiVersion": "v1"
+  },
+  "expectedResponse": {
+    "requestID": "10000000-0000-4000-8000-000000000003",
+    "assessment": {
+      "level": "orange",
+      "reasons": [
+        {
+          "code": "frequent_use",
+          "message": "近期记录达到演示频率阈值，请核对用药历史。",
+          "evidence": "4 matching records in the configured 7-day window",
+          "ruleIdentifier": "frequent-use"
+        }
+      ],
+      "recommendedActions": [
+        "consult_healthcare_professional",
+        "review_medication_history"
+      ],
+      "assessedAt": "2026-01-15T10:00:00.000Z",
+      "requiresProfessionalAdvice": true,
+      "requiresFamilyAttention": false,
+      "evidenceCompleteness": "complete"
+    },
+    "sourceReferences": [
+      {
+        "sourceName": "SlowWalk Demo Reference",
+        "documentTitle": "Verified Demo Cold Relief Leaflet",
+        "optionalURL": "https://example.invalid/slowwalk/demo/cold-relief",
+        "retrievedAt": "2026-01-10T00:00:00.000Z",
+        "versionOrDate": "demo-2026-01-10"
+      }
+    ],
+    "generatedAt": "2026-01-15T10:00:01.000Z",
+    "apiVersion": "v1"
+  }
+}
