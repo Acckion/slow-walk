@@ -3,9 +3,12 @@ name: Swift Server
 on:
   push:
     branches:
-      - main
       - develop
+      - "feature/**"
   pull_request:
+    branches:
+      - develop
+      - main
   workflow_dispatch:
 
 permissions:
@@ -18,10 +21,9 @@ concurrency:
 jobs:
   test:
     name: Ubuntu Hummingbird
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
-    container:
-      image: swift:6.3.3-noble
+    container: swift:6.3.2-jammy
 
     steps:
       - name: Check out repository
@@ -31,10 +33,13 @@ jobs:
         run: swift --version
 
       - name: Resolve dependencies
-        run: swift package --package-path server resolve
+        working-directory: server
+        run: swift package resolve
 
       - name: Build server
-        run: swift build --package-path server
+        working-directory: server
+        run: swift build
 
       - name: Test server
-        run: swift test --package-path server
+        working-directory: server
+        run: swift test
