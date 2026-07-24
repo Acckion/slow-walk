@@ -9,7 +9,9 @@ public struct ActionCardFactory: Sendable {
         resolution: MedicineResolution,
         assessment: RiskAssessment?,
         generatedAt: Date,
-        healthContextWarnings: [HealthContextValidationIssue] = []
+        healthContextWarnings: [HealthContextValidationIssue] = [],
+        knowledgeWarnings: [String] = [],
+        requiresKnowledgeConfirmation: Bool = false
     ) -> ActionCard {
         guard resolution.status == .resolved,
               let medicine = resolution.selectedMedicine,
@@ -39,6 +41,14 @@ public struct ActionCardFactory: Sendable {
             actions.append(.reviewMedicineSources)
             actions.append(.consultHealthcareProfessional)
         }
+        if requiresKnowledgeConfirmation {
+            actions.removeAll {
+                $0 == .followVerifiedSourceInformation
+            }
+            actions.append(.reviewMedicineSources)
+            actions.append(.consultHealthcareProfessional)
+            actions.append(.doNotTakeUntilMedicineConfirmed)
+        }
 
         return ActionCard(
             title: medicine.canonicalName,
@@ -48,12 +58,14 @@ public struct ActionCardFactory: Sendable {
             warnings: unique(
                 medicine.warnings
                     + healthContextWarnings.map(\.message)
+                    + knowledgeWarnings
                     + assessment.reasons.map(\.message)
             ),
             recommendedActions: stableActions(actions),
             riskLevel: effectiveLevel,
             sourceReferences: medicine.sourceReferences,
-            mustConfirmMedicine: false,
+            mustConfirmMedicine:
+                requiresKnowledgeConfirmation,
             generatedAt: generatedAt
         )
     }

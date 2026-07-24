@@ -26,7 +26,10 @@ let package = Package(
         ),
         .target(
             name: "SlowWalkAPIContracts",
-            dependencies: ["SlowWalkDomain"]
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkMedicineKnowledge",
+            ]
         ),
         .target(
             name: "SlowWalkDataInterfaces",
@@ -59,7 +62,11 @@ let package = Package(
         ),
         .testTarget(
             name: "SlowWalkAPIContractsTests",
-            dependencies: ["SlowWalkDomain", "SlowWalkAPIContracts"]
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkMedicineKnowledge",
+                "SlowWalkAPIContracts",
+            ]
         ),
         .testTarget(
             name: "SlowWalkDataInterfacesTests",
@@ -79,6 +86,7 @@ let package = Package(
                 "SlowWalkDomain",
                 "SlowWalkRiskEngine",
                 "SlowWalkDataInterfaces",
+                "SlowWalkMedicineKnowledge",
                 "SlowWalkMedicinePipeline",
             ]
         ),
