@@ -24,7 +24,7 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
                     response.headers[.contentType],
                     "application/json; charset=utf-8"
                 )
-                let health = try decode(
+                let health = try self.decode(
                     HealthResponseDTO.self,
                     from: response.body
                 )
@@ -59,7 +59,7 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
                     "application/json; charset=utf-8"
                 )
 
-                let output = try decode(
+                let output = try self.decode(
                     RiskAssessmentResponseDTO.self,
                     from: response.body
                 )
@@ -99,7 +99,10 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
                 body: ByteBuffer(string: #"{"medicine":"#)
             ) { response in
                 XCTAssertEqual(response.status, .badRequest)
-                let error = try decode(APIErrorDTO.self, from: response.body)
+                let error = try self.decode(
+                    APIErrorDTO.self,
+                    from: response.body
+                )
                 XCTAssertEqual(error.code, "invalid_json")
                 XCTAssertEqual(error.requestID, fallbackID)
                 XCTAssertNil(error.details)
@@ -121,7 +124,10 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
                 body: try encode(request)
             ) { response in
                 XCTAssertEqual(response.status, .unprocessableContent)
-                let error = try decode(APIErrorDTO.self, from: response.body)
+                let error = try self.decode(
+                    APIErrorDTO.self,
+                    from: response.body
+                )
                 XCTAssertEqual(error.code, "validation_error")
                 XCTAssertEqual(error.requestID, fallbackID)
                 XCTAssertEqual(error.details?.first?.field, "apiVersion")
@@ -146,7 +152,10 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
                 body: try encode(invalidRequest)
             ) { response in
                 XCTAssertEqual(response.status, .unprocessableContent)
-                let error = try decode(APIErrorDTO.self, from: response.body)
+                let error = try self.decode(
+                    APIErrorDTO.self,
+                    from: response.body
+                )
                 XCTAssertEqual(error.code, "validation_error")
                 XCTAssertEqual(error.requestID, invalidRequest.requestID)
                 XCTAssertTrue(
