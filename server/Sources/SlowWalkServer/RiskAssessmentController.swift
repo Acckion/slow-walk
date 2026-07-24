@@ -45,8 +45,9 @@ public struct RiskAssessmentController: Sendable {
 
         let input: RiskAssessmentRequestDTO
         do {
-            input = try await request.decode(
-                as: RiskAssessmentRequestDTO.self,
+            input = try await context.requestDecoder.decode(
+                RiskAssessmentRequestDTO.self,
+                from: request,
                 context: context
             )
         } catch let decodingError as DecodingError {
