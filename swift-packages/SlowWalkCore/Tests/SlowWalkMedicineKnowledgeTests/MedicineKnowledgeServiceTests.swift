@@ -546,6 +546,231 @@ final class MedicineKnowledgeServiceTests:
         )
     }
 
+    func testResponseWarningCreatesConservativeVerdict()
+        async throws
+    {
+        let response = makeResponse(
+            sourceIdentifier: primaryID,
+            version: "primary-v1",
+            dosageTextFromSource: "demo dosage",
+            responseValidationStatus: .warning
+        )
+        let service = try makeService(
+            sources: [
+                makeSource(
+                    identifier: primaryID,
+                    priority: 100,
+                    authoritative: true,
+                    response: response
+                ),
+            ]
+        )
+
+        let result = try await service.search(
+            query: .init(
+                normalizedQuery: "acetaminophen"
+            )
+        )
+
+        XCTAssertTrue(
+            result.governanceVerdict
+                .requiresConservativeAction
+        )
+        XCTAssertEqual(
+            result.governanceVerdict.validationStatus,
+            .warning
+        )
+        XCTAssertTrue(
+            result.warnings.contains {
+                $0.code == .sourceValidationWarning
+            }
+        )
+        XCTAssertNil(
+            result.candidates.first?
+                .medicine.dosageTextFromSource
+        )
+    }
+
+    func testRecordWarningCreatesConservativeVerdict()
+        async throws
+    {
+        let response = makeResponse(
+            sourceIdentifier: primaryID,
+            version: "primary-v1",
+            dosageTextFromSource: "demo dosage",
+            recordValidationStatus: .warning
+        )
+        let service = try makeService(
+            sources: [
+                makeSource(
+                    identifier: primaryID,
+                    priority: 100,
+                    authoritative: true,
+                    response: response
+                ),
+            ]
+        )
+
+        let result = try await service.search(
+            query: .init(
+                normalizedQuery: "acetaminophen"
+            )
+        )
+
+        XCTAssertTrue(
+            result.requiresConservativeAction
+        )
+        XCTAssertTrue(
+            result.candidates.first?
+                .governanceVerdict
+                .requiresConfirmation == true
+        )
+        XCTAssertNil(
+            result.candidates.first?
+                .medicine.dosageTextFromSource
+        )
+    }
+
+    func testLowCompletenessSuppressesDosageAndGreenPath()
+        async throws
+    {
+        let response = makeResponse(
+            sourceIdentifier: primaryID,
+            version: "primary-v1",
+            dosageTextFromSource: "demo dosage",
+            responseCompleteness: 0.4,
+            recordCompleteness: 0.4
+        )
+        let service = try makeService(
+            sources: [
+                makeSource(
+                    identifier: primaryID,
+                    priority: 100,
+                    authoritative: true,
+                    response: response
+                ),
+            ]
+        )
+
+        let result = try await service.search(
+            query: .init(
+                normalizedQuery: "acetaminophen"
+            )
+        )
+
+        XCTAssertTrue(
+            result.requiresConservativeAction
+        )
+        XCTAssertLessThan(
+            result.governanceVerdict.completeness,
+            0.5
+        )
+        XCTAssertTrue(
+            result.warnings.contains {
+                $0.code
+                    == .completenessBelowThreshold
+            }
+        )
+        XCTAssertNil(
+            result.candidates.first?
+                .medicine.dosageTextFromSource
+        )
+    }
+
+    func testStaleRecordCreatesStaleConservativeVerdict()
+        async throws
+    {
+        let response = makeResponse(
+            sourceIdentifier: primaryID,
+            version: "primary-v1",
+            dosageTextFromSource: "demo dosage",
+            recordFetchedAt:
+                serviceTestDate.addingTimeInterval(-7_200)
+        )
+        let service = try makeService(
+            sources: [
+                makeSource(
+                    identifier: primaryID,
+                    priority: 100,
+                    authoritative: true,
+                    response: response
+                ),
+            ]
+        )
+
+        let result = try await service.search(
+            query: .init(
+                normalizedQuery: "acetaminophen"
+            )
+        )
+
+        XCTAssertEqual(
+            result.governanceVerdict.freshnessStatus,
+            .stale
+        )
+        XCTAssertTrue(
+            result.requiresConservativeAction
+        )
+        XCTAssertTrue(
+            result.warnings.contains {
+                $0.code == .sourceRecordStale
+            }
+        )
+        XCTAssertNil(
+            result.candidates.first?
+                .medicine.dosageTextFromSource
+        )
+    }
+
+    func testReferenceAndVersionMismatchRetainsEvidenceButIsConservative()
+        async throws
+    {
+        let response = makeResponse(
+            sourceIdentifier: primaryID,
+            version: "primary-v1",
+            dosageTextFromSource: "demo dosage",
+            recordReferenceVersion: "record-reference-v0",
+            recordDocumentVersion: "record-v0"
+        )
+        let service = try makeService(
+            sources: [
+                makeSource(
+                    identifier: primaryID,
+                    priority: 100,
+                    authoritative: true,
+                    response: response
+                ),
+            ]
+        )
+
+        let result = try await service.search(
+            query: .init(
+                normalizedQuery: "acetaminophen"
+            )
+        )
+        let candidate = try XCTUnwrap(
+            result.candidates.first
+        )
+
+        XCTAssertEqual(
+            candidate.governanceVerdict
+                .provenanceStatus,
+            .unverifiable
+        )
+        XCTAssertTrue(
+            candidate.governanceVerdict
+                .requiresConservativeAction
+        )
+        XCTAssertGreaterThanOrEqual(
+            candidate.governanceVerdict
+                .sourceReferences.count,
+            2
+        )
+        XCTAssertNil(
+            candidate.medicine.dosageTextFromSource
+        )
+    }
+
     func testNoConfiguredSourceIsUnavailable()
         async throws
     {
@@ -630,7 +855,17 @@ final class MedicineKnowledgeServiceTests:
             "acetaminophen",
         ],
         fetchedAt: Date = serviceTestDate,
-        metadataVersion: String? = nil
+        metadataVersion: String? = nil,
+        dosageTextFromSource: String? = nil,
+        responseValidationStatus:
+            MedicineKnowledgeValidationStatus = .valid,
+        recordValidationStatus:
+            MedicineKnowledgeValidationStatus = .valid,
+        responseCompleteness: Double = 1,
+        recordCompleteness: Double = 1,
+        recordFetchedAt: Date? = nil,
+        recordReferenceVersion: String? = nil,
+        recordDocumentVersion: String? = nil
     ) -> MedicineKnowledgeSourceResponse {
         let reference = SourceReference(
             sourceName: sourceIdentifier,
@@ -639,6 +874,15 @@ final class MedicineKnowledgeServiceTests:
             optionalURL: nil,
             retrievedAt: fetchedAt,
             versionOrDate: version
+        )
+        let recordReference = SourceReference(
+            sourceName: sourceIdentifier,
+            documentTitle:
+                MedicineKnowledgeSafety.demoDisclaimer,
+            optionalURL: nil,
+            retrievedAt: fetchedAt,
+            versionOrDate:
+                recordReferenceVersion ?? version
         )
         let record = MedicineKnowledgeRecord(
             canonicalMedicineIdentifier:
@@ -651,13 +895,16 @@ final class MedicineKnowledgeServiceTests:
                 MedicineKnowledgeSafety.demoDisclaimer,
             ],
             contraindicationTags: [],
-            dosageTextFromSource: nil,
+            dosageTextFromSource:
+                dosageTextFromSource,
             sourceIdentifier: sourceIdentifier,
-            sourceReference: reference,
-            sourceDocumentVersion: version,
-            fetchedAt: fetchedAt,
-            completeness: 1,
-            validationStatus: .valid
+            sourceReference: recordReference,
+            sourceDocumentVersion:
+                recordDocumentVersion ?? version,
+            fetchedAt: recordFetchedAt ?? fetchedAt,
+            completeness: recordCompleteness,
+            validationStatus:
+                recordValidationStatus
         )
         return MedicineKnowledgeSourceResponse(
             sourceIdentifier: sourceIdentifier,
@@ -665,8 +912,9 @@ final class MedicineKnowledgeServiceTests:
             sourceReference: reference,
             sourceDocumentVersion: version,
             fetchedAt: fetchedAt,
-            completeness: 1,
-            validationStatus: .valid,
+            completeness: responseCompleteness,
+            validationStatus:
+                responseValidationStatus,
             validationMetadata:
                 MedicineSourceValidationMetadata(
                     etag: #""\#(version)""#,

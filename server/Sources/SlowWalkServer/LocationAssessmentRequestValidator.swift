@@ -11,16 +11,16 @@ public enum LocationRequestValidationFailure:
     case accuracyInsufficient
     case insufficientHistory
 
-    var code: String {
+    var code: APIErrorCode {
         switch self {
         case .invalidSample:
-            "INVALID_LOCATION_SAMPLE"
+            .invalidLocationSample
         case .stale:
-            "LOCATION_DATA_STALE"
+            .locationDataStale
         case .accuracyInsufficient:
-            "LOCATION_ACCURACY_INSUFFICIENT"
+            .locationAccuracyInsufficient
         case .insufficientHistory:
-            "INSUFFICIENT_LOCATION_HISTORY"
+            .insufficientLocationHistory
         }
     }
 

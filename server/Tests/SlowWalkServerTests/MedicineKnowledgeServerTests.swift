@@ -29,7 +29,10 @@ final class MedicineKnowledgeServerTests:
                 from: response.body
             )
             XCTAssertEqual(output.sourceStatus, .authoritative)
-            XCTAssertEqual(output.cacheStatus, .miss)
+            XCTAssertEqual(
+                output.knowledgeCacheStatus,
+                .miss
+            )
             XCTAssertEqual(output.completeness, 1)
             XCTAssertEqual(output.candidates.count, 1)
             XCTAssertEqual(
@@ -37,6 +40,15 @@ final class MedicineKnowledgeServerTests:
                 ["test-authoritative": "test-v1"]
             )
             XCTAssertEqual(output.apiVersion, SlowWalkAPI.version)
+            XCTAssertFalse(
+                output.governanceVerdict
+                    .requiresConservativeAction
+            )
+            XCTAssertEqual(
+                output.governanceVerdict
+                    .provenanceStatus,
+                .verified
+            )
         }
     }
 
@@ -50,7 +62,7 @@ final class MedicineKnowledgeServerTests:
         try await assertSearchError(
             application: application,
             status: .notFound,
-            code: "MEDICINE_NOT_FOUND"
+            code: .medicineNotFound
         )
     }
 
@@ -66,7 +78,7 @@ final class MedicineKnowledgeServerTests:
         try await assertSearchError(
             application: application,
             status: .gatewayTimeout,
-            code: "KNOWLEDGE_SOURCE_TIMEOUT"
+            code: .knowledgeSourceTimeout
         )
     }
 
@@ -136,7 +148,10 @@ final class MedicineKnowledgeServerTests:
                 from: response.body
             )
             XCTAssertEqual(output.sourceStatus, .staleOffline)
-            XCTAssertEqual(output.cacheStatus, .staleOffline)
+            XCTAssertEqual(
+                output.knowledgeCacheStatus,
+                .staleOffline
+            )
             XCTAssertTrue(output.isOffline)
         }
     }
@@ -168,7 +183,10 @@ final class MedicineKnowledgeServerTests:
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "MALFORMED_REQUEST")
+                XCTAssertEqual(
+                    error.code,
+                    .validationError
+                )
                 XCTAssertEqual(
                     error.details?.first?.field,
                     "normalizedQuery"
@@ -193,7 +211,10 @@ final class MedicineKnowledgeServerTests:
                 APIErrorDTO.self,
                 from: response.body
             )
-            XCTAssertEqual(error.code, "MALFORMED_REQUEST")
+            XCTAssertEqual(
+                error.code,
+                .unsupportedAPIVersion
+            )
             XCTAssertEqual(error.requestID, self.requestID)
         }
     }
@@ -227,7 +248,7 @@ final class MedicineKnowledgeServerTests:
             )
             XCTAssertEqual(
                 error.code,
-                "INVALID_SOURCE_RESPONSE"
+                .invalidSourceResponse
             )
         }
     }
@@ -293,7 +314,14 @@ final class MedicineKnowledgeServerTests:
                 .yellow
             )
             XCTAssertTrue(output.actionCard.mustConfirmMedicine)
-            XCTAssertEqual(output.cacheStatus, .expired)
+            XCTAssertEqual(
+                output.resolutionCacheStatus,
+                .expired
+            )
+            XCTAssertEqual(
+                output.knowledgeCacheStatus,
+                .staleOffline
+            )
         }
     }
 
@@ -376,7 +404,55 @@ final class MedicineKnowledgeServerTests:
             )
             XCTAssertEqual(
                 error.code,
-                "KNOWLEDGE_SOURCE_TIMEOUT"
+                .knowledgeSourceTimeout
+            )
+        }
+    }
+
+    func testAssessSourceValidationWarningCannotReturnGreen()
+        async throws
+    {
+        let result = try makeKnowledgeResult(
+            warning: MedicineKnowledgeWarning(
+                code: .sourceValidationWarning,
+                message:
+                    "The authoritative response requires review."
+            )
+        )
+        let application = try makeTestApplication(
+            result: .success(result)
+        )
+
+        try await executeAssessment(
+            application: application
+        ) { response in
+            XCTAssertEqual(response.status, .ok)
+            let output = try self.decode(
+                MedicineAssessmentResponseDTO.self,
+                from: response.body
+            )
+            let assessment = try XCTUnwrap(
+                output.assessment
+            )
+            XCTAssertGreaterThanOrEqual(
+                assessment.level,
+                .yellow
+            )
+            XCTAssertNotEqual(
+                output.actionCard.riskLevel,
+                .green
+            )
+            XCTAssertTrue(
+                output.actionCard.mustConfirmMedicine
+            )
+            XCTAssertNil(
+                output.resolution.selectedMedicine?
+                    .dosageTextFromSource
+            )
+            XCTAssertTrue(
+                output.medicineKnowledge?
+                    .governanceVerdict
+                    .requiresConservativeAction == true
             )
         }
     }
@@ -431,7 +507,7 @@ final class MedicineKnowledgeServerTests:
     >(
         application: Application,
         status: HTTPResponse.Status,
-        code: String
+        code: APIErrorCode
     ) async throws {
         try await executeSearch(
             application: application
@@ -464,8 +540,10 @@ final class MedicineKnowledgeServerTests:
                 languageCode: "en",
                 rawConfidence: 0.98
             ),
-            userProfile: makeProfile(
-                allergies: allergies
+            userProfile: UserHealthProfileDTO(
+                makeProfile(
+                    allergies: allergies
+                )
             ),
             recentRecords: [],
             requestID: requestID,

@@ -100,7 +100,7 @@ private struct LocationScenarioFixture: Decodable {
     let scenario: String
     let disclaimer: [String]
     let request: LocationAssessmentRequestDTO
-    let expectedRiskLevel: LocationRiskLevel?
+    let expectedRiskLevel: RiskLevel?
     let expectedErrorCode: String?
 }
 

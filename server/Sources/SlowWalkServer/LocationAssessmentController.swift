@@ -38,7 +38,7 @@ public struct LocationAssessmentController: Sendable {
         let fallbackRequestID = uuidProvider.makeUUID()
         guard hasJSONContentType(request) else {
             return try rejectionResponse(
-                code: "MALFORMED_REQUEST",
+                code: .unsupportedMediaType,
                 message: "Content-Type must be application/json.",
                 requestID: fallbackRequestID,
                 details: nil,
@@ -66,7 +66,7 @@ public struct LocationAssessmentController: Sendable {
                 details = [detail]
             }
             return try rejectionResponse(
-                code: "MALFORMED_REQUEST",
+                code: .malformedRequest,
                 message:
                     "The location assessment request is not valid JSON.",
                 requestID: fallbackRequestID,
@@ -77,7 +77,7 @@ public struct LocationAssessmentController: Sendable {
             )
         } catch {
             return try rejectionResponse(
-                code: "MALFORMED_REQUEST",
+                code: .malformedRequest,
                 message:
                     "The location assessment request could not be decoded.",
                 requestID: fallbackRequestID,
@@ -88,9 +88,12 @@ public struct LocationAssessmentController: Sendable {
             )
         }
 
-        guard input.apiVersion == SlowWalkAPI.version else {
+        guard SlowWalkAPI.supports(
+            bodyVersion: input.apiVersion,
+            for: .locationAssess
+        ) else {
             return try rejectionResponse(
-                code: "UNSUPPORTED_API_VERSION",
+                code: .unsupportedAPIVersion,
                 message:
                     "The requested API version is not supported.",
                 requestID: input.requestID,
@@ -111,7 +114,7 @@ public struct LocationAssessmentController: Sendable {
         let fieldDetails = validator.validateFields(input)
         guard fieldDetails.isEmpty else {
             return try rejectionResponse(
-                code: "MALFORMED_REQUEST",
+                code: .validationError,
                 message:
                     "One or more destination fields are invalid.",
                 requestID: input.requestID,
@@ -183,7 +186,7 @@ public struct LocationAssessmentController: Sendable {
                 ]
             )
             return try rejectionResponse(
-                code: "MALFORMED_REQUEST",
+                code: .validationError,
                 message:
                     "The destination could not be assessed.",
                 requestID: input.requestID,
@@ -207,7 +210,7 @@ public struct LocationAssessmentController: Sendable {
     }
 
     private func rejectionResponse(
-        code: String,
+        code: APIErrorCode,
         message: String,
         requestID: UUID,
         details: [APIErrorDetailDTO]?,
@@ -221,7 +224,9 @@ public struct LocationAssessmentController: Sendable {
                 "slowwalk.api_request_id": .string(
                     requestID.uuidString
                 ),
-                "slowwalk.error_code": .string(code),
+                "slowwalk.error_code": .string(
+                    code.rawValue
+                ),
                 "slowwalk.http_status": .string(
                     String(status.code)
                 ),

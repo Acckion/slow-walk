@@ -41,7 +41,14 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     "Acetaminophen"
                 )
                 XCTAssertFalse(output.resolution.requiresUserConfirmation)
-                XCTAssertEqual(output.cacheStatus, .miss)
+                XCTAssertEqual(
+                    output.resolutionCacheStatus,
+                    .miss
+                )
+                XCTAssertEqual(
+                    output.knowledgeCacheStatus,
+                    .miss
+                )
                 XCTAssertFalse(output.cacheHit)
                 XCTAssertEqual(
                     output.sourceDataVersion,
@@ -81,7 +88,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     MedicineResolutionResponseDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(output.cacheStatus, .miss)
+                XCTAssertEqual(
+                    output.resolutionCacheStatus,
+                    .miss
+                )
                 XCTAssertFalse(output.cacheHit)
             }
 
@@ -96,7 +106,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     MedicineResolutionResponseDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(output.cacheStatus, .hit)
+                XCTAssertEqual(
+                    output.resolutionCacheStatus,
+                    .hit
+                )
                 XCTAssertTrue(output.cacheHit)
                 XCTAssertEqual(output.resolution.status, .resolved)
             }
@@ -114,7 +127,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
             application: application,
             request: request,
             expectedStatus: .conflict,
-            expectedCode: "medicine_ambiguous"
+            expectedCode: .medicineAmbiguous
         )
     }
 
@@ -129,7 +142,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
             application: application,
             request: request,
             expectedStatus: .notFound,
-            expectedCode: "medicine_not_found"
+            expectedCode: .medicineNotFound
         )
     }
 
@@ -144,7 +157,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
             application: application,
             request: request,
             expectedStatus: .unprocessableContent,
-            expectedCode: "medicine_recognition_failed"
+            expectedCode: .medicineRecognitionFailed
         )
     }
 
@@ -159,7 +172,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
             application: application,
             request: request,
             expectedStatus: .unprocessableContent,
-            expectedCode: "medicine_insufficient_evidence"
+            expectedCode: .medicineInsufficientEvidence
         )
     }
 
@@ -178,7 +191,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "invalid_json")
+                XCTAssertEqual(
+                    error.code,
+                    .malformedRequest
+                )
                 XCTAssertEqual(error.requestID, try self.fallbackRequestID())
                 XCTAssertNil(error.details)
             }
@@ -206,7 +222,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "validation_error")
+                XCTAssertEqual(
+                    error.code,
+                    .validationError
+                )
                 XCTAssertEqual(error.requestID, try self.fallbackRequestID())
                 XCTAssertEqual(error.details?.first?.field, "apiVersion")
                 XCTAssertEqual(
@@ -237,7 +256,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "unsupported_api_version")
+                XCTAssertEqual(
+                    error.code,
+                    .unsupportedAPIVersion
+                )
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertEqual(error.details?.first?.field, "apiVersion")
             }
@@ -263,7 +285,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "validation_error")
+                XCTAssertEqual(
+                    error.code,
+                    .validationError
+                )
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertTrue(
                     error.details?.contains {
@@ -293,7 +318,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "unsupported_media_type")
+                XCTAssertEqual(
+                    error.code,
+                    .unsupportedMediaType
+                )
                 XCTAssertEqual(error.requestID, try self.fallbackRequestID())
             }
         }
@@ -392,7 +420,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     MedicineAssessmentResponseDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(output.cacheStatus, .miss)
+                XCTAssertEqual(
+                    output.resolutionCacheStatus,
+                    .miss
+                )
                 XCTAssertFalse(output.cacheHit)
                 XCTAssertNotNil(output.assessment)
             }
@@ -408,7 +439,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     MedicineAssessmentResponseDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(output.cacheStatus, .hit)
+                XCTAssertEqual(
+                    output.resolutionCacheStatus,
+                    .hit
+                )
                 XCTAssertTrue(output.cacheHit)
                 XCTAssertNotNil(output.assessment)
                 XCTAssertEqual(output.assessment?.level, .green)
@@ -476,7 +510,10 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "INVALID_USER_PROFILE")
+                XCTAssertEqual(
+                    error.code,
+                    .invalidUserProfile
+                )
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertTrue(
                     error.details?.contains {
@@ -492,7 +529,7 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
         application: Application,
         request: MedicineResolutionRequestDTO,
         expectedStatus: HTTPResponse.Status,
-        expectedCode: String
+        expectedCode: APIErrorCode
     ) async throws {
         try await application.test(.router) { client in
             try await client.execute(
@@ -592,9 +629,11 @@ final class MedicinePipelineServerTests: XCTestCase, @unchecked Sendable {
                 texts: texts,
                 confidence: confidence
             ),
-            userProfile: try userProfile(
-                age: age,
-                allergies: allergies
+            userProfile: UserHealthProfileDTO(
+                try userProfile(
+                    age: age,
+                    allergies: allergies
+                )
             ),
             recentRecords: [],
             requestID: try requestID(),

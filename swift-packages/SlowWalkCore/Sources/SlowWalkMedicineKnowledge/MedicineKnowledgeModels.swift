@@ -50,6 +50,29 @@ public enum MedicineKnowledgeCacheStatus:
     case notStored = "not_stored"
 }
 
+public enum MedicineKnowledgeProvenanceStatus:
+    String,
+    Codable,
+    Sendable,
+    CaseIterable,
+    Hashable
+{
+    case verified
+    case unverifiable
+    case conflicting
+}
+
+public enum MedicineKnowledgeFreshnessStatus:
+    String,
+    Codable,
+    Sendable,
+    CaseIterable,
+    Hashable
+{
+    case current
+    case stale
+}
+
 public enum MedicineKnowledgeWarningCode:
     String,
     Codable,
@@ -68,6 +91,11 @@ public enum MedicineKnowledgeWarningCode:
     case authoritativeSourceMissing = "AUTHORITATIVE_SOURCE_MISSING"
     case dosageSuppressed = "DOSAGE_SUPPRESSED"
     case sourceNotWhitelisted = "SOURCE_NOT_WHITELISTED"
+    case sourceValidationWarning = "SOURCE_VALIDATION_WARNING"
+    case completenessBelowThreshold =
+        "COMPLETENESS_BELOW_THRESHOLD"
+    case sourceRecordStale = "SOURCE_RECORD_STALE"
+    case provenanceUnverifiable = "PROVENANCE_UNVERIFIABLE"
 }
 
 public struct MedicineKnowledgeWarning:
@@ -88,6 +116,56 @@ public struct MedicineKnowledgeWarning:
         self.code = code
         self.message = message
         self.sourceIdentifiers = sourceIdentifiers
+    }
+}
+
+/// Consolidated safety decision for source-derived medicine knowledge.
+///
+/// Consumers use this verdict instead of independently interpreting warning,
+/// freshness, completeness, and provenance fields.
+public struct KnowledgeGovernanceVerdict:
+    Codable,
+    Sendable,
+    Equatable,
+    Hashable
+{
+    public let validationStatus:
+        MedicineKnowledgeValidationStatus
+    public let completeness: Double
+    public let provenanceStatus:
+        MedicineKnowledgeProvenanceStatus
+    public let freshnessStatus:
+        MedicineKnowledgeFreshnessStatus
+    public let requiresConfirmation: Bool
+    public let requiresConservativeAction: Bool
+    public let allowsDosageDisplay: Bool
+    public let warnings: [MedicineKnowledgeWarning]
+    public let sourceReferences: [SourceReference]
+
+    public init(
+        validationStatus:
+            MedicineKnowledgeValidationStatus,
+        completeness: Double,
+        provenanceStatus:
+            MedicineKnowledgeProvenanceStatus,
+        freshnessStatus:
+            MedicineKnowledgeFreshnessStatus,
+        requiresConfirmation: Bool,
+        requiresConservativeAction: Bool,
+        allowsDosageDisplay: Bool,
+        warnings: [MedicineKnowledgeWarning],
+        sourceReferences: [SourceReference]
+    ) {
+        self.validationStatus = validationStatus
+        self.completeness = completeness
+        self.provenanceStatus = provenanceStatus
+        self.freshnessStatus = freshnessStatus
+        self.requiresConfirmation = requiresConfirmation
+        self.requiresConservativeAction =
+            requiresConservativeAction
+        self.allowsDosageDisplay = allowsDosageDisplay
+        self.warnings = warnings
+        self.sourceReferences = sourceReferences
     }
 }
 
@@ -277,6 +355,8 @@ public struct MedicineKnowledgeCandidate:
     public let conflicts: [MedicineSourceConflict]
     public let warnings: [MedicineKnowledgeWarning]
     public let requiresConfirmation: Bool
+    public let governanceVerdict:
+        KnowledgeGovernanceVerdict
 
     public init(
         medicine: Medicine,
@@ -285,7 +365,9 @@ public struct MedicineKnowledgeCandidate:
         sourceIdentifiers: [String],
         conflicts: [MedicineSourceConflict],
         warnings: [MedicineKnowledgeWarning],
-        requiresConfirmation: Bool
+        requiresConfirmation: Bool,
+        governanceVerdict:
+            KnowledgeGovernanceVerdict? = nil
     ) {
         self.medicine = medicine
         self.completeness = completeness
@@ -294,6 +376,43 @@ public struct MedicineKnowledgeCandidate:
         self.conflicts = conflicts
         self.warnings = warnings
         self.requiresConfirmation = requiresConfirmation
+        let hasStaleWarning = warnings.contains {
+            $0.code == .sourceStale
+                || $0.code == .sourceRecordStale
+                || $0.code == .offlineCacheUsed
+        }
+        let hasUnverifiableWarning = warnings.contains {
+            $0.code == .provenanceUnverifiable
+                || $0.code == .authoritativeSourceMissing
+                || $0.code == .invalidSourceResponse
+                || $0.code == .sourceVersionUnsupported
+        }
+        let conservative = requiresConfirmation
+            || !warnings.isEmpty
+            || validationStatus != .valid
+            || !conflicts.isEmpty
+        self.governanceVerdict = governanceVerdict
+            ?? KnowledgeGovernanceVerdict(
+                validationStatus: conservative
+                    ? .warning
+                    : validationStatus,
+                completeness: completeness,
+                provenanceStatus: !conflicts.isEmpty
+                    ? .conflicting
+                    : hasUnverifiableWarning
+                        ? .unverifiable
+                        : .verified,
+                freshnessStatus: hasStaleWarning
+                    ? .stale
+                    : .current,
+                requiresConfirmation: conservative,
+                requiresConservativeAction:
+                    conservative,
+                allowsDosageDisplay: !conservative,
+                warnings: warnings,
+                sourceReferences:
+                    medicine.sourceReferences
+            )
     }
 }
 
@@ -313,6 +432,8 @@ public struct MedicineKnowledgeSearchResult:
     public let sourceVersions: [String: String]
     public let generatedAt: Date
     public let isOffline: Bool
+    public let governanceVerdict:
+        KnowledgeGovernanceVerdict
 
     public var sourceDataVersion: String {
         sourceVersions
@@ -322,11 +443,7 @@ public struct MedicineKnowledgeSearchResult:
     }
 
     public var requiresConservativeAction: Bool {
-        isOffline
-            || sourceStatus == .partial
-            || sourceStatus == .conflicting
-            || sourceStatus == .staleOffline
-            || candidates.contains(where: \.requiresConfirmation)
+        governanceVerdict.requiresConservativeAction
     }
 
     public init(
@@ -339,7 +456,9 @@ public struct MedicineKnowledgeSearchResult:
         warnings: [MedicineKnowledgeWarning],
         sourceVersions: [String: String],
         generatedAt: Date,
-        isOffline: Bool
+        isOffline: Bool,
+        governanceVerdict:
+            KnowledgeGovernanceVerdict? = nil
     ) {
         self.normalizedQuery = normalizedQuery
         self.candidates = candidates
@@ -351,6 +470,62 @@ public struct MedicineKnowledgeSearchResult:
         self.sourceVersions = sourceVersions
         self.generatedAt = generatedAt
         self.isOffline = isOffline
+        let candidateVerdicts = candidates.map(
+            \.governanceVerdict
+        )
+        let conservative = isOffline
+            || sourceStatus == .partial
+            || sourceStatus == .conflicting
+            || sourceStatus == .staleOffline
+            || !warnings.isEmpty
+            || candidateVerdicts.contains {
+                $0.requiresConservativeAction
+            }
+        let hasStaleEvidence = isOffline
+            || sourceStatus == .staleOffline
+            || warnings.contains {
+                $0.code == .sourceStale
+                    || $0.code == .sourceRecordStale
+                    || $0.code == .offlineCacheUsed
+            }
+        let hasUnverifiableEvidence =
+            sourceStatus == .partial
+            || warnings.contains {
+                $0.code == .provenanceUnverifiable
+                    || $0.code
+                    == .authoritativeSourceMissing
+                    || $0.code
+                    == .invalidSourceResponse
+                    || $0.code
+                    == .sourceVersionUnsupported
+            }
+        self.governanceVerdict = governanceVerdict
+            ?? KnowledgeGovernanceVerdict(
+                validationStatus: conservative
+                    ? .warning
+                    : .valid,
+                completeness: completeness,
+                provenanceStatus:
+                    sourceStatus == .conflicting
+                    ? .conflicting
+                    : hasUnverifiableEvidence
+                        ? .unverifiable
+                        : .verified,
+                freshnessStatus: hasStaleEvidence
+                    ? .stale
+                    : .current,
+                requiresConfirmation: conservative,
+                requiresConservativeAction:
+                    conservative,
+                allowsDosageDisplay:
+                    !conservative
+                    && !candidateVerdicts.isEmpty
+                    && candidateVerdicts.allSatisfy {
+                        $0.allowsDosageDisplay
+                    },
+                warnings: warnings,
+                sourceReferences: sourceReferences
+            )
     }
 }
 

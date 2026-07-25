@@ -35,13 +35,16 @@ public struct MedicineKnowledgeSearchResponseDTO:
     public let normalizedQuery: String
     public let candidates: [MedicineKnowledgeCandidate]
     public let sourceStatus: MedicineKnowledgeSourceStatus
-    public let cacheStatus: MedicineKnowledgeCacheStatus
+    public let knowledgeCacheStatus:
+        MedicineKnowledgeCacheStatus
     public let completeness: Double
     public let sourceReferences: [SourceReference]
     public let warnings: [MedicineKnowledgeWarning]
     public let sourceVersions: [String: String]
     public let generatedAt: Date
     public let isOffline: Bool
+    public let governanceVerdict:
+        KnowledgeGovernanceVerdict
     public let apiVersion: String
 
     public init(
@@ -53,13 +56,14 @@ public struct MedicineKnowledgeSearchResponseDTO:
         normalizedQuery = result.normalizedQuery
         candidates = result.candidates
         sourceStatus = result.sourceStatus
-        cacheStatus = result.cacheStatus
+        knowledgeCacheStatus = result.cacheStatus
         completeness = result.completeness
         sourceReferences = result.sourceReferences
         warnings = result.warnings
         sourceVersions = result.sourceVersions
         generatedAt = result.generatedAt
         isOffline = result.isOffline
+        governanceVerdict = result.governanceVerdict
         self.apiVersion = apiVersion
     }
 }

@@ -121,6 +121,58 @@ public struct UserHealthProfileDTO:
             schemaVersion: schemaVersion
         )
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case age
+        case allergies
+        case diagnosedConditions
+        case currentMedicineIngredientIDs
+        case bodyMetrics
+        case createdAt
+        case updatedAt
+        case schemaVersion
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(
+            keyedBy: CodingKeys.self
+        )
+        id = try container.decode(UUID.self, forKey: .id)
+        age = try container.decode(Int.self, forKey: .age)
+
+        // Missing means unknown/incomplete. An explicit [] means the user
+        // answered that no relevant information is currently known.
+        allergies = try container.decode(
+            [String].self,
+            forKey: .allergies
+        )
+        diagnosedConditions = try container.decode(
+            [String].self,
+            forKey: .diagnosedConditions
+        )
+        currentMedicineIngredientIDs = try container.decode(
+            [String].self,
+            forKey: .currentMedicineIngredientIDs
+        )
+
+        bodyMetrics = try container.decodeIfPresent(
+            BodyMetricsDTO.self,
+            forKey: .bodyMetrics
+        )
+        updatedAt = try container.decode(
+            Date.self,
+            forKey: .updatedAt
+        )
+        createdAt = try container.decodeIfPresent(
+            Date.self,
+            forKey: .createdAt
+        ) ?? updatedAt
+        schemaVersion = try container.decodeIfPresent(
+            Int.self,
+            forKey: .schemaVersion
+        ) ?? UserHealthProfile.currentSchemaVersion
+    }
 }
 
 public struct MedicationRecordDTO:

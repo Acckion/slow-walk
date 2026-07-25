@@ -53,7 +53,7 @@ final class HealthContextServerTests:
         try await assertError(
             application: application,
             request: request,
-            expectedCode: "INVALID_USER_PROFILE",
+            expectedCode: .invalidUserProfile,
             expectedDetailCode: "INVALID_AGE"
         )
     }
@@ -71,7 +71,7 @@ final class HealthContextServerTests:
         try await assertError(
             application: application,
             request: request,
-            expectedCode: "FUTURE_MEDICATION_RECORD",
+            expectedCode: .futureMedicationRecord,
             expectedDetailCode: "FUTURE_MEDICATION_RECORD"
         )
     }
@@ -87,7 +87,7 @@ final class HealthContextServerTests:
         try await assertError(
             application: application,
             request: request,
-            expectedCode: "INVALID_BODY_METRICS",
+            expectedCode: .invalidBodyMetrics,
             expectedDetailCode: "BODY_METRICS_NON_POSITIVE"
         )
     }
@@ -147,7 +147,7 @@ final class HealthContextServerTests:
         try await assertError(
             application: application,
             request: request,
-            expectedCode: "UNSUPPORTED_PROFILE_SCHEMA",
+            expectedCode: .unsupportedProfileSchema,
             expectedDetailCode: "UNSUPPORTED_PROFILE_SCHEMA"
         )
     }
@@ -171,7 +171,7 @@ final class HealthContextServerTests:
                 )
                 XCTAssertEqual(
                     error.code,
-                    "UNSUPPORTED_API_VERSION"
+                    .unsupportedAPIVersion
                 )
                 XCTAssertEqual(error.requestID, request.requestID)
                 XCTAssertEqual(
@@ -197,7 +197,10 @@ final class HealthContextServerTests:
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "MALFORMED_REQUEST")
+                XCTAssertEqual(
+                    error.code,
+                    .malformedRequest
+                )
                 XCTAssertEqual(
                     error.requestID,
                     self.fallbackRequestID
@@ -238,7 +241,10 @@ final class HealthContextServerTests:
                     APIErrorDTO.self,
                     from: response.body
                 )
-                XCTAssertEqual(error.code, "INVALID_USER_PROFILE")
+                XCTAssertEqual(
+                    error.code,
+                    .invalidUserProfile
+                )
             }
         }
     }
@@ -302,10 +308,34 @@ final class HealthContextServerTests:
         }
     }
 
+    func testMissingAllergiesCannotReturnGreen()
+        async throws
+    {
+        try await assertMissingProfileField(
+            "allergies"
+        )
+    }
+
+    func testMissingDiagnosedConditionsCannotReturnGreen()
+        async throws
+    {
+        try await assertMissingProfileField(
+            "diagnosedConditions"
+        )
+    }
+
+    func testMissingCurrentMedicineIngredientIDsCannotReturnGreen()
+        async throws
+    {
+        try await assertMissingProfileField(
+            "currentMedicineIngredientIDs"
+        )
+    }
+
     private func assertError<Application: ApplicationProtocol>(
         application: Application,
         request: MedicineAssessmentRequestDTO,
-        expectedCode: String,
+        expectedCode: APIErrorCode,
         expectedDetailCode: String
     ) async throws {
         try await application.test(.router) { client in
@@ -334,6 +364,52 @@ final class HealthContextServerTests:
         }
     }
 
+    private func assertMissingProfileField(
+        _ field: String
+    ) async throws {
+        let application = try makeTestApplication()
+        let body = try requestBodyOmittingProfileField(
+            field
+        )
+
+        try await application.test(.router) { client in
+            try await client.execute(
+                uri:
+                    SlowWalkAPI.Endpoint.medicineAssess.path,
+                method: .post,
+                headers: [
+                    .contentType: "application/json",
+                ],
+                body: body
+            ) { response in
+                XCTAssertEqual(
+                    response.status,
+                    .unprocessableContent
+                )
+                let responseText = String(
+                    decoding:
+                        response.body.readableBytesView,
+                    as: UTF8.self
+                )
+                XCTAssertFalse(
+                    responseText.contains("\"green\"")
+                )
+                let error = try self.decode(
+                    APIErrorDTO.self,
+                    from: response.body
+                )
+                XCTAssertEqual(
+                    error.code,
+                    .invalidUserProfile
+                )
+                XCTAssertEqual(
+                    error.details?.first?.field,
+                    "userProfile.\(field)"
+                )
+            }
+        }
+    }
+
     private func makeTestApplication() throws
         -> some ApplicationProtocol {
         try makeSlowWalkApplication(
@@ -357,8 +433,12 @@ final class HealthContextServerTests:
                 languageCode: "en",
                 rawConfidence: 0.98
             ),
-            userProfile: profile ?? makeProfile(),
-            recentRecords: records,
+            userProfile: UserHealthProfileDTO(
+                profile ?? makeProfile()
+            ),
+            recentRecords: records.map(
+                MedicationRecordDTO.init
+            ),
             requestID: requestID,
             apiVersion: apiVersion
         )
@@ -448,6 +528,30 @@ final class HealthContextServerTests:
         ByteBuffer(
             bytes: try SlowWalkJSONCoding.makeEncoder().encode(
                 value
+            )
+        )
+    }
+
+    private func requestBodyOmittingProfileField(
+        _ field: String
+    ) throws -> ByteBuffer {
+        let encoded = try SlowWalkJSONCoding.makeEncoder()
+            .encode(makeRequest())
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: encoded
+            ) as? [String: Any]
+        )
+        var profile = try XCTUnwrap(
+            object["userProfile"]
+                as? [String: Any]
+        )
+        XCTAssertNotNil(profile.removeValue(forKey: field))
+        object["userProfile"] = profile
+        return ByteBuffer(
+            bytes: try JSONSerialization.data(
+                withJSONObject: object,
+                options: [.sortedKeys]
             )
         )
     }
