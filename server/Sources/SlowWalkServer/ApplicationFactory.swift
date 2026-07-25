@@ -75,7 +75,9 @@ public func makeSlowWalkApplication(
         knowledgeSearcher:
             configuredKnowledgeSearcher
     )
-    router.post(SlowWalkAPI.Endpoint.medicineSearch.path) {
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.medicineSearch.path)
+    ) {
         request,
         context in
         try await medicineController.search(
@@ -83,7 +85,9 @@ public func makeSlowWalkApplication(
             context: context
         )
     }
-    router.post(SlowWalkAPI.Endpoint.medicineResolve.path) {
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.medicineResolve.path)
+    ) {
         request,
         context in
         try await medicineController.resolve(
@@ -91,7 +95,9 @@ public func makeSlowWalkApplication(
             context: context
         )
     }
-    router.post(SlowWalkAPI.Endpoint.medicineAssess.path) {
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.medicineAssess.path)
+    ) {
         request,
         context in
         try await medicineController.assess(
@@ -115,7 +121,9 @@ public func makeSlowWalkApplication(
         dateProvider: dateProvider,
         uuidProvider: uuidProvider
     )
-    router.post(SlowWalkAPI.Endpoint.locationAssess.path) {
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.locationAssess.path)
+    ) {
         request,
         context in
         try await locationController.handle(
