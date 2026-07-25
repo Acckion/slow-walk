@@ -11,11 +11,16 @@ SlowWalk 将可测试的业务核心、HTTP 适配和 Apple 平台能力分开�
 
 ```text
 SlowWalkServer
-  ├──→ SlowWalkAPIContracts ──→ SlowWalkDomain
+  ├──→ SlowWalkAPIContracts ──→ SlowWalkMedicineKnowledge
   └──→ SlowWalkMedicinePipeline
          ├──→ SlowWalkRiskEngine ──→ SlowWalkDomain
          ├──→ SlowWalkDataInterfaces ──→ SlowWalkDomain
+         ├──→ SlowWalkMedicineKnowledge
          └──→ SlowWalkDomain
+
+SlowWalkMedicineKnowledge
+  ├──→ SlowWalkDataInterfaces ──→ SlowWalkDomain
+  └──→ SlowWalkDomain
 
 iOS App
   ├──→ SlowWalkAPIContracts
@@ -63,8 +68,8 @@ Apple 平台专属 API。领域值优先使用不可变 struct/enum，并在跨�
 - 稳定 JSON 枚举值、ISO 8601 日期策略和 API 版本字段。
 - 领域对象与线上协议之间的显式边界。
 
-仅依赖 `SlowWalkDomain` 与 Foundation。这里不包含 URLSession、HTTP 路由或任何
-传输实现。
+依赖 `SlowWalkDomain`、`SlowWalkMedicineKnowledge` 与 Foundation。这里不
+包含 URLSession、HTTP 路由或任何传输实现。
 
 ### SlowWalkDataInterfaces
 
@@ -90,8 +95,23 @@ Apple 持久化类型；具体实现由 Server 或 iOS 组合根提供。
 - 每次 assessment（包括解析缓存命中）都使用当前档案、当前历史和当前身体指标
   重新执行 preflight 与 `MedicationRiskContext` 构造。
 
-依赖 `SlowWalkDomain`、`SlowWalkDataInterfaces` 和 `SlowWalkRiskEngine`。它不依赖
-API DTO、Hummingbird、UI、Vision 或其他 Apple 平台框架。
+依赖 `SlowWalkDomain`、`SlowWalkDataInterfaces`、
+`SlowWalkMedicineKnowledge` 和 `SlowWalkRiskEngine`。它不依赖 API DTO、
+Hummingbird、UI、Vision 或其他 Apple 平台框架。
+
+### SlowWalkMedicineKnowledge
+
+职责：
+
+- `MedicineKnowledgeSource`、`MedicineKnowledgeSearching` 与
+  `HTTPTransporting` 协议。
+- 白名单、来源优先级、版本、时间、可追溯引用和完整度验证。
+- ETag/Last-Modified、304、重试、取消、响应边界与结构化缓存。
+- 多来源合并、冲突证据和 stale/offline 安全降级。
+
+依赖 `SlowWalkDomain` 与 `SlowWalkDataInterfaces`。生产 HTTP adapter 可使用
+Foundation URLSession；当前 Server demo 与所有测试只使用 mock transport。
+Domain 和 RiskEngine 不反向依赖该模块。
 
 ## 外层适配器
 
@@ -100,7 +120,8 @@ API DTO、Hummingbird、UI、Vision 或其他 Apple 平台框架。
 服务端负责：
 
 - `GET /health`、`POST /api/v1/risk/assess`、`POST
-  /api/v1/medicine/resolve` 和 `POST /api/v1/medicine/assess` 路由。
+  /api/v1/medicine/search`、`POST /api/v1/medicine/resolve` 和
+  `POST /api/v1/medicine/assess` 路由。
 - JSON 解码、必要字段验证、DTO/领域映射和统一错误。
 - 注入风险引擎、Repository、Clock、UUID 和演示配置。
 - request ID、基础结构化日志、Content-Type 和 HTTP 状态码。
@@ -126,7 +147,7 @@ iOS 可以依赖核心公开模块；核心模块不能反向依赖 iOS。Apple 
 相机或文字输入
   → Vision OCR 结果与置信度
   → 药品名称/别名标准化
-  → 药品来源与证据完整性检查
+  → 白名单知识源 + 版本/时间验证 + 冲突/缓存状态
   → 用户档案 + 近期用药记录 + 身体指标数据质量
   → 确定性风险规则
   → 最高风险 + 全部原因 + 稳定建议动作

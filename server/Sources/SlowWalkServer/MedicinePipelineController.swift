@@ -3,6 +3,7 @@ import Hummingbird
 import SlowWalkAPIContracts
 import SlowWalkDataInterfaces
 import SlowWalkDomain
+import SlowWalkMedicineKnowledge
 import SlowWalkMedicinePipeline
 import SlowWalkRiskEngine
 
@@ -15,15 +16,100 @@ public struct MedicinePipelineController: Sendable {
     private let pipeline: MedicinePipeline
     private let validator: MedicinePipelineRequestValidator
     private let uuidProvider: any UUIDProviding
+    private let knowledgeSearcher:
+        (any MedicineKnowledgeSearching)?
 
     public init(
         pipeline: MedicinePipeline,
         validator: MedicinePipelineRequestValidator = .init(),
-        uuidProvider: any UUIDProviding = SystemUUIDProvider()
+        uuidProvider: any UUIDProviding = SystemUUIDProvider(),
+        knowledgeSearcher:
+            (any MedicineKnowledgeSearching)? = nil
     ) {
         self.pipeline = pipeline
         self.validator = validator
         self.uuidProvider = uuidProvider
+        self.knowledgeSearcher = knowledgeSearcher
+    }
+
+    public func search(
+        request: Request,
+        context: SlowWalkRequestContext
+    ) async throws -> Response {
+        let fallbackRequestID = uuidProvider.makeUUID()
+        let decoded:
+            DecodedMedicineRequest<
+                MedicineKnowledgeSearchRequestDTO
+            > = try await decodeRequest(
+                request,
+                context: context,
+                fallbackRequestID: fallbackRequestID,
+                operation: "medicine_knowledge_search"
+            )
+
+        let input: MedicineKnowledgeSearchRequestDTO
+        switch decoded {
+        case .value(let value):
+            input = value
+        case .rejection(let response):
+            return response
+        }
+
+        if let rejection = try validateTransport(
+            apiVersion: input.apiVersion,
+            requestID: input.requestID,
+            details: validator.validate(input),
+            request: request,
+            context: context,
+            operation: "medicine_knowledge_search"
+        ) {
+            return rejection
+        }
+
+        guard let knowledgeSearcher else {
+            return try knowledgeErrorResponse(
+                .knowledgeSourceUnavailable(
+                    sourceIdentifier: nil
+                ),
+                requestID: input.requestID,
+                request: request,
+                context: context
+            )
+        }
+
+        do {
+            let result = try await knowledgeSearcher.search(
+                query: MedicineKnowledgeQuery(
+                    normalizedQuery: input.normalizedQuery
+                )
+            )
+            return try jsonResponse(
+                MedicineKnowledgeSearchResponseDTO(
+                    requestID: input.requestID,
+                    result: result,
+                    apiVersion: SlowWalkAPI.version
+                ),
+                status: .ok,
+                request: request,
+                context: context
+            )
+        } catch let error as MedicineKnowledgeError {
+            return try knowledgeErrorResponse(
+                error,
+                requestID: input.requestID,
+                request: request,
+                context: context
+            )
+        } catch {
+            return try knowledgeErrorResponse(
+                .knowledgeSourceUnavailable(
+                    sourceIdentifier: nil
+                ),
+                requestID: input.requestID,
+                request: request,
+                context: context
+            )
+        }
     }
 
     public func resolve(
@@ -69,7 +155,9 @@ public struct MedicinePipelineController: Sendable {
                     cacheStatus: result.cacheStatus,
                     sourceDataVersion: result.sourceDataVersion,
                     generatedAt: result.generatedAt,
-                    apiVersion: SlowWalkAPI.version
+                    apiVersion: SlowWalkAPI.version,
+                    medicineKnowledge:
+                        result.knowledgeResult
                 )
                 return try jsonResponse(
                     output,
@@ -118,6 +206,14 @@ public struct MedicinePipelineController: Sendable {
                     context: context
                 )
             }
+        } catch let error as MedicineKnowledgeError {
+            return try knowledgeErrorResponse(
+                error,
+                requestID: input.requestID,
+                request: request,
+                context: context,
+                operation: "medicine_resolution"
+            )
         } catch {
             return try internalErrorResponse(
                 operation: "medicine_resolution",
@@ -179,7 +275,9 @@ public struct MedicinePipelineController: Sendable {
                 apiVersion: SlowWalkAPI.version,
                 healthContextValidation: HealthContextValidationDTO(
                     result.healthContextValidation
-                )
+                ),
+                medicineKnowledge:
+                    result.knowledgeResult
             )
 
             // Every valid recognition state, including unresolved states, is a
@@ -197,6 +295,14 @@ public struct MedicinePipelineController: Sendable {
                 requestID: input.requestID,
                 request: request,
                 context: context
+            )
+        } catch let error as MedicineKnowledgeError {
+            return try knowledgeErrorResponse(
+                error,
+                requestID: input.requestID,
+                request: request,
+                context: context,
+                operation: "medicine_assessment"
             )
         } catch {
             return try internalErrorResponse(
@@ -216,9 +322,13 @@ public struct MedicinePipelineController: Sendable {
         operation: String
     ) async throws -> DecodedMedicineRequest<Value> {
         guard hasJSONContentType(request) else {
+            let code = operation
+                == "medicine_knowledge_search"
+                ? "MALFORMED_REQUEST"
+                : "unsupported_media_type"
             return .rejection(
                 try rejectionResponse(
-                    code: "unsupported_media_type",
+                    code: code,
                     message: "Content-Type must be application/json.",
                     requestID: fallbackRequestID,
                     details: [
@@ -247,7 +357,7 @@ public struct MedicinePipelineController: Sendable {
         } catch let decodingError as DecodingError {
             switch RequestDecodingFailure(error: decodingError) {
             case .malformedJSON:
-                let errorCode = operation == "medicine_assessment"
+                let errorCode = operation != "medicine_resolution"
                     ? "MALFORMED_REQUEST"
                     : "invalid_json"
                 return .rejection(
@@ -295,7 +405,10 @@ public struct MedicinePipelineController: Sendable {
             )
             return .rejection(
                 try rejectionResponse(
-                    code: "invalid_json",
+                    code: operation
+                        == "medicine_knowledge_search"
+                        ? "MALFORMED_REQUEST"
+                        : "invalid_json",
                     message: "The request body could not be decoded.",
                     requestID: fallbackRequestID,
                     details: nil,
@@ -317,9 +430,16 @@ public struct MedicinePipelineController: Sendable {
         operation: String
     ) throws -> Response? {
         guard apiVersion == SlowWalkAPI.version else {
-            let errorCode = operation == "medicine_assessment"
-                ? "UNSUPPORTED_API_VERSION"
-                : "unsupported_api_version"
+            let errorCode: String
+            if operation == "medicine_assessment" {
+                errorCode = "UNSUPPORTED_API_VERSION"
+            } else if operation
+                == "medicine_knowledge_search"
+            {
+                errorCode = "MALFORMED_REQUEST"
+            } else {
+                errorCode = "unsupported_api_version"
+            }
             return try rejectionResponse(
                 code: errorCode,
                 message: "The requested API version is not supported.",
@@ -340,7 +460,10 @@ public struct MedicinePipelineController: Sendable {
 
         guard details.isEmpty else {
             return try rejectionResponse(
-                code: "validation_error",
+                code: operation
+                    == "medicine_knowledge_search"
+                    ? "MALFORMED_REQUEST"
+                    : "validation_error",
                 message: "One or more request fields are invalid.",
                 requestID: requestID,
                 details: details,
@@ -357,6 +480,9 @@ public struct MedicinePipelineController: Sendable {
         operation: String,
         detail: APIErrorDetailDTO
     ) -> String {
+        if operation == "medicine_knowledge_search" {
+            return "MALFORMED_REQUEST"
+        }
         guard operation == "medicine_assessment" else {
             return "validation_error"
         }
@@ -382,7 +508,8 @@ public struct MedicinePipelineController: Sendable {
         _ error: MedicationRiskContextBuildError,
         requestID: UUID,
         request: Request,
-        context: SlowWalkRequestContext
+        context: SlowWalkRequestContext,
+        operation: String = "medicine_knowledge_search"
     ) throws -> Response {
         let code: String
         let message: String
@@ -434,6 +561,70 @@ public struct MedicinePipelineController: Sendable {
             },
             status: .unprocessableContent,
             operation: "medicine_assessment",
+            request: request,
+            context: context
+        )
+    }
+
+    private func knowledgeErrorResponse(
+        _ error: MedicineKnowledgeError,
+        requestID: UUID,
+        request: Request,
+        context: SlowWalkRequestContext,
+        operation: String = "medicine_knowledge_search"
+    ) throws -> Response {
+        let code: String
+        let message: String
+        let status: HTTPResponse.Status
+        switch error {
+        case .knowledgeSourceUnavailable, .requestCancelled:
+            code = "KNOWLEDGE_SOURCE_UNAVAILABLE"
+            message =
+                "The medicine knowledge source is unavailable."
+            status = .serviceUnavailable
+        case .knowledgeSourceTimeout:
+            code = "KNOWLEDGE_SOURCE_TIMEOUT"
+            message =
+                "The medicine knowledge request timed out."
+            status = .gatewayTimeout
+        case .invalidSourceResponse:
+            code = "INVALID_SOURCE_RESPONSE"
+            message =
+                "A medicine knowledge source returned an invalid response."
+            status = .badGateway
+        case .sourceVersionUnsupported:
+            code = "SOURCE_VERSION_UNSUPPORTED"
+            message =
+                "A medicine knowledge source version is unsupported."
+            status = .badGateway
+        case .medicineNotFound:
+            code = "MEDICINE_NOT_FOUND"
+            message =
+                "No trusted medicine source matched the query."
+            status = .notFound
+        case .sourceConflict:
+            code = "SOURCE_CONFLICT"
+            message =
+                "Trusted medicine sources returned a conflict."
+            status = .conflict
+        case .offlineCacheUnavailable:
+            code = "OFFLINE_CACHE_UNAVAILABLE"
+            message =
+                "No usable offline medicine knowledge cache is available."
+            status = .serviceUnavailable
+        case .malformedRequest:
+            code = "MALFORMED_REQUEST"
+            message =
+                "The medicine knowledge request is malformed."
+            status = .badRequest
+        }
+        return try rejectionResponse(
+            code: code,
+            message: message,
+            requestID: requestID,
+            details: nil,
+            status: status,
+            operation: operation,
             request: request,
             context: context
         )

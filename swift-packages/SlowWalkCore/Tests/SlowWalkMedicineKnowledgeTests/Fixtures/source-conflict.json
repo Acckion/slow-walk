@@ -1,0 +1,9 @@
+{
+  "scenario": "source_conflict",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "httpStatus": 200,
+  "expectedSourceStatus": "conflicting",
+  "expectedCacheStatus": "miss",
+  "expectedErrorCode": "SOURCE_CONFLICT",
+  "sourceDataVersion": "demo-conflict-v1"
+}

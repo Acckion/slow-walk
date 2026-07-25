@@ -32,6 +32,10 @@ let package = Package(
                 .product(name: "SlowWalkAPIContracts", package: "SlowWalkCore"),
                 .product(name: "SlowWalkDataInterfaces", package: "SlowWalkCore"),
                 .product(
+                    name: "SlowWalkMedicineKnowledge",
+                    package: "SlowWalkCore"
+                ),
+                .product(
                     name: "SlowWalkMedicinePipeline",
                     package: "SlowWalkCore"
                 ),
@@ -50,6 +54,10 @@ let package = Package(
                 .product(name: "SlowWalkDomain", package: "SlowWalkCore"),
                 .product(name: "SlowWalkAPIContracts", package: "SlowWalkCore"),
                 .product(name: "SlowWalkDataInterfaces", package: "SlowWalkCore"),
+                .product(
+                    name: "SlowWalkMedicineKnowledge",
+                    package: "SlowWalkCore"
+                ),
                 .product(
                     name: "SlowWalkMedicinePipeline",
                     package: "SlowWalkCore"

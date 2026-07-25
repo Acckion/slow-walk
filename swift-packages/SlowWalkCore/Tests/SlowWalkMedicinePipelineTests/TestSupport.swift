@@ -1,6 +1,7 @@
 import Foundation
 import SlowWalkDataInterfaces
 import SlowWalkDomain
+import SlowWalkMedicineKnowledge
 import SlowWalkMedicinePipeline
 import SlowWalkRiskEngine
 
@@ -128,7 +129,9 @@ func makeAssessment(
 
 func makePipeline(
     cache: any MedicineCache = InMemoryMedicineCache(),
-    date: Date = pipelineTestDate
+    date: Date = pipelineTestDate,
+    knowledgeSearcher:
+        (any MedicineKnowledgeSearching)? = nil
 ) -> MedicinePipeline {
     MedicinePipeline(
         catalogLoader: BundledDemoMedicineCatalogLoader(),
@@ -136,6 +139,7 @@ func makePipeline(
         dateProvider: FixedClock(fixedDate: date),
         uuidProvider: FixedUUIDProvider(
             fixedUUID: pipelineTestUUID
-        )
+        ),
+        knowledgeSearcher: knowledgeSearcher
     )
 }

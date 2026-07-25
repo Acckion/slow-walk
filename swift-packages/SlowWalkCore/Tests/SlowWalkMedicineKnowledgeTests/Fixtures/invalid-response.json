@@ -1,0 +1,7 @@
+{
+  "scenario": "invalid_source_response",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "httpStatus": 200,
+  "expectedErrorCode": "INVALID_SOURCE_RESPONSE",
+  "sourceDataVersion": "demo-invalid-v1"
+}

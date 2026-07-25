@@ -22,6 +22,50 @@ public struct MedicinePipelineRequestValidator: Sendable {
         validateRecognitionConfidence(request.input)
     }
 
+    public func validate(
+        _ request: MedicineKnowledgeSearchRequestDTO
+    ) -> [APIErrorDetailDTO] {
+        let query = request.normalizedQuery
+        let trimmed = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !trimmed.isEmpty else {
+            return [
+                APIErrorDetailDTO(
+                    field: "normalizedQuery",
+                    code: "required",
+                    message:
+                        "A normalized medicine query is required."
+                ),
+            ]
+        }
+        guard trimmed.count <= 256 else {
+            return [
+                APIErrorDetailDTO(
+                    field: "normalizedQuery",
+                    code: "too_long",
+                    message:
+                        "The normalized medicine query must not exceed 256 characters."
+                ),
+            ]
+        }
+        guard trimmed == trimmed.lowercased(),
+            !trimmed.unicodeScalars.contains(where: {
+                CharacterSet.controlCharacters.contains($0)
+            })
+        else {
+            return [
+                APIErrorDetailDTO(
+                    field: "normalizedQuery",
+                    code: "not_normalized",
+                    message:
+                        "The query must be trimmed, lowercase, and free of control characters."
+                ),
+            ]
+        }
+        return []
+    }
+
     private func validateRecognitionConfidence(
         _ input: MedicineRecognitionInput
     ) -> [APIErrorDetailDTO] {

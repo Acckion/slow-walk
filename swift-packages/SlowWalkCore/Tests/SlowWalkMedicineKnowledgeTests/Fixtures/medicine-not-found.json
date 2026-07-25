@@ -1,0 +1,7 @@
+{
+  "scenario": "medicine_not_found",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "httpStatus": 404,
+  "expectedErrorCode": "MEDICINE_NOT_FOUND",
+  "sourceDataVersion": "demo-not-found-v1"
+}
