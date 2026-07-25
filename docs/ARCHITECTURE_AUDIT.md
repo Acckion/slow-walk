@@ -429,11 +429,11 @@ contract，并在 Mac 上完成一次 strict-concurrency package + simulator bui
 未发现 P0。当前没有生产/临床部署证据，因此不会把“未来接真实数据前必须处理”
 误标为正在发生的灾难性故障。
 
-### P1：已确认
+### P1：已确认与已修复
 
 #### SW-P1-01：旧 raw risk endpoint 可绕过可信药品 Pipeline
 
-- **分类**：已确认。
+- **分类**：已修复（`fix/pre-ios-safety-contract`，已进入 `develop`）。
 - **文件和符号**：
   - `SlowWalkAPIContracts/RiskAssessmentDTOs.swift:5-27`
   - `SlowWalkServer/ApplicationFactory.swift:70-72`
@@ -450,10 +450,13 @@ contract，并在 Mac 上完成一次 strict-concurrency package + simulator bui
   `/api/v1/medicine/assess`。若必须保留，只接收服务端可重新解析的 identifier，
   不采用客户端 source/ingredient。
 - **iOS 集成前**：必须。
+- **修复验证**：默认 raw risk route 与公开 raw risk DTO 已移除；medicine 客户端
+  只允许提交 `MedicineAssessmentRequestDTO`，可信 medicine/source 仍由服务端
+  Pipeline 管理。对应 Core 与 Server 回归测试已随合并分支通过。
 
 #### SW-P1-02：knowledge warning、低 completeness 和 provenance 未形成保守门
 
-- **分类**：已确认。
+- **分类**：已修复（`fix/pre-ios-safety-contract`，已进入 `develop`）。
 - **文件和符号**：
   - `SlowWalkMedicineKnowledge/SourcePolicy.swift:113-178,181-244`
   - `SlowWalkMedicineKnowledge/MedicineKnowledgeService.swift:315-358,424-533`
@@ -474,10 +477,13 @@ contract，并在 Mac 上完成一次 strict-concurrency package + simulator bui
   `.partial`/`requiresConfirmation`，并禁止 dosage；补 Core/Server “不得 green”
   测试。
 - **iOS 集成前**：风险结果与可点击来源展示前必须；真实来源前必须。
+- **修复验证**：`KnowledgeGovernanceVerdict` 已统一约束 warning、
+  completeness、provenance 与 freshness；不可信来源进入 conservative action，
+  并禁止 dosage 透传。对应 Core/Server 保守门回归测试已随合并分支通过。
 
 #### SW-P1-03：API 必填健康数组缺失会被静默当成空数组
 
-- **分类**：已确认。
+- **分类**：已修复（`fix/pre-ios-safety-contract`，已进入 `develop`）。
 - **文件和符号**：
   - `SlowWalkDomain/UserHealthProfile.swift:114-142`
   - `SlowWalkDomain/HealthContextValidation.swift:220-231`
@@ -492,10 +498,13 @@ contract，并在 Mac 上完成一次 strict-concurrency package + simulator bui
   明确允许兼容的 `createdAt` 和 schemaVersion 提供默认；在 Server 显式映射到领域
   模型。领域持久化 decoder 可保留兼容逻辑。
 - **iOS 集成前**：必须。
+- **修复验证**：API request 使用严格 `UserHealthProfileDTO` decoder；缺失必填
+  健康数组会产生 typed validation error，Server 再显式映射到 Domain。领域文件
+  持久化兼容 decoder 保持独立。
 
 #### SW-P1-04：Location 将“未命中异常”误判为正在前进的 green
 
-- **分类**：已确认。
+- **分类**：已修复（`fix/pre-ios-safety-contract`，已进入 `develop`）。
 - **文件和符号**：
   - `SlowWalkLocationRisk/LocationRiskEngine.swift:144-176`
   - `SlowWalkLocationRisk/LocationActionCardFactory.swift:43-69`
@@ -510,10 +519,13 @@ contract，并在 Mac 上完成一次 strict-concurrency package + simulator bui
   indeterminate 时至少 yellow/neutral。ActionCard 按 arrived/progress reason
   区分文案，而不是只按 level。
 - **iOS 集成前**：必须，尤其在 CoreLocation/SwiftUI 展示前。
+- **修复验证**：geofence 外只有明确距离递减证据才产生 progressing green；
+  arrived、approaching、progressing 与 trend indeterminate 使用独立 reason/card
+  文案，并有 engine/card 回归测试。
 
 #### SW-P1-05：Location 将数据质量 orange 计入独立行为信号并可升级 red
 
-- **分类**：已确认。
+- **分类**：已修复（`fix/pre-ios-safety-contract`，已进入 `develop`）。
 - **文件和符号**：
   - `SlowWalkLocationRisk/LocationRiskEngine.swift:100-142,179-223,257-339`
   - `SlowWalkLocationRisk/LocationDataQuality.swift:63-120`
@@ -528,10 +540,13 @@ contract，并在 Mac 上完成一次 strict-concurrency package + simulator bui
   `prolongedStop`、`movingAway`；invalid/insufficient quality 使用独立状态或固定的
   non-green 提示，不参与 family-attention red 计数。
 - **iOS 集成前**：必须。
+- **修复验证**：family-attention red 聚合只统计 `prolongedStop`、
+  `movingAway` 等独立行为信号；数据质量 issue 仍可阻止 green，但不再被计为行为
+  信号。
 
 #### SW-P1-06：iOS OCR、Network、Location 协议接在错误的用例层
 
-- **分类**：已确认。
+- **分类**：已修复（`fix/ios-adapter-contracts`）。
 - **文件和符号**：
   - `ios/SlowWalkApp/Services/OCR/MedicineTextRecognizing.swift:5-10`
   - `ios/SlowWalkApp/Services/Network/RiskAssessmentRequesting.swift:3-8`
@@ -549,6 +564,16 @@ contract，并在 Mac 上完成一次 strict-concurrency package + simulator bui
   medicine/location 正式用例；Location adapter 提供保留 accuracy/time/speed 的
   bounded history 或 `AsyncSequence<LocationSample>`。
 - **iOS 集成前**：必须。
+- **修复验证**：
+  - 新增 Linux SwiftPM target `SlowWalkClientCore`，统一 OCR observation mapper、
+    canonical medicine/location request protocol、View state 与 coordinator。
+  - `LocationSampleProviding` 保留 point/time/accuracy/speed/source；
+    `LocationHistoryBuffer` actor 提供数量和时间双重上限、稳定排序、去重、乱序
+    保留与 privacy clear。
+  - 旧 `imageData → MedicineScanEvent` OCR 协议、
+    `LocationSnapshotProviding` 与 ios 目录中的重复 network protocol 已删除。
+  - Client Core 新增 47 个 XCTest；实际 build/test 结论以该分支 GitHub Actions
+    为准，不据此声称 Apple adapter 已验证。
 
 #### SW-P1-07：文件 Repository 的 actor 不能防止同路径多实例 lost update
 
