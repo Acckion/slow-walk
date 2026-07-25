@@ -24,7 +24,8 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
     public let requestID: UUID
     public let resolution: MedicineResolution
     public let cacheHit: Bool
-    public let cacheStatus: MedicineResolutionCacheStatus
+    public let resolutionCacheStatus: MedicineResolutionCacheStatus
+    public let knowledgeCacheStatus: MedicineKnowledgeCacheStatus?
     public let sourceDataVersion: String
     public let generatedAt: Date
     public let apiVersion: String
@@ -35,7 +36,8 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
         requestID: UUID,
         resolution: MedicineResolution,
         cacheHit: Bool,
-        cacheStatus: MedicineResolutionCacheStatus,
+        resolutionCacheStatus: MedicineResolutionCacheStatus,
+        knowledgeCacheStatus: MedicineKnowledgeCacheStatus? = nil,
         sourceDataVersion: String,
         generatedAt: Date,
         apiVersion: String,
@@ -45,7 +47,8 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
         self.requestID = requestID
         self.resolution = resolution
         self.cacheHit = cacheHit
-        self.cacheStatus = cacheStatus
+        self.resolutionCacheStatus = resolutionCacheStatus
+        self.knowledgeCacheStatus = knowledgeCacheStatus
         self.sourceDataVersion = sourceDataVersion
         self.generatedAt = generatedAt
         self.apiVersion = apiVersion
@@ -60,15 +63,15 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
 /// warnings, or source references.
 public struct MedicineAssessmentRequestDTO: Codable, Sendable, Equatable, Hashable {
     public let input: MedicineRecognitionInput
-    public let userProfile: UserHealthProfile
-    public let recentRecords: [MedicationRecord]
+    public let userProfile: UserHealthProfileDTO
+    public let recentRecords: [MedicationRecordDTO]
     public let requestID: UUID
     public let apiVersion: String
 
     public init(
         input: MedicineRecognitionInput,
-        userProfile: UserHealthProfile,
-        recentRecords: [MedicationRecord],
+        userProfile: UserHealthProfileDTO,
+        recentRecords: [MedicationRecordDTO],
         requestID: UUID,
         apiVersion: String
     ) {
@@ -87,7 +90,8 @@ public struct MedicineAssessmentResponseDTO: Codable, Sendable, Equatable, Hasha
     public let assessment: RiskAssessment?
     public let actionCard: ActionCard
     public let cacheHit: Bool
-    public let cacheStatus: MedicineResolutionCacheStatus
+    public let resolutionCacheStatus: MedicineResolutionCacheStatus
+    public let knowledgeCacheStatus: MedicineKnowledgeCacheStatus?
     public let sourceDataVersion: String
     public let generatedAt: Date
     public let apiVersion: String
@@ -101,7 +105,8 @@ public struct MedicineAssessmentResponseDTO: Codable, Sendable, Equatable, Hasha
         assessment: RiskAssessment?,
         actionCard: ActionCard,
         cacheHit: Bool,
-        cacheStatus: MedicineResolutionCacheStatus,
+        resolutionCacheStatus: MedicineResolutionCacheStatus,
+        knowledgeCacheStatus: MedicineKnowledgeCacheStatus? = nil,
         sourceDataVersion: String,
         generatedAt: Date,
         apiVersion: String,
@@ -114,7 +119,8 @@ public struct MedicineAssessmentResponseDTO: Codable, Sendable, Equatable, Hasha
         self.assessment = assessment
         self.actionCard = actionCard
         self.cacheHit = cacheHit
-        self.cacheStatus = cacheStatus
+        self.resolutionCacheStatus = resolutionCacheStatus
+        self.knowledgeCacheStatus = knowledgeCacheStatus
         self.sourceDataVersion = sourceDataVersion
         self.generatedAt = generatedAt
         self.apiVersion = apiVersion

@@ -1,11 +1,10 @@
 # 健康上下文与 JSON 持久化
 
-## 分支与依赖
+## 当前基线
 
-`feature/health-context-mvp` 是 stacked branch，基于
-`origin/feature/medicine-pipeline-mvp`。后者又包含已合并到 `develop` 的
-foundation 代码。本分支在 medicine pipeline 合并前不能直接以 `develop` 为基线；
-合并上游后应通过普通 rebase 或重新建立 PR 基线处理，禁止 force push。
+health context 已进入 `develop`，本文件描述当前 canonical medicine assessment
+契约。Windows 只负责编辑、Git 和静态审查；Swift 构建与测试结论以 GitHub
+Actions 为准。
 
 ## 设计落点
 
@@ -22,6 +21,22 @@ foundation 代码。本分支在 medicine pipeline 合并前不能直接以 `dev
 
 依赖方向保持为外层依赖核心；Domain 不依赖 Repository，RiskEngine 不依赖
 Server，核心模块不导入 Hummingbird 或 Apple 平台框架。
+
+## 严格 wire contract
+
+`POST /api/v1/medicine/assess` 使用 `UserHealthProfileDTO`，Server 再显式映射为
+`UserHealthProfile`。以下三个数组是独立必填字段：
+
+- `allergies`
+- `diagnosedConditions`
+- `currentMedicineIngredientIDs`
+
+字段缺失表示 unknown/incomplete，必须在解码阶段失败，不能静默转换成空数组。
+显式 `[]` 才表示用户明确提供“当前没有相关信息”。API 只保留两项兼容默认：
+缺少 `createdAt` 时使用 `updatedAt`，缺少 `schemaVersion` 时使用 `1`。
+
+Domain 的 `UserHealthProfile` decoder 继续为已有持久化 JSON 保留宽松读取逻辑；
+该兼容行为不得被 HTTP 边界直接复用。
 
 ## 档案验证
 
@@ -87,6 +102,14 @@ typed error 区分 `fileNotFound`、`emptyFile`、`corruptedJSON`、
 档案、过敏详情、身体指标或文件路径。身体指标随档案持久化，因此当前架构不需要
 独立 `FileBodyMetricsRepository`。
 
+当前 JSON 文件只提供编码格式、schemaVersion 与单进程 actor/原子替换语义：
+
+- **未加密**；
+- **没有 Apple Data Protection**；
+- 不提供跨进程锁、云同步或密钥管理。
+
+因此在完成 Apple 平台受保护存储设计前，不应把真实敏感健康资料写入该文件实现。
+
 ## 安全边界与限制
 
 - 全部默认值和 fixtures 均为 `NOT FOR CLINICAL USE`。
@@ -94,3 +117,4 @@ typed error 区分 `fileNotFound`、`emptyFile`、`corruptedJSON`、
 - 不生成来源未提供的剂量、频次或治疗方案。
 - cache 只复用药品名称解析；健康上下文永远按当前请求重建。
 - 文件 Repository 是单进程 actor 隔离，不提供跨进程锁或云同步。
+- 当前 JSON 未加密且没有 Data Protection；真实用户数据接入前必须另行处理。

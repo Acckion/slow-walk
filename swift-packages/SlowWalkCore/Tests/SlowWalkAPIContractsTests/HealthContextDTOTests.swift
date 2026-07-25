@@ -79,6 +79,46 @@ final class HealthContextDTOTests: XCTestCase {
         XCTAssertNil(profile.bodyMetrics?.deviceIdentifier)
     }
 
+    func testAPIProfileDTOAllowsCreatedAtAndSchemaDefaults()
+        throws
+    {
+        let profile = try SlowWalkJSONCoding.makeDecoder()
+            .decode(
+                UserHealthProfileDTO.self,
+                from: strictProfileData()
+            )
+
+        XCTAssertEqual(profile.schemaVersion, 1)
+        XCTAssertEqual(profile.createdAt, profile.updatedAt)
+    }
+
+    func testAPIProfileDTORejectsMissingAllergies() {
+        assertMissingRequiredField(
+            "allergies",
+            data: strictProfileData(
+                allergies: nil
+            )
+        )
+    }
+
+    func testAPIProfileDTORejectsMissingDiagnosedConditions() {
+        assertMissingRequiredField(
+            "diagnosedConditions",
+            data: strictProfileData(
+                diagnosedConditions: nil
+            )
+        )
+    }
+
+    func testAPIProfileDTORejectsMissingCurrentMedicineIngredientIDs() {
+        assertMissingRequiredField(
+            "currentMedicineIngredientIDs",
+            data: strictProfileData(
+                currentMedicineIngredientIDs: nil
+            )
+        )
+    }
+
     func testValidationDTOIncludesConfigurationNotice() {
         let dto = HealthContextValidationDTO(
             HealthContextValidation(
@@ -151,6 +191,70 @@ final class HealthContextDTOTests: XCTestCase {
             eventType: .confirmedIntake,
             source: .demoData
         )
+    }
+
+    private func strictProfileData(
+        allergies: String? = "[]",
+        diagnosedConditions: String? = "[]",
+        currentMedicineIngredientIDs:
+            String? = "[]"
+    ) -> Data {
+        var fields = [
+            #""id":"00000000-0000-0000-0000-000000000001""#,
+            #""age":70"#,
+            #""updatedAt":"2025-07-23T16:00:00Z""#,
+        ]
+        if let allergies {
+            fields.append(
+                #""allergies":\#(allergies)"#
+            )
+        }
+        if let diagnosedConditions {
+            fields.append(
+                #""diagnosedConditions":\#(diagnosedConditions)"#
+            )
+        }
+        if let currentMedicineIngredientIDs {
+            fields.append(
+                #""currentMedicineIngredientIDs":\#(currentMedicineIngredientIDs)"#
+            )
+        }
+        return Data(
+            "{\(fields.joined(separator: ","))}".utf8
+        )
+    }
+
+    private func assertMissingRequiredField(
+        _ expectedField: String,
+        data: Data,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(
+            try SlowWalkJSONCoding.makeDecoder().decode(
+                UserHealthProfileDTO.self,
+                from: data
+            ),
+            file: file,
+            line: line
+        ) { error in
+            guard case DecodingError.keyNotFound(
+                let key,
+                _
+            ) = error else {
+                return XCTFail(
+                    "Expected keyNotFound, got \(error).",
+                    file: file,
+                    line: line
+                )
+            }
+            XCTAssertEqual(
+                key.stringValue,
+                expectedField,
+                file: file,
+                line: line
+            )
+        }
     }
 }
 

@@ -58,12 +58,20 @@ final class MedicineKnowledgeDTOTests: XCTestCase {
 
         XCTAssertEqual(decoded, envelope)
         XCTAssertEqual(
-            decoded.response.cacheStatus,
+            decoded.response.knowledgeCacheStatus,
             .staleOffline
         )
         XCTAssertEqual(
             decoded.response.warnings.first?.code,
             .offlineCacheUsed
+        )
+        XCTAssertTrue(
+            decoded.response.governanceVerdict
+                .requiresConservativeAction
+        )
+        XCTAssertFalse(
+            decoded.response.governanceVerdict
+                .allowsDosageDisplay
         )
     }
 }

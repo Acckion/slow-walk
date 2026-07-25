@@ -17,7 +17,7 @@ final class MedicinePipelineDTOTests: XCTestCase {
             requestID: request.requestID,
             resolution: makeResolution(input: input),
             cacheHit: false,
-            cacheStatus: .miss,
+            resolutionCacheStatus: .miss,
             sourceDataVersion: "demo-2026-07-24",
             generatedAt: now,
             apiVersion: SlowWalkAPI.version
@@ -46,7 +46,7 @@ final class MedicinePipelineDTOTests: XCTestCase {
         )
         let request = MedicineAssessmentRequestDTO(
             input: input,
-            userProfile: profile,
+            userProfile: UserHealthProfileDTO(profile),
             recentRecords: [],
             requestID: fixedUUID(lastByte: 3),
             apiVersion: SlowWalkAPI.version
@@ -84,7 +84,8 @@ final class MedicinePipelineDTOTests: XCTestCase {
             assessment: assessment,
             actionCard: actionCard,
             cacheHit: true,
-            cacheStatus: .hit,
+            resolutionCacheStatus: .hit,
+            knowledgeCacheStatus: nil,
             sourceDataVersion: "demo-2026-07-24",
             generatedAt: now,
             apiVersion: SlowWalkAPI.version

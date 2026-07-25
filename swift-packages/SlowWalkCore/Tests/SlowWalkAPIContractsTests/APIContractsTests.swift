@@ -4,171 +4,258 @@ import SlowWalkDomain
 import XCTest
 
 final class APIContractsTests: XCTestCase {
-    private let timestamp = Date(timeIntervalSince1970: 1_735_689_600)
+    private let timestamp = Date(
+        timeIntervalSince1970: 1_735_689_600
+    )
 
-    func testRequestAndResponseRoundTripWithISO8601Coding() throws {
+    func testMedicineAssessmentRequestRoundTripsWithISO8601Coding()
+        throws
+    {
         let request = makeRequest()
-        let assessment = RiskAssessment(
-            level: .green,
-            reasons: [],
-            recommendedActions: [.followVerifiedSourceInformation],
-            assessedAt: timestamp,
-            requiresProfessionalAdvice: false,
-            requiresFamilyAttention: false,
-            evidenceCompleteness: .complete
-        )
-        let response = RiskAssessmentResponseDTO(
-            requestID: request.requestID,
-            assessment: assessment,
-            sourceReferences: request.medicine.sourceReferences,
-            generatedAt: timestamp,
-            apiVersion: SlowWalkAPI.version
-        )
-        let envelope = RoundTripEnvelope(request: request, response: response)
+        let data = try SlowWalkJSONCoding.makeEncoder()
+            .encode(request)
+        let decoded = try SlowWalkJSONCoding.makeDecoder()
+            .decode(
+                MedicineAssessmentRequestDTO.self,
+                from: data
+            )
 
-        let data = try SlowWalkJSONCoding.makeEncoder().encode(envelope)
-        let decoded = try SlowWalkJSONCoding.makeDecoder().decode(
-            RoundTripEnvelope.self,
-            from: data
+        XCTAssertEqual(decoded, request)
+        let json = try XCTUnwrap(
+            String(data: data, encoding: .utf8)
         )
-
-        XCTAssertEqual(decoded, envelope)
-        let json = try XCTUnwrap(String(data: data, encoding: .utf8))
-        XCTAssertTrue(json.contains("2025-01-01T00:00:00.000Z"))
-        XCTAssertFalse(json.contains("RiskAssessmentRequestDTO"))
+        XCTAssertTrue(
+            json.contains("2025-01-01T00:00:00.000Z")
+        )
+        XCTAssertFalse(
+            json.contains("RiskAssessmentRequestDTO")
+        )
+        XCTAssertFalse(json.contains("\"medicine\":"))
+        XCTAssertFalse(
+            json.contains("\"sourceReferences\":")
+        )
     }
 
-    func testEncoderUsesFractionalISO8601AndDecoderPreservesMilliseconds() throws {
-        let date = Date(timeIntervalSince1970: 1_735_689_600.123)
-        let data = try SlowWalkJSONCoding.makeEncoder().encode(DateBox(date: date))
-        let json = try XCTUnwrap(String(data: data, encoding: .utf8))
-        let decoded = try SlowWalkJSONCoding.makeDecoder().decode(
-            DateBox.self,
-            from: data
+    func testEncoderUsesFractionalISO8601AndDecoderPreservesMilliseconds()
+        throws
+    {
+        let date = Date(
+            timeIntervalSince1970: 1_735_689_600.123
         )
+        let data = try SlowWalkJSONCoding.makeEncoder()
+            .encode(DateBox(date: date))
+        let json = try XCTUnwrap(
+            String(data: data, encoding: .utf8)
+        )
+        let decoded = try SlowWalkJSONCoding.makeDecoder()
+            .decode(DateBox.self, from: data)
 
-        XCTAssertTrue(json.contains("2025-01-01T00:00:00.123Z"))
-        XCTAssertEqual(decoded.date.timeIntervalSince1970, date.timeIntervalSince1970, accuracy: 0.001)
+        XCTAssertTrue(
+            json.contains("2025-01-01T00:00:00.123Z")
+        )
+        XCTAssertEqual(
+            decoded.date.timeIntervalSince1970,
+            date.timeIntervalSince1970,
+            accuracy: 0.001
+        )
     }
 
-    func testDecoderAcceptsISO8601WithoutFractionalSeconds() throws {
-        let data = Data(#"{"date":"2025-01-01T00:00:00Z"}"#.utf8)
-
-        let decoded = try SlowWalkJSONCoding.makeDecoder().decode(
-            DateBox.self,
-            from: data
+    func testDecoderAcceptsISO8601WithoutFractionalSeconds()
+        throws
+    {
+        let data = Data(
+            #"{"date":"2025-01-01T00:00:00Z"}"#.utf8
         )
+
+        let decoded = try SlowWalkJSONCoding.makeDecoder()
+            .decode(DateBox.self, from: data)
 
         XCTAssertEqual(decoded.date, timestamp)
     }
 
     func testDecoderRejectsNonISO8601Date() {
-        let data = Data(#"{"date":"01/01/2025"}"#.utf8)
+        let data = Data(
+            #"{"date":"01/01/2025"}"#.utf8
+        )
 
         XCTAssertThrowsError(
-            try SlowWalkJSONCoding.makeDecoder().decode(DateBox.self, from: data)
+            try SlowWalkJSONCoding.makeDecoder().decode(
+                DateBox.self,
+                from: data
+            )
         )
     }
 
-    func testAPIErrorRoundTripsWithoutUntypedDetails() throws {
+    func testAPIErrorRoundTripsWithTypedCode() throws {
         let error = APIErrorDTO(
-            code: "validation_failed",
+            code: .validationError,
             message: "The request is invalid.",
             requestID: fixedUUID(lastByte: 9),
             details: [
                 APIErrorDetailDTO(
-                    field: "scanEvent.confidence",
+                    field: "input.rawConfidence",
                     code: "out_of_range",
-                    message: "Confidence must be between zero and one."
+                    message:
+                        "Confidence must be between zero and one."
                 ),
             ]
         )
 
-        let data = try SlowWalkJSONCoding.makeEncoder().encode(error)
-        let decoded = try SlowWalkJSONCoding.makeDecoder().decode(
-            APIErrorDTO.self,
-            from: data
+        let data = try SlowWalkJSONCoding.makeEncoder()
+            .encode(error)
+        let decoded = try SlowWalkJSONCoding.makeDecoder()
+            .decode(APIErrorDTO.self, from: data)
+        let json = try XCTUnwrap(
+            String(data: data, encoding: .utf8)
         )
 
         XCTAssertEqual(decoded, error)
+        XCTAssertTrue(
+            json.contains("\"code\":\"VALIDATION_ERROR\"")
+        )
     }
 
-    func testAllSharedRiskFixturesDecode() throws {
-        let fixtureNames = [
-            "green-risk.json",
-            "yellow-risk.json",
-            "orange-risk.json",
-            "red-risk.json",
-            "recognition-failed.json",
-        ]
-        let fixtureDirectory = sharedFixtureDirectory()
+    func testLegacyLowercaseErrorAliasDecodesCentrally()
+        throws
+    {
+        let data = Data(
+            """
+            {
+              "code": "invalid_json",
+              "message": "Legacy response.",
+              "requestID": "00000000-0000-0000-0000-000000000009"
+            }
+            """.utf8
+        )
 
-        for fixtureName in fixtureNames {
-            let fixtureURL = fixtureDirectory.appendingPathComponent(fixtureName)
-            let data = try Data(contentsOf: fixtureURL)
-            let envelope = try SlowWalkJSONCoding.makeDecoder().decode(
-                FixtureEnvelope.self,
-                from: data
-            )
+        let decoded = try SlowWalkJSONCoding.makeDecoder()
+            .decode(APIErrorDTO.self, from: data)
 
-            XCTAssertEqual(envelope.request.apiVersion, SlowWalkAPI.version)
+        XCTAssertEqual(decoded.code, .malformedRequest)
+        XCTAssertEqual(
+            decoded.code.rawValue,
+            "MALFORMED_REQUEST"
+        )
+    }
+
+    func testEveryAPIErrorCodeIsCanonicalUpperSnakeCase() {
+        XCTAssertFalse(APIErrorCode.allCases.isEmpty)
+        for code in APIErrorCode.allCases {
             XCTAssertEqual(
-                envelope.expectedResponse.apiVersion,
-                SlowWalkAPI.version
+                code.rawValue,
+                code.rawValue.uppercased()
             )
-            XCTAssertEqual(
-                envelope.request.requestID,
-                envelope.expectedResponse.requestID
+            XCTAssertNotNil(
+                code.rawValue.range(
+                    of: #"^[A-Z][A-Z0-9_]*$"#,
+                    options: .regularExpression
+                )
             )
         }
     }
 
-    private func makeRequest() -> RiskAssessmentRequestDTO {
-        let source = SourceReference(
-            sourceName: "Demo Source",
-            documentTitle: "DEMO DATA - NOT FOR CLINICAL USE",
-            optionalURL: nil,
-            retrievedAt: timestamp,
-            versionOrDate: "demo-v1"
-        )
-        let medicine = Medicine(
-            id: "medicine-a",
-            canonicalName: "Demo Medicine",
-            aliases: ["Demo Alias"],
-            activeIngredientIDs: ["ingredient-a"],
-            medicineCategory: .other,
-            sourceReferences: [source],
-            dosageTextFromSource: nil,
-            contraindicationTags: []
-        )
-        let profile = UserHealthProfile(
-            id: fixedUUID(lastByte: 1),
-            age: 70,
-            allergies: [],
-            diagnosedConditions: [],
-            currentMedicineIngredientIDs: [],
-            bodyMetrics: BodyMetrics(
-                systolicBloodPressure: 120,
-                diastolicBloodPressure: 80,
-                heartRate: 70,
-                measuredAt: timestamp
-            ),
-            updatedAt: timestamp
-        )
-        let scan = MedicineScanEvent(
-            id: fixedUUID(lastByte: 2),
-            recognizedText: medicine.canonicalName,
-            candidateMedicineID: medicine.id,
-            confidence: 0.99,
-            scannedAt: timestamp,
-            recognitionStatus: .recognized
-        )
+    func testEndpointErrorCodeSnapshots() {
+        let snapshots: [
+            SlowWalkAPI.Endpoint: [String]
+        ] = [
+            .medicineSearch: [
+                "UNSUPPORTED_MEDIA_TYPE",
+                "MALFORMED_REQUEST",
+                "UNSUPPORTED_API_VERSION",
+                "VALIDATION_ERROR",
+                "KNOWLEDGE_SOURCE_UNAVAILABLE",
+                "KNOWLEDGE_SOURCE_TIMEOUT",
+                "INVALID_SOURCE_RESPONSE",
+                "SOURCE_VERSION_UNSUPPORTED",
+                "MEDICINE_NOT_FOUND",
+                "SOURCE_CONFLICT",
+                "OFFLINE_CACHE_UNAVAILABLE",
+            ],
+            .medicineResolve: [
+                "UNSUPPORTED_MEDIA_TYPE",
+                "MALFORMED_REQUEST",
+                "UNSUPPORTED_API_VERSION",
+                "VALIDATION_ERROR",
+                "KNOWLEDGE_SOURCE_UNAVAILABLE",
+                "KNOWLEDGE_SOURCE_TIMEOUT",
+                "INVALID_SOURCE_RESPONSE",
+                "SOURCE_VERSION_UNSUPPORTED",
+                "MEDICINE_NOT_FOUND",
+                "SOURCE_CONFLICT",
+                "OFFLINE_CACHE_UNAVAILABLE",
+                "MEDICINE_AMBIGUOUS",
+                "MEDICINE_RECOGNITION_FAILED",
+                "MEDICINE_INSUFFICIENT_EVIDENCE",
+                "INTERNAL_ERROR",
+            ],
+            .medicineAssess: [
+                "UNSUPPORTED_MEDIA_TYPE",
+                "MALFORMED_REQUEST",
+                "UNSUPPORTED_API_VERSION",
+                "VALIDATION_ERROR",
+                "KNOWLEDGE_SOURCE_UNAVAILABLE",
+                "KNOWLEDGE_SOURCE_TIMEOUT",
+                "INVALID_SOURCE_RESPONSE",
+                "SOURCE_VERSION_UNSUPPORTED",
+                "MEDICINE_NOT_FOUND",
+                "SOURCE_CONFLICT",
+                "OFFLINE_CACHE_UNAVAILABLE",
+                "INVALID_USER_PROFILE",
+                "UNSUPPORTED_PROFILE_SCHEMA",
+                "INVALID_MEDICATION_RECORD",
+                "FUTURE_MEDICATION_RECORD",
+                "INVALID_BODY_METRICS",
+                "INTERNAL_ERROR",
+            ],
+            .locationAssess: [
+                "UNSUPPORTED_MEDIA_TYPE",
+                "MALFORMED_REQUEST",
+                "UNSUPPORTED_API_VERSION",
+                "VALIDATION_ERROR",
+                "INVALID_LOCATION_SAMPLE",
+                "LOCATION_DATA_STALE",
+                "LOCATION_ACCURACY_INSUFFICIENT",
+                "INSUFFICIENT_LOCATION_HISTORY",
+            ],
+        ]
 
-        return RiskAssessmentRequestDTO(
-            medicine: medicine,
-            userProfile: profile,
+        for endpoint in SlowWalkAPI.Endpoint.allCases {
+            XCTAssertEqual(
+                endpoint.errorCodes.map(\.rawValue),
+                snapshots[endpoint] ?? []
+            )
+        }
+    }
+
+    private func makeRequest()
+        -> MedicineAssessmentRequestDTO
+    {
+        MedicineAssessmentRequestDTO(
+            input: MedicineRecognitionInput(
+                recognizedTexts: ["Demo Medicine"],
+                capturedAt: timestamp,
+                languageCode: "en",
+                rawConfidence: 0.99
+            ),
+            userProfile: UserHealthProfileDTO(
+                id: fixedUUID(lastByte: 1),
+                age: 70,
+                allergies: [],
+                diagnosedConditions: [],
+                currentMedicineIngredientIDs: [],
+                bodyMetrics: BodyMetricsDTO(
+                    systolicBloodPressure: 120,
+                    diastolicBloodPressure: 80,
+                    heartRate: 70,
+                    measuredAt: timestamp,
+                    source: "demo_data",
+                    deviceIdentifier: nil
+                ),
+                createdAt: timestamp,
+                updatedAt: timestamp,
+                schemaVersion: 1
+            ),
             recentRecords: [],
-            scanEvent: scan,
             requestID: fixedUUID(lastByte: 3),
             apiVersion: SlowWalkAPI.version
         )
@@ -176,30 +263,12 @@ final class APIContractsTests: XCTestCase {
 
     private func fixedUUID(lastByte: UInt8) -> UUID {
         UUID(
-            uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, lastByte)
+            uuid: (
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, lastByte
+            )
         )
     }
-
-    private func sharedFixtureDirectory() -> URL {
-        var directory = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-        for _ in 0 ..< 4 {
-            directory.deleteLastPathComponent()
-        }
-        return directory
-            .appendingPathComponent("shared", isDirectory: true)
-            .appendingPathComponent("fixtures", isDirectory: true)
-    }
-}
-
-private struct RoundTripEnvelope: Codable, Equatable {
-    let request: RiskAssessmentRequestDTO
-    let response: RiskAssessmentResponseDTO
-}
-
-private struct FixtureEnvelope: Decodable {
-    let request: RiskAssessmentRequestDTO
-    let expectedResponse: RiskAssessmentResponseDTO
 }
 
 private struct DateBox: Codable {

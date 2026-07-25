@@ -23,7 +23,8 @@ SlowWalkAPIContracts
 SlowWalkServer
 ```
 
-- `SlowWalkLocationRisk` 只依赖 `SlowWalkDomain` 提供的 `Clock`。
+- `SlowWalkLocationRisk` 依赖 `SlowWalkDomain` 提供的 `Clock` 和共享
+  `RiskLevel`。
 - `SlowWalkAPIContracts` 复用正式位置模型定义 API v1 DTO。
 - `SlowWalkServer` 只负责解码、输入分类、错误映射和依赖注入。
 - Hummingbird route 不包含位置判断规则。
@@ -36,6 +37,7 @@ LocationSample
   → LocationDataQualityAssessor
   → HaversineDistanceCalculator
   → GeofenceEvaluator
+  → ProgressTowardDestinationEvaluator
   → ProlongedStopEvaluator / MovingAwayEvaluator
   → LocationRiskEngine
   → LocationAssessment
@@ -67,6 +69,12 @@ LocationSample
 - `approaching`
 - `inside`
 
+geofence 只表示空间关系，不自动证明用户正在前进。只有所有保留样本的目的地距离
+都超过噪声容差持续递减，且总递减量达到演示阈值时，才产生
+`progressingTowardDestination`；进入 approaching buffer 后使用独立
+`approachingDestination` reason。geofence 外趋势不可判定时至少 yellow，并返回
+`locationTrendIndeterminate`，不得自动显示 green。
+
 ## 异常停留
 
 `ProlongedStopEvaluator` 同时要求：
@@ -93,14 +101,21 @@ LocationSample
 `LocationRiskEngine`：
 
 1. 保留全部命中原因并稳定排序；
-2. 使用命中规则的最高等级；
-3. 数据不足至少 yellow；
-4. 可靠样本进入目的地 geofence 时可返回 green；
-5. 单个 prolonged stop 或 moving away 为 orange；
-6. 至少两个独立 orange 信号才按 demo 配置升级为 red；
-7. red 不会被低等级提示覆盖。
+2. medicine 与 location 统一复用 `SlowWalkDomain.RiskLevel` 的
+   green/yellow/orange/red raw value；
+3. 数据不足、stale、低精度或趋势不可判定至少 yellow；
+4. 只有 inside geofence 才使用 arrived reason/文案；
+5. geofence 外只有明确距离递减趋势才能返回 green；
+6. 单个 prolonged stop 或 moving away 为 orange；
+7. red 聚合只统计 `prolongedStop`、`movingAway` 及未来明确批准的行为信号；
+8. invalid coordinate、乱序、跳点、stale、低精度和样本不足可阻止 green 或输出
+   yellow/orange，但不参与 family-attention red 计数；
+9. red 不会被低等级提示覆盖。
 
-`LocationActionCardFactory` 根据最终等级生成结构化提示。它只建议用户在安全位置重新确认、检查方向或主动联系家属/工作人员，不会自动联系任何人。
+`LocationActionCardFactory` 同时读取 level 与 reason，分别输出 arrived、
+approaching、progressing、trend indeterminate、low accuracy 及行为风险文案。
+它只建议用户在安全位置重新确认、检查方向或主动联系家属/工作人员，不会自动联系
+任何人。red 卡片不包含普通继续导航动作。
 
 ## API
 
@@ -136,6 +151,8 @@ LocationSample
 
 稳定错误码：
 
+- `UNSUPPORTED_MEDIA_TYPE`
+- `VALIDATION_ERROR`
 - `INVALID_LOCATION_SAMPLE`
 - `LOCATION_DATA_STALE`
 - `LOCATION_ACCURACY_INSUFFICIENT`
