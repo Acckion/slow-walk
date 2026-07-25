@@ -3,16 +3,19 @@ import Hummingbird
 import HummingbirdTesting
 import SlowWalkAPIContracts
 import SlowWalkDataInterfaces
-import SlowWalkDomain
 @testable import SlowWalkServer
 import XCTest
 
-final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
-    private let now = Date(timeIntervalSince1970: 1_735_689_600)
+final class SlowWalkServerTests:
+    XCTestCase,
+    @unchecked Sendable
+{
+    private let now = Date(
+        timeIntervalSince1970: 1_735_689_600
+    )
 
     func testHealthReturnsContractJSON() async throws {
-        let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
-        let application = try makeTestApplication(fallbackID: fallbackID)
+        let application = try makeTestApplication()
 
         try await application.test(.router) { client in
             try await client.execute(
@@ -33,249 +36,166 @@ final class SlowWalkServerTests: XCTestCase, @unchecked Sendable {
                     HealthResponseDTO(
                         status: "ok",
                         service: "slow-walk-server",
-                        apiVersion: "v1"
+                        apiVersion: SlowWalkAPI.version
                     )
                 )
             }
         }
     }
 
-    func testRiskAssessmentSuccessUsesCoreEngine() async throws {
-        let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
-        let request = try makeValidRequest()
-        let body = try encode(request)
-        let application = try makeTestApplication(fallbackID: fallbackID)
+    func testRawRiskRouteIsNotRegisteredForForgedMedicine()
+        async throws
+    {
+        let application = try makeTestApplication()
+        let forgedPayload = ByteBuffer(
+            string:
+                """
+                {
+                  "medicine": {
+                    "id": "forged",
+                    "activeIngredientIDs": [],
+                    "sourceReferences": [{
+                      "sourceName": "forged",
+                      "documentTitle": "forged",
+                      "retrievedAt": "2025-01-01T00:00:00Z",
+                      "versionOrDate": "forged"
+                    }]
+                  }
+                }
+                """
+        )
 
         try await application.test(.router) { client in
             try await client.execute(
                 uri: "/api/v1/risk/assess",
                 method: .post,
-                headers: [.contentType: "application/json"],
-                body: body
+                headers: [
+                    .contentType: "application/json",
+                ],
+                body: forgedPayload
             ) { response in
-                XCTAssertEqual(response.status, .ok)
-                XCTAssertEqual(
-                    response.headers[.contentType],
-                    "application/json; charset=utf-8"
+                XCTAssertEqual(response.status, .notFound)
+                let body = String(
+                    decoding:
+                        response.body.readableBytesView,
+                    as: UTF8.self
                 )
-
-                let output = try self.decode(
-                    RiskAssessmentResponseDTO.self,
-                    from: response.body
-                )
-                XCTAssertEqual(output.requestID, request.requestID)
-                XCTAssertEqual(output.generatedAt, self.now)
-                XCTAssertEqual(output.apiVersion, SlowWalkAPI.version)
-                XCTAssertEqual(output.assessment.level, .green)
-                XCTAssertEqual(output.assessment.assessedAt, self.now)
-                XCTAssertEqual(output.assessment.reasons, [])
-                XCTAssertEqual(
-                    output.assessment.recommendedActions,
-                    [.followVerifiedSourceInformation]
-                )
-                XCTAssertFalse(output.assessment.requiresProfessionalAdvice)
-                XCTAssertFalse(output.assessment.requiresFamilyAttention)
-                XCTAssertEqual(
-                    output.assessment.evidenceCompleteness,
-                    .complete
-                )
-                XCTAssertEqual(
-                    output.sourceReferences,
-                    request.medicine.sourceReferences
+                XCTAssertFalse(body.contains("\"green\""))
+                XCTAssertFalse(
+                    body.contains("sourceReferences")
                 )
             }
         }
     }
 
-    func testMalformedJSONReturnsTypedError() async throws {
-        let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
-        let application = try makeTestApplication(fallbackID: fallbackID)
+    func testCanonicalRoutesExcludeRawRiskPath() {
+        let paths = SlowWalkAPI.Endpoint.allCases
+            .map(\.path)
+
+        XCTAssertEqual(Set(paths).count, 4)
+        XCTAssertTrue(
+            paths.allSatisfy {
+                $0.hasPrefix(
+                    SlowWalkAPI.routePrefix + "/"
+                )
+            }
+        )
+        XCTAssertFalse(
+            paths.contains("/api/v1/risk/assess")
+        )
+    }
+
+    func testEveryPOSTEndpointUsesCanonicalMediaTypeError()
+        async throws
+    {
+        let application = try makeTestApplication()
 
         try await application.test(.router) { client in
-            try await client.execute(
-                uri: "/api/v1/risk/assess",
-                method: .post,
-                headers: [.contentType: "application/json"],
-                body: ByteBuffer(string: #"{"medicine":"#)
-            ) { response in
-                XCTAssertEqual(response.status, .badRequest)
-                let error = try self.decode(
-                    APIErrorDTO.self,
-                    from: response.body
-                )
-                XCTAssertEqual(error.code, "invalid_json")
-                XCTAssertEqual(error.requestID, fallbackID)
-                XCTAssertNil(error.details)
+            for endpoint in SlowWalkAPI.Endpoint.allCases {
+                try await client.execute(
+                    uri: endpoint.path,
+                    method: .post,
+                    body: ByteBuffer(string: "{}")
+                ) { response in
+                    XCTAssertEqual(
+                        response.status,
+                        .badRequest,
+                        endpoint.path
+                    )
+                    let error = try self.decode(
+                        APIErrorDTO.self,
+                        from: response.body
+                    )
+                    XCTAssertEqual(
+                        error.code,
+                        .unsupportedMediaType,
+                        endpoint.path
+                    )
+                    XCTAssertEqual(
+                        error.code.rawValue,
+                        "UNSUPPORTED_MEDIA_TYPE"
+                    )
+                    XCTAssertEqual(
+                        error.requestID,
+                        self.fallbackRequestID
+                    )
+                }
             }
         }
     }
 
-    func testMissingRequiredFieldReturnsValidationError() async throws {
-        let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
-        let validRequest = try makeValidRequest()
-        let request = RequestWithoutAPIVersion(validRequest)
-        let application = try makeTestApplication(fallbackID: fallbackID)
-
-        try await application.test(.router) { client in
-            try await client.execute(
-                uri: "/api/v1/risk/assess",
-                method: .post,
-                headers: [.contentType: "application/json"],
-                body: try encode(request)
-            ) { response in
-                XCTAssertEqual(response.status, .unprocessableContent)
-                let error = try self.decode(
-                    APIErrorDTO.self,
-                    from: response.body
+    func testPathAndBodyVersionMappingIsCentralized() {
+        for endpoint in SlowWalkAPI.Endpoint.allCases {
+            XCTAssertTrue(
+                SlowWalkAPI.supports(
+                    bodyVersion: SlowWalkAPI.version,
+                    for: endpoint
                 )
-                XCTAssertEqual(error.code, "validation_error")
-                XCTAssertEqual(error.requestID, fallbackID)
-                XCTAssertEqual(error.details?.first?.field, "apiVersion")
-                XCTAssertEqual(
-                    error.details?.first?.code,
-                    "missing_required_field"
+            )
+            XCTAssertFalse(
+                SlowWalkAPI.supports(
+                    bodyVersion: "v999",
+                    for: endpoint
                 )
-            }
+            )
+            XCTAssertEqual(
+                endpoint.path,
+                SlowWalkAPI.routePrefix
+                    + endpoint.rawValue
+            )
         }
     }
 
-    func testSemanticValidationReturnsFieldDetails() async throws {
-        let fallbackID = try makeUUID("00000000-0000-0000-0000-000000000099")
-        let invalidRequest = try makeRequest(age: 0)
-        let application = try makeTestApplication(fallbackID: fallbackID)
-
-        try await application.test(.router) { client in
-            try await client.execute(
-                uri: "/api/v1/risk/assess",
-                method: .post,
-                headers: [.contentType: "application/json"],
-                body: try encode(invalidRequest)
-            ) { response in
-                XCTAssertEqual(response.status, .unprocessableContent)
-                let error = try self.decode(
-                    APIErrorDTO.self,
-                    from: response.body
-                )
-                XCTAssertEqual(error.code, "validation_error")
-                XCTAssertEqual(error.requestID, invalidRequest.requestID)
-                XCTAssertTrue(
-                    error.details?.contains {
-                        $0.field == "userProfile.age"
-                            && $0.code == "out_of_range"
-                    } == true
-                )
-            }
-        }
-    }
-
-    private func makeTestApplication(
-        fallbackID: UUID
-    ) throws -> some ApplicationProtocol {
+    private func makeTestApplication()
+        throws -> some ApplicationProtocol
+    {
         try makeSlowWalkApplication(
             configuration: .init(port: 0),
-            dateProvider: FixedDateProvider(fixedDate: now),
-            uuidProvider: FixedUUIDProvider(fixedUUID: fallbackID)
-        )
-    }
-
-    private func makeValidRequest() throws -> RiskAssessmentRequestDTO {
-        try makeRequest(age: 72)
-    }
-
-    private func makeRequest(age: Int) throws -> RiskAssessmentRequestDTO {
-        let source = SourceReference(
-            sourceName: "Demo medicines reference",
-            documentTitle: "Acetaminophen demo monograph",
-            optionalURL: nil,
-            retrievedAt: now.addingTimeInterval(-86_400),
-            versionOrDate: "2025-01-01"
-        )
-        let medicine = Medicine(
-            id: "medicine-acetaminophen",
-            canonicalName: "Acetaminophen",
-            aliases: ["Paracetamol"],
-            activeIngredientIDs: ["acetaminophen"],
-            medicineCategory: .analgesic,
-            sourceReferences: [source],
-            dosageTextFromSource: nil,
-            contraindicationTags: []
-        )
-        let bodyMetrics = BodyMetrics(
-            systolicBloodPressure: 120,
-            diastolicBloodPressure: 80,
-            heartRate: 70,
-            measuredAt: now.addingTimeInterval(-300)
-        )
-        let userProfile = UserHealthProfile(
-            id: try makeUUID("00000000-0000-0000-0000-000000000001"),
-            age: age,
-            allergies: [],
-            diagnosedConditions: [],
-            currentMedicineIngredientIDs: [],
-            bodyMetrics: bodyMetrics,
-            updatedAt: now.addingTimeInterval(-300)
-        )
-        let scanEvent = MedicineScanEvent(
-            id: try makeUUID("00000000-0000-0000-0000-000000000002"),
-            recognizedText: "Acetaminophen",
-            candidateMedicineID: medicine.id,
-            confidence: 0.99,
-            scannedAt: now.addingTimeInterval(-60),
-            recognitionStatus: .recognized
-        )
-
-        return RiskAssessmentRequestDTO(
-            medicine: medicine,
-            userProfile: userProfile,
-            recentRecords: [],
-            scanEvent: scanEvent,
-            requestID: try makeUUID(
-                "00000000-0000-0000-0000-000000000003"
+            dateProvider: FixedDateProvider(
+                fixedDate: now
             ),
-            apiVersion: SlowWalkAPI.version
+            uuidProvider: FixedUUIDProvider(
+                fixedUUID: fallbackRequestID
+            )
         )
-    }
-
-    private func makeUUID(
-        _ value: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws -> UUID {
-        try XCTUnwrap(
-            UUID(uuidString: value),
-            "Invalid UUID test fixture.",
-            file: file,
-            line: line
-        )
-    }
-
-    private func encode<Value: Encodable>(
-        _ value: Value
-    ) throws -> ByteBuffer {
-        ByteBuffer(bytes: try SlowWalkJSONCoding.makeEncoder().encode(value))
     }
 
     private func decode<Value: Decodable>(
         _ type: Value.Type,
         from buffer: ByteBuffer
     ) throws -> Value {
-        let data = Data(buffer.readableBytesView)
-        return try SlowWalkJSONCoding.makeDecoder().decode(type, from: data)
+        try SlowWalkJSONCoding.makeDecoder().decode(
+            type,
+            from: Data(buffer.readableBytesView)
+        )
     }
-}
 
-private struct RequestWithoutAPIVersion: Encodable {
-    let medicine: Medicine
-    let userProfile: UserHealthProfile
-    let recentRecords: [MedicationRecord]
-    let scanEvent: MedicineScanEvent
-    let requestID: UUID
-
-    init(_ request: RiskAssessmentRequestDTO) {
-        medicine = request.medicine
-        userProfile = request.userProfile
-        recentRecords = request.recentRecords
-        scanEvent = request.scanEvent
-        requestID = request.requestID
+    private var fallbackRequestID: UUID {
+        UUID(
+            uuid: (
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 99
+            )
+        )
     }
 }

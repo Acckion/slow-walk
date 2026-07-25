@@ -360,6 +360,107 @@ final class LocationRiskCoreTests: XCTestCase {
         XCTAssertTrue(assessment.requiresUserAttention)
     }
 
+    func testShortStationaryTrackCannotBeGreenProgress()
+        throws
+    {
+        let assessment = try engine.assess(
+            destination: destination,
+            recentSamples: [
+                sample(longitude: 20.005, age: 120),
+                sample(longitude: 20.005, age: 60),
+                sample(longitude: 20.005, age: 0),
+            ]
+        )
+
+        XCTAssertEqual(assessment.level, .yellow)
+        XCTAssertFalse(
+            assessment.reasons.contains {
+                $0.code == .progressingTowardDestination
+            }
+        )
+        XCTAssertTrue(
+            assessment.reasons.contains {
+                $0.code == .locationTrendIndeterminate
+            }
+        )
+    }
+
+    func testLateralMovementCannotBeGreenProgress()
+        throws
+    {
+        let assessment = try engine.assess(
+            destination: destination,
+            recentSamples: [
+                sample(
+                    latitude: 10.001,
+                    longitude: 20.005,
+                    age: 120
+                ),
+                sample(
+                    latitude: 10,
+                    longitude: 20.005,
+                    age: 60
+                ),
+                sample(
+                    latitude: 9.999,
+                    longitude: 20.005,
+                    age: 0
+                ),
+            ]
+        )
+
+        XCTAssertEqual(assessment.level, .yellow)
+        XCTAssertFalse(
+            assessment.reasons.contains {
+                $0.code == .progressingTowardDestination
+            }
+        )
+    }
+
+    func testExplicitDecreasingDistanceTrendIsGreen()
+        throws
+    {
+        let assessment = try engine.assess(
+            destination: destination,
+            recentSamples: [
+                sample(longitude: 20.007, age: 240),
+                sample(longitude: 20.005, age: 120),
+                sample(longitude: 20.003, age: 0),
+            ]
+        )
+
+        XCTAssertEqual(assessment.level, .green)
+        XCTAssertTrue(
+            assessment.reasons.contains {
+                $0.code == .progressingTowardDestination
+            }
+        )
+    }
+
+    func testApproachingTrendUsesSpecificReasonAndCopy()
+        throws
+    {
+        let assessment = try engine.assess(
+            destination: destination,
+            recentSamples: [
+                sample(longitude: 20.0020, age: 120),
+                sample(longitude: 20.0015, age: 60),
+                sample(longitude: 20.0010, age: 0),
+            ]
+        )
+        let card = LocationActionCardFactory()
+            .makeCard(from: assessment)
+
+        XCTAssertEqual(assessment.level, .green)
+        XCTAssertTrue(
+            assessment.reasons.contains {
+                $0.code == .approachingDestination
+            }
+        )
+        XCTAssertEqual(card.title, "正在接近目的地")
+        XCTAssertFalse(card.title.contains("到达"))
+    }
+
     func testArrivedWithReliableHistoryIsGreen() throws {
         let assessment = try engine.assess(
             destination: destination,
@@ -376,6 +477,9 @@ final class LocationRiskCoreTests: XCTestCase {
             assessment.recommendedActions,
             [.confirmArrival]
         )
+        let card = LocationActionCardFactory()
+            .makeCard(from: assessment)
+        XCTAssertEqual(card.title, "已到达目的地范围")
     }
 
     func testProlongedStopProducesOrangeNotRed() throws {
@@ -416,6 +520,83 @@ final class LocationRiskCoreTests: XCTestCase {
         )
     }
 
+    func testTwoDataQualityOrangeReasonsCannotProduceRed()
+        throws
+    {
+        let quality = LocationDataQuality(
+            status: .invalid,
+            accuracy: .good,
+            issues: [
+                qualityIssue(
+                    code: .samplesOutOfOrder,
+                    rule: "test-order"
+                ),
+                qualityIssue(
+                    code: .implausibleJump,
+                    rule: "test-jump"
+                ),
+            ],
+            usableSampleIndices: [0, 1, 2],
+            configurationNotices:
+                LocationRiskConfiguration.notices
+        )
+        let assessment = try engine(
+            quality: quality
+        ).assess(
+            destination: destination,
+            recentSamples: [
+                sample(longitude: 20.005, age: 120),
+                sample(longitude: 20.005, age: 60),
+                sample(longitude: 20.005, age: 0),
+            ]
+        )
+
+        XCTAssertEqual(assessment.level, .orange)
+        XCTAssertFalse(assessment.requiresFamilyAttention)
+        XCTAssertFalse(
+            assessment.reasons.contains {
+                $0.code == .multipleHighRiskSignals
+            }
+        )
+    }
+
+    func testQualityOrangePlusOneBehaviorIsNotTwoBehaviors()
+        throws
+    {
+        let quality = LocationDataQuality(
+            status: .invalid,
+            accuracy: .good,
+            issues: [
+                qualityIssue(
+                    code: .implausibleJump,
+                    rule: "test-jump"
+                ),
+            ],
+            usableSampleIndices: [0, 1, 2],
+            configurationNotices:
+                LocationRiskConfiguration.notices
+        )
+        let assessment = try engine(
+            quality: quality
+        ).assess(
+            destination: destination,
+            recentSamples: prolongedStopSamples
+        )
+
+        XCTAssertEqual(assessment.level, .orange)
+        XCTAssertTrue(
+            assessment.reasons.contains {
+                $0.code == .prolongedStop
+            }
+        )
+        XCTAssertFalse(assessment.requiresFamilyAttention)
+        XCTAssertFalse(
+            assessment.reasons.contains {
+                $0.code == .multipleHighRiskSignals
+            }
+        )
+    }
+
     func testReasonOrderingAndOutputAreDeterministic()
         throws {
         let first = try engine.assess(
@@ -444,7 +625,12 @@ final class LocationRiskCoreTests: XCTestCase {
         XCTAssertEqual(card.riskLevel, .red)
         XCTAssertEqual(
             card.primaryInstruction,
-            "当前出现多项高风险位置异常，建议联系家属或工作人员。"
+            "检测到多个独立行为风险，请停在安全位置并联系家属或工作人员。"
+        )
+        XCTAssertFalse(
+            card.recommendedActions.contains(
+                .continueTowardDestination
+            )
         )
         XCTAssertTrue(
             card.warnings.contains(
@@ -465,6 +651,18 @@ final class LocationRiskCoreTests: XCTestCase {
     private var engine: LocationRiskEngine {
         LocationRiskEngine(
             clock: LocationTestClock(date: now)
+        )
+    }
+
+    private func engine(
+        quality: LocationDataQuality
+    ) -> LocationRiskEngine {
+        LocationRiskEngine(
+            clock: LocationTestClock(date: now),
+            dataQualityAssessor:
+                FixedLocationDataQualityAssessor(
+                    result: quality
+                )
         )
     }
 
@@ -521,6 +719,19 @@ final class LocationRiskCoreTests: XCTestCase {
             source: "demo"
         )
     }
+
+    private func qualityIssue(
+        code: LocationDataQualityIssueCode,
+        rule: String
+    ) -> LocationDataQualityIssue {
+        LocationDataQualityIssue(
+            code: code,
+            message: "Test data-quality issue.",
+            sampleIndex: 1,
+            severity: .error,
+            ruleIdentifier: rule
+        )
+    }
 }
 
 private struct LocationTestClock: Clock, Sendable {
@@ -528,5 +739,19 @@ private struct LocationTestClock: Clock, Sendable {
 
     func now() -> Date {
         date
+    }
+}
+
+private struct FixedLocationDataQualityAssessor:
+    LocationDataQualityAssessing,
+    Sendable
+{
+    let result: LocationDataQuality
+
+    func assess(
+        samples: [LocationSample],
+        relativeTo referenceDate: Date
+    ) -> LocationDataQuality {
+        result
     }
 }

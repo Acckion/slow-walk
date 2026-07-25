@@ -297,6 +297,7 @@ public struct MedicineKnowledgeService:
             let candidate = makeCandidate(
                 identifier: identifier,
                 records: values,
+                responses: responses,
                 inheritedWarnings: warnings
             )
             candidates.append(candidate)
@@ -362,6 +363,8 @@ public struct MedicineKnowledgeService:
     private func makeCandidate(
         identifier: String,
         records: [MedicineKnowledgeRecord],
+        responses:
+            [String: MedicineKnowledgeSourceResponse],
         inheritedWarnings: [MedicineKnowledgeWarning]
     ) -> MedicineKnowledgeCandidate {
         let orderedRecords = records.sorted {
@@ -394,19 +397,7 @@ public struct MedicineKnowledgeService:
             return $0.field < $1.field
         }
 
-        var candidateWarnings = inheritedWarnings.filter {
-            $0.sourceIdentifiers.isEmpty
-                || $0.sourceIdentifiers.contains(
-                    primary.sourceIdentifier
-                )
-                || !$0.sourceIdentifiers
-                    .filter {
-                        orderedRecords
-                            .map(\.sourceIdentifier)
-                            .contains($0)
-                    }
-                    .isEmpty
-        }
+        var candidateWarnings = inheritedWarnings
         if !conflicts.isEmpty {
             candidateWarnings.append(
                 MedicineKnowledgeWarning(
@@ -441,14 +432,26 @@ public struct MedicineKnowledgeService:
         }
         let hasStaleSource = candidateWarnings.contains {
             $0.code == .sourceStale
+                || $0.code == .sourceRecordStale
+                || $0.code == .offlineCacheUsed
         }
+        let hasValidationConcern =
+            orderedRecords.contains {
+                $0.validationStatus != .valid
+                    || $0.completeness
+                    < policy.minimumCompleteness
+            }
+            || !candidateWarnings.isEmpty
         let mayUseDosage = primaryDescriptor?
             .isAuthoritative == true
             && primary.validationStatus == .valid
+            && primary.completeness
+            >= policy.minimumCompleteness
             && conflicts.allSatisfy {
                 $0.field != "dosageTextFromSource"
             }
             && !hasStaleSource
+            && !hasValidationConcern
         let dosageText: String?
         if mayUseDosage {
             dosageText = primary.dosageTextFromSource
@@ -470,6 +473,10 @@ public struct MedicineKnowledgeService:
 
         let references = stableSourceReferences(
             orderedRecords.map(\.sourceReference)
+                + orderedRecords.compactMap {
+                    responses[$0.sourceIdentifier]?
+                        .sourceReference
+                }
         )
         let versions = orderedRecords.map {
             "\($0.sourceIdentifier)=\($0.sourceDocumentVersion)"
@@ -517,9 +524,44 @@ public struct MedicineKnowledgeService:
             !conflicts.isEmpty
             || !hasAuthoritativeRecord
             || hasStaleSource
+            || hasValidationConcern
+            || completeness
+            < policy.minimumCompleteness
         let validationStatus:
             MedicineKnowledgeValidationStatus =
                 requiresConfirmation ? .warning : .valid
+        let stableCandidateWarnings = stableWarnings(
+            candidateWarnings
+        )
+        let hasUnverifiableProvenance =
+            !hasAuthoritativeRecord
+            || stableCandidateWarnings.contains {
+                $0.code == .provenanceUnverifiable
+                    || $0.code
+                    == .invalidSourceResponse
+                    || $0.code
+                    == .sourceVersionUnsupported
+            }
+        let verdict = KnowledgeGovernanceVerdict(
+            validationStatus: validationStatus,
+            completeness: completeness,
+            provenanceStatus: !conflicts.isEmpty
+                ? .conflicting
+                : hasUnverifiableProvenance
+                    ? .unverifiable
+                    : .verified,
+            freshnessStatus: hasStaleSource
+                ? .stale
+                : .current,
+            requiresConfirmation: requiresConfirmation,
+            requiresConservativeAction:
+                requiresConfirmation,
+            allowsDosageDisplay:
+                mayUseDosage
+                && !requiresConfirmation,
+            warnings: stableCandidateWarnings,
+            sourceReferences: references
+        )
 
         return MedicineKnowledgeCandidate(
             medicine: medicine,
@@ -529,8 +571,9 @@ public struct MedicineKnowledgeService:
                 orderedRecords.map(\.sourceIdentifier)
             ),
             conflicts: conflicts,
-            warnings: stableWarnings(candidateWarnings),
-            requiresConfirmation: requiresConfirmation
+            warnings: stableCandidateWarnings,
+            requiresConfirmation: requiresConfirmation,
+            governanceVerdict: verdict
         )
     }
 

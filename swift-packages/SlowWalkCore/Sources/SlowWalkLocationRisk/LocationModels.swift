@@ -1,4 +1,5 @@
 import Foundation
+import SlowWalkDomain
 
 public struct GeoPoint: Codable, Sendable, Equatable, Hashable {
     public let latitude: Double
@@ -66,40 +67,8 @@ public enum LocationAccuracy:
     case missing
 }
 
-public enum LocationRiskLevel:
-    String,
-    Codable,
-    Sendable,
-    CaseIterable,
-    Comparable,
-    Equatable,
-    Hashable
-{
-    case green
-    case yellow
-    case orange
-    case red
-
-    public static func < (
-        lhs: LocationRiskLevel,
-        rhs: LocationRiskLevel
-    ) -> Bool {
-        lhs.severityRank < rhs.severityRank
-    }
-
-    private var severityRank: Int {
-        switch self {
-        case .green:
-            0
-        case .yellow:
-            1
-        case .orange:
-            2
-        case .red:
-            3
-        }
-    }
-}
+@available(*, deprecated, renamed: "RiskLevel")
+public typealias LocationRiskLevel = RiskLevel
 
 public enum LocationRiskReasonCode:
     String,
@@ -110,7 +79,9 @@ public enum LocationRiskReasonCode:
     Hashable
 {
     case arrivedAtDestination = "arrived_at_destination"
+    case approachingDestination = "approaching_destination"
     case progressingTowardDestination = "progressing_toward_destination"
+    case locationTrendIndeterminate = "location_trend_indeterminate"
     case insufficientLocationHistory = "insufficient_location_history"
     case locationDataStale = "location_data_stale"
     case locationAccuracyInsufficient = "location_accuracy_insufficient"
@@ -283,7 +254,7 @@ public struct LocationAssessment:
     Equatable,
     Hashable
 {
-    public let level: LocationRiskLevel
+    public let level: RiskLevel
     public let reasons: [LocationRiskReason]
     public let recommendedActions: [LocationRecommendedAction]
     public let assessedAt: Date
@@ -294,7 +265,7 @@ public struct LocationAssessment:
     public let requiresFamilyAttention: Bool
 
     public init(
-        level: LocationRiskLevel,
+        level: RiskLevel,
         reasons: [LocationRiskReason],
         recommendedActions: [LocationRecommendedAction],
         assessedAt: Date,
@@ -327,7 +298,7 @@ public struct LocationActionCard:
     public let primaryInstruction: String
     public let warnings: [String]
     public let recommendedActions: [LocationRecommendedAction]
-    public let riskLevel: LocationRiskLevel
+    public let riskLevel: RiskLevel
     public let distanceText: String?
     public let generatedAt: Date
 
@@ -336,7 +307,7 @@ public struct LocationActionCard:
         primaryInstruction: String,
         warnings: [String],
         recommendedActions: [LocationRecommendedAction],
-        riskLevel: LocationRiskLevel,
+        riskLevel: RiskLevel,
         distanceText: String?,
         generatedAt: Date
     ) {

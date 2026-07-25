@@ -56,7 +56,8 @@
 交付：
 
 - Hummingbird 2.x `GET /health`。
-- `POST /api/v1/risk/assess` 的 JSON/验证/映射/引擎编排。
+- 历史 `POST /api/v1/risk/assess` 已关闭；正式药品评估统一由
+  `POST /api/v1/medicine/assess` 经 `MedicinePipeline` 编排。
 - request ID、结构化错误、基础日志和演示数据组合。
 
 验收：

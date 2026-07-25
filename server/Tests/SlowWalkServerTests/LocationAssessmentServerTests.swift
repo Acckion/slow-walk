@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdTesting
 import SlowWalkAPIContracts
 import SlowWalkDataInterfaces
+import SlowWalkDomain
 import SlowWalkLocationRisk
 @testable import SlowWalkServer
 import XCTest
@@ -28,6 +29,12 @@ final class LocationAssessmentServerTests:
                 $0.actionCard.recommendedActions,
                 [.continueTowardDestination]
             )
+            XCTAssertTrue(
+                $0.assessment.reasons.contains {
+                    $0.code
+                        == .progressingTowardDestination
+                }
+            )
         }
     }
 
@@ -47,6 +54,95 @@ final class LocationAssessmentServerTests:
                 $0.actionCard.recommendedActions,
                 [.confirmArrival]
             )
+            XCTAssertEqual(
+                $0.actionCard.title,
+                "已到达目的地范围"
+            )
+        }
+    }
+
+    func testApproachingRequiresDecreasingDistanceTrend()
+        async throws
+    {
+        try await assertAssessment(
+            samples: [
+                sample(longitude: 20.0020, age: 120),
+                sample(longitude: 20.0015, age: 60),
+                sample(longitude: 20.0010, age: 0),
+            ],
+            expectedLevel: .green
+        ) {
+            XCTAssertTrue(
+                $0.assessment.reasons.contains {
+                    $0.code == .approachingDestination
+                }
+            )
+            XCTAssertEqual(
+                $0.actionCard.title,
+                "正在接近目的地"
+            )
+        }
+    }
+
+    func testShortStationaryTrackIsNotGreenProgress()
+        async throws
+    {
+        try await assertAssessment(
+            samples: [
+                sample(longitude: 20.005, age: 120),
+                sample(longitude: 20.005, age: 60),
+                sample(longitude: 20.005, age: 0),
+            ],
+            expectedLevel: .yellow
+        ) {
+            XCTAssertFalse(
+                $0.assessment.reasons.contains {
+                    $0.code
+                        == .progressingTowardDestination
+                }
+            )
+            XCTAssertTrue(
+                $0.assessment.reasons.contains {
+                    $0.code
+                        == .locationTrendIndeterminate
+                }
+            )
+        }
+    }
+
+    func testLateralTrackIsNotGreenProgress()
+        async throws
+    {
+        try await assertAssessment(
+            samples: [
+                sample(
+                    latitude: 10.001,
+                    longitude: 20.005,
+                    age: 120
+                ),
+                sample(
+                    latitude: 10,
+                    longitude: 20.005,
+                    age: 60
+                ),
+                sample(
+                    latitude: 9.999,
+                    longitude: 20.005,
+                    age: 0
+                ),
+            ],
+            expectedLevel: .yellow
+        ) {
+            XCTAssertFalse(
+                $0.assessment.reasons.contains {
+                    $0.code
+                        == .progressingTowardDestination
+                }
+            )
+            XCTAssertEqual(
+                $0.actionCard.title,
+                "行进趋势无法确认"
+            )
         }
     }
 
@@ -59,7 +155,7 @@ final class LocationAssessmentServerTests:
                 ]
             ),
             expectedCode:
-                "LOCATION_ACCURACY_INSUFFICIENT"
+                .locationAccuracyInsufficient
         )
     }
 
@@ -71,7 +167,7 @@ final class LocationAssessmentServerTests:
                     sample(age: 1_900),
                 ]
             ),
-            expectedCode: "LOCATION_DATA_STALE"
+            expectedCode: .locationDataStale
         )
     }
 
@@ -113,7 +209,7 @@ final class LocationAssessmentServerTests:
                     sample(age: 0),
                 ]
             ),
-            expectedCode: "INVALID_LOCATION_SAMPLE"
+            expectedCode: .invalidLocationSample
         )
     }
 
@@ -124,7 +220,7 @@ final class LocationAssessmentServerTests:
                 samples: [sample(age: 0)]
             ),
             expectedCode:
-                "INSUFFICIENT_LOCATION_HISTORY"
+                .insufficientLocationHistory
         )
     }
 
@@ -153,7 +249,7 @@ final class LocationAssessmentServerTests:
                 )
                 XCTAssertEqual(
                     error.code,
-                    "MALFORMED_REQUEST"
+                    .malformedRequest
                 )
                 XCTAssertEqual(
                     error.requestID,
@@ -171,7 +267,7 @@ final class LocationAssessmentServerTests:
                 apiVersion: "v2"
             ),
             expectedCode:
-                "UNSUPPORTED_API_VERSION",
+                .unsupportedAPIVersion,
             expectedStatus: .badRequest
         )
     }
@@ -234,7 +330,7 @@ final class LocationAssessmentServerTests:
             )
             XCTAssertEqual(
                 $0.actionCard.primaryInstruction,
-                "当前出现多项高风险位置异常，建议联系家属或工作人员。"
+                "检测到多个独立行为风险，请停在安全位置并联系家属或工作人员。"
             )
             XCTAssertTrue(
                 $0.assessment.requiresFamilyAttention
@@ -244,7 +340,7 @@ final class LocationAssessmentServerTests:
 
     private func assertAssessment(
         samples: [LocationSample],
-        expectedLevel: LocationRiskLevel,
+        expectedLevel: RiskLevel,
         verify:
             @escaping @Sendable (
                 LocationAssessmentResponseDTO
@@ -296,7 +392,7 @@ final class LocationAssessmentServerTests:
 
     private func assertError(
         request: LocationAssessmentRequestDTO,
-        expectedCode: String,
+        expectedCode: APIErrorCode,
         expectedStatus: HTTPResponse.Status =
             .unprocessableContent
     ) async throws {

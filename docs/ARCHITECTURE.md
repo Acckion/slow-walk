@@ -11,12 +11,16 @@ SlowWalk 将可测试的业务核心、HTTP 适配和 Apple 平台能力分开�
 
 ```text
 SlowWalkServer
-  ├──→ SlowWalkAPIContracts ──→ SlowWalkMedicineKnowledge
-  └──→ SlowWalkMedicinePipeline
+  ├──→ SlowWalkAPIContracts
+  │      ├──→ SlowWalkDomain
+  │      ├──→ SlowWalkMedicineKnowledge
+  │      └──→ SlowWalkLocationRisk ──→ SlowWalkDomain
+  ├──→ SlowWalkMedicinePipeline
          ├──→ SlowWalkRiskEngine ──→ SlowWalkDomain
          ├──→ SlowWalkDataInterfaces ──→ SlowWalkDomain
          ├──→ SlowWalkMedicineKnowledge
          └──→ SlowWalkDomain
+  └──→ SlowWalkLocationRisk
 
 SlowWalkMedicineKnowledge
   ├──→ SlowWalkDataInterfaces ──→ SlowWalkDomain
@@ -25,6 +29,7 @@ SlowWalkMedicineKnowledge
 iOS App
   ├──→ SlowWalkAPIContracts
   ├──→ SlowWalkDomain
+  ├──→ SlowWalkLocationRisk
   └──→ Apple platform adapters (outside SlowWalkCore)
 ```
 
@@ -65,11 +70,17 @@ Apple 平台专属 API。领域值优先使用不可变 struct/enum，并在跨�
 职责：
 
 - API v1 请求、响应和结构化错误 DTO。
+- canonical `MedicineAssessmentRequestDTO`/
+  `MedicineAssessmentResponseDTO` 与 `LocationAssessmentRequestDTO`/
+  `LocationAssessmentResponseDTO`。
+- 严格的 `UserHealthProfileDTO` wire contract；Server 显式映射到 Domain。
+- typed `APIErrorCode`、集中式 route prefix 与 path/body version 映射。
 - 稳定 JSON 枚举值、ISO 8601 日期策略和 API 版本字段。
 - 领域对象与线上协议之间的显式边界。
 
-依赖 `SlowWalkDomain`、`SlowWalkMedicineKnowledge` 与 Foundation。这里不
-包含 URLSession、HTTP 路由或任何传输实现。
+依赖 `SlowWalkDomain`、`SlowWalkMedicineKnowledge`、
+`SlowWalkLocationRisk` 与 Foundation。这里不包含 URLSession、HTTP 路由或任何
+传输实现。
 
 ### SlowWalkDataInterfaces
 
@@ -108,10 +119,28 @@ Hummingbird、UI、Vision 或其他 Apple 平台框架。
 - 白名单、来源优先级、版本、时间、可追溯引用和完整度验证。
 - ETag/Last-Modified、304、重试、取消、响应边界与结构化缓存。
 - 多来源合并、冲突证据和 stale/offline 安全降级。
+- 以 `KnowledgeGovernanceVerdict` 汇总 validation、completeness、
+  provenance、freshness、是否允许展示 dosage 及保守动作。
 
 依赖 `SlowWalkDomain` 与 `SlowWalkDataInterfaces`。生产 HTTP adapter 可使用
 Foundation URLSession；当前 Server demo 与所有测试只使用 mock transport。
 Domain 和 RiskEngine 不反向依赖该模块。
+
+### SlowWalkLocationRisk
+
+职责：
+
+- 经纬度、时间、精度、速度和样本数量的数据质量检查。
+- Haversine 距离、geofence、明确的距离递减趋势、异常停留和持续远离评估。
+- 位置领域专属 reason/action/assessment；风险等级复用
+  `SlowWalkDomain.RiskLevel`。
+- 数据质量问题可以阻止 green，但只有 `prolongedStop`、`movingAway`
+  等明确行为信号参与 family-attention red 聚合。
+- 根据 arrived、approaching、progressing、trend indeterminate 与 low
+  accuracy 分别生成 `LocationActionCard`。
+
+仅依赖 `SlowWalkDomain` 与 Foundation，不导入 `CoreLocation`、MapKit、
+SwiftUI 或 UIKit。
 
 ## 外层适配器
 
@@ -119,15 +148,19 @@ Domain 和 RiskEngine 不反向依赖该模块。
 
 服务端负责：
 
-- `GET /health`、`POST /api/v1/risk/assess`、`POST
-  /api/v1/medicine/search`、`POST /api/v1/medicine/resolve` 和
-  `POST /api/v1/medicine/assess` 路由。
+- `GET /health`、`POST /api/v1/medicine/search`、`POST
+  /api/v1/medicine/resolve`、`POST /api/v1/medicine/assess` 和
+  `POST /api/v1/location/assess` 路由。
 - JSON 解码、必要字段验证、DTO/领域映射和统一错误。
 - 注入风险引擎、Repository、Clock、UUID 和演示配置。
 - request ID、基础结构化日志、Content-Type 和 HTTP 状态码。
 
 路由只编排用例，不包含风险业务分支。Hummingbird 类型不得越过服务端边界进入
 核心 Package。
+
+旧 `POST /api/v1/risk/assess` 默认路由已关闭，公开 raw risk DTO 已移除。客户端
+不能提交完整 `Medicine`、ingredient 或 `SourceReference` 绕过
+`MedicinePipeline`、`SourcePolicy` 与 health preflight。
 
 ### iOS App
 
@@ -152,6 +185,13 @@ iOS 可以依赖核心公开模块；核心模块不能反向依赖 iOS。Apple 
   → 确定性风险规则
   → 最高风险 + 全部原因 + 稳定建议动作
   → iOS 风险行动卡 / API v1 响应
+
+位置样本
+  → 数据质量
+  → 距离/geofence/趋势
+  → 行为规则
+  → 共享 RiskLevel + 位置专属 reasons/actions
+  → iOS 位置行动卡 / API v1 响应
 ```
 
 识别失败或来源不足会沿数据流保留下来，不能在中间层被转换为“无风险”。
@@ -185,6 +225,11 @@ GitHub Actions Linux 容器能运行 SwiftPM/XCTest，但不能编译 SwiftUI、
 ## 医疗安全不变量
 
 - 缺少来源、用户信息或识别置信度时不得返回确定绿色。
+- 字段缺失不能被解释成用户明确填写的空数组。
+- knowledge validation warning、低 completeness、stale 或 provenance
+  无法确认时至少 yellow，并禁止 dosage/frequency 展示。
+- geofence 外只有明确距离递减趋势才能返回 progressing green。
+- 数据质量 orange 不参与 family-attention red 行为信号计数。
 - 红色命中不得被低风险覆盖。
 - 所有命中原因必须保留并可追溯。
 - 不生成来源未提供的剂量、频次、禁忌或治疗方案。

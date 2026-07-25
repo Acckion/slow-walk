@@ -26,6 +26,8 @@ public struct LocationRiskEngine:
         any LocationDataQualityAssessing
     private let distanceCalculator: any DistanceCalculating
     private let geofenceEvaluator: GeofenceEvaluator
+    private let progressEvaluator:
+        ProgressTowardDestinationEvaluator
     private let prolongedStopEvaluator: ProlongedStopEvaluator
     private let movingAwayEvaluator: MovingAwayEvaluator
 
@@ -49,6 +51,11 @@ public struct LocationRiskEngine:
         geofenceEvaluator = GeofenceEvaluator(
             configuration: configuration
         )
+        progressEvaluator =
+            ProgressTowardDestinationEvaluator(
+                configuration: configuration,
+                distanceCalculator: distanceCalculator
+            )
         prolongedStopEvaluator = ProlongedStopEvaluator(
             configuration: configuration,
             distanceCalculator: distanceCalculator
@@ -107,6 +114,10 @@ public struct LocationRiskEngine:
             samples: usableSamples,
             destination: destination
         )
+        let progress = progressEvaluator.evaluate(
+            samples: usableSamples,
+            destination: destination
+        )
 
         if prolongedStop.isDetected {
             ratedReasons.append(
@@ -157,29 +168,61 @@ public struct LocationRiskEngine:
                     )
                 )
             )
-        } else if ratedReasons.isEmpty {
+        } else if ratedReasons.isEmpty,
+                  progress.isDetected {
             ratedReasons.append(
                 RatedLocationReason(
                     level: .green,
                     reason: LocationRiskReason(
-                        code: .progressingTowardDestination,
+                        code: geofenceState == .approaching
+                            ? .approachingDestination
+                            : .progressingTowardDestination,
                         message:
                             geofenceState == .approaching
-                            ? "The latest reliable sample is approaching the destination."
-                            : "No demo location-risk rule was triggered.",
+                            ? "Reliable distance samples show progress while near the destination."
+                            : "Reliable distance samples show progress toward the destination.",
                         evidence:
-                            "Recent reliable samples did not meet stop or moving-away thresholds.",
+                            "Every retained distance step decreased beyond the noise tolerance and the total decrease met the demo threshold.",
                         ruleIdentifier:
                             "location-normal-progress"
                     )
                 )
             )
+        } else if ratedReasons.isEmpty {
+            ratedReasons.append(
+                RatedLocationReason(
+                    level: .yellow,
+                    reason: LocationRiskReason(
+                        code: .locationTrendIndeterminate,
+                        message:
+                            "Reliable samples do not establish a decreasing-distance trend.",
+                        evidence:
+                            progress.isDeterminate
+                            ? "The retained distances did not decrease consistently beyond the demo noise threshold."
+                            : "There were not enough usable distance samples to determine a trend.",
+                        ruleIdentifier:
+                            "location-progress-trend"
+                    )
+                )
+            )
         }
 
-        let orangeSignalCount = ratedReasons.filter {
-            $0.level == .orange
+        let behavioralSignalCodes:
+            Set<LocationRiskReasonCode> = [
+                .prolongedStop,
+                .movingAway,
+            ]
+        let behavioralOrangeSignalCount =
+            ratedReasons.filter {
+                $0.level == .orange
+                    && behavioralSignalCodes.contains(
+                        $0.reason.code
+                    )
         }.count
-        if orangeSignalCount >= configuration.redSignalCount {
+        let hasBehavioralEmergency =
+            behavioralOrangeSignalCount
+            >= configuration.redSignalCount
+        if hasBehavioralEmergency {
             ratedReasons.append(
                 RatedLocationReason(
                     level: .red,
@@ -219,7 +262,8 @@ public struct LocationRiskEngine:
             isInsideDestinationGeofence:
                 geofenceState == .inside,
             requiresUserAttention: level != .green,
-            requiresFamilyAttention: level == .red
+            requiresFamilyAttention:
+                hasBehavioralEmergency
         )
     }
 
@@ -340,7 +384,7 @@ public struct LocationRiskEngine:
     }
 
     private func recommendedActions(
-        for level: LocationRiskLevel,
+        for level: RiskLevel,
         geofenceState: GeofenceState
     ) -> [LocationRecommendedAction] {
         switch level {
@@ -369,6 +413,6 @@ public struct LocationRiskEngine:
 }
 
 private struct RatedLocationReason: Sendable {
-    let level: LocationRiskLevel
+    let level: RiskLevel
     let reason: LocationRiskReason
 }

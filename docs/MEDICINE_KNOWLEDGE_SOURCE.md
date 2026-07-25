@@ -152,9 +152,9 @@ HTTP 或 Server，因此不存在循环依赖。
 }
 ```
 
-成功响应包含 `candidates`、`sourceStatus`、`cacheStatus`、
+成功响应包含 `candidates`、`sourceStatus`、`knowledgeCacheStatus`、
 `completeness`、`sourceReferences`、`warnings`、`sourceVersions`、
-`generatedAt` 与 `isOffline`。
+`generatedAt`、`isOffline` 与统一的 `governanceVerdict`。
 
 稳定错误 code：
 

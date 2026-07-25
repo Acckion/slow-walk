@@ -1,5 +1,86 @@
 import Foundation
 
+struct ProgressTowardDestinationEvaluation: Sendable {
+    let isDetected: Bool
+    let isDeterminate: Bool
+    let totalDistanceDecreaseMeters: Double?
+    let consecutiveDecreases: Int
+}
+
+struct ProgressTowardDestinationEvaluator: Sendable {
+    private let configuration: LocationRiskConfiguration
+    private let distanceCalculator: any DistanceCalculating
+
+    init(
+        configuration: LocationRiskConfiguration,
+        distanceCalculator: any DistanceCalculating
+    ) {
+        self.configuration = configuration
+        self.distanceCalculator = distanceCalculator
+    }
+
+    func evaluate(
+        samples: [LocationSample],
+        destination: Destination
+    ) -> ProgressTowardDestinationEvaluation {
+        let ordered = samples.sorted {
+            $0.recordedAt < $1.recordedAt
+        }
+        guard ordered.count
+            >= configuration.minimumSamplesForAssessment
+        else {
+            return ProgressTowardDestinationEvaluation(
+                isDetected: false,
+                isDeterminate: false,
+                totalDistanceDecreaseMeters: nil,
+                consecutiveDecreases: 0
+            )
+        }
+
+        let distances = ordered.compactMap {
+            try? distanceCalculator.distance(
+                from: $0.point,
+                to: destination.point
+            )
+        }
+        guard distances.count == ordered.count,
+              let first = distances.first,
+              let last = distances.last
+        else {
+            return ProgressTowardDestinationEvaluation(
+                isDetected: false,
+                isDeterminate: false,
+                totalDistanceDecreaseMeters: nil,
+                consecutiveDecreases: 0
+            )
+        }
+
+        var consecutiveDecreases = 0
+        for index in 1 ..< distances.count {
+            if distances[index - 1] - distances[index]
+                > configuration
+                .movingAwayNoiseToleranceMeters
+            {
+                consecutiveDecreases += 1
+            }
+        }
+        let totalDecrease = first - last
+        let requiredDecreases = distances.count - 1
+        let isDetected =
+            consecutiveDecreases == requiredDecreases
+            && totalDecrease
+            >= configuration
+            .movingAwayMinimumDistanceIncreaseMeters
+
+        return ProgressTowardDestinationEvaluation(
+            isDetected: isDetected,
+            isDeterminate: true,
+            totalDistanceDecreaseMeters: totalDecrease,
+            consecutiveDecreases: consecutiveDecreases
+        )
+    }
+}
+
 public struct ProlongedStopEvaluation:
     Codable,
     Sendable,

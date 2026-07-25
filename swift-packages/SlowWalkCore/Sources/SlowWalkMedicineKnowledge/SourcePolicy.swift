@@ -141,18 +141,41 @@ public struct SourcePolicy:
             )
         }
 
+        var warnings = [MedicineKnowledgeWarning]()
+        if response.validationStatus == .warning {
+            warnings.append(
+                MedicineKnowledgeWarning(
+                    code: .sourceValidationWarning,
+                    message:
+                        "The source response carries a validation warning.",
+                    sourceIdentifiers: [source.identifier]
+                )
+            )
+        }
+        if response.sourceReference.versionOrDate
+            != response.sourceDocumentVersion
+        {
+            warnings.append(
+                MedicineKnowledgeWarning(
+                    code: .provenanceUnverifiable,
+                    message:
+                        "The response reference version does not match its source document version.",
+                    sourceIdentifiers: [source.identifier]
+                )
+            )
+        }
         if response.validationStatus != .notModified {
             for record in response.records {
-                try validate(
-                    record: record,
-                    response: response,
-                    source: source,
-                    now: now
+                warnings.append(
+                    contentsOf: try validate(
+                        record: record,
+                        response: response,
+                        source: source,
+                        now: now
+                    )
                 )
             }
         }
-
-        var warnings = [MedicineKnowledgeWarning]()
         if now.timeIntervalSince(response.fetchedAt)
             > maximumSourceAge
         {
@@ -168,7 +191,7 @@ public struct SourcePolicy:
         if response.completeness < minimumCompleteness {
             warnings.append(
                 MedicineKnowledgeWarning(
-                    code: .invalidSourceResponse,
+                    code: .completenessBelowThreshold,
                     message:
                         "The source response is below the configured completeness threshold.",
                     sourceIdentifiers: [source.identifier]
@@ -183,18 +206,11 @@ public struct SourcePolicy:
         response: MedicineKnowledgeSourceResponse,
         source: any MedicineKnowledgeSource,
         now: Date
-    ) throws {
+    ) throws -> [MedicineKnowledgeWarning] {
         guard record.sourceIdentifier == source.identifier else {
             throw SourcePolicyError.recordSourceIdentifierMismatch(
                 expected: source.identifier,
                 actual: record.sourceIdentifier
-            )
-        }
-        guard record.sourceDocumentVersion
-            == response.sourceDocumentVersion
-        else {
-            throw SourcePolicyError.recordVersionMismatch(
-                source.identifier
             )
         }
         guard record.validationStatus != .invalid,
@@ -241,6 +257,57 @@ public struct SourcePolicy:
                 source.identifier
             )
         }
+
+        var warnings = [MedicineKnowledgeWarning]()
+        if record.validationStatus == .warning {
+            warnings.append(
+                MedicineKnowledgeWarning(
+                    code: .sourceValidationWarning,
+                    message:
+                        "A medicine source record carries a validation warning.",
+                    sourceIdentifiers: [source.identifier]
+                )
+            )
+        }
+        if record.completeness < minimumCompleteness {
+            warnings.append(
+                MedicineKnowledgeWarning(
+                    code: .completenessBelowThreshold,
+                    message:
+                        "A medicine source record is below the configured completeness threshold.",
+                    sourceIdentifiers: [source.identifier]
+                )
+            )
+        }
+        if now.timeIntervalSince(record.fetchedAt)
+            > maximumSourceAge
+        {
+            warnings.append(
+                MedicineKnowledgeWarning(
+                    code: .sourceRecordStale,
+                    message:
+                        "A medicine source record is older than the configured data-quality window.",
+                    sourceIdentifiers: [source.identifier]
+                )
+            )
+        }
+        if record.sourceDocumentVersion
+            != response.sourceDocumentVersion
+            || record.sourceReference
+            != response.sourceReference
+            || record.sourceReference.versionOrDate
+            != record.sourceDocumentVersion
+        {
+            warnings.append(
+                MedicineKnowledgeWarning(
+                    code: .provenanceUnverifiable,
+                    message:
+                        "The response and record source reference or version do not match.",
+                    sourceIdentifiers: [source.identifier]
+                )
+            )
+        }
+        return warnings
     }
 
     private func validateCompleteness(

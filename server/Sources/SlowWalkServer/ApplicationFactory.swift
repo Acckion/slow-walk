@@ -1,4 +1,5 @@
 import Hummingbird
+import SlowWalkAPIContracts
 import SlowWalkDataInterfaces
 import SlowWalkLocationRisk
 import SlowWalkMedicineKnowledge
@@ -59,18 +60,6 @@ public func makeSlowWalkApplication(
         HealthResponseDTO()
     }
 
-    let service = RiskAssessmentService(
-        engine: riskEngine,
-        dateProvider: dateProvider
-    )
-    let controller = RiskAssessmentController(
-        service: service,
-        uuidProvider: uuidProvider
-    )
-    router.post("/api/v1/risk/assess") { request, context in
-        try await controller.handle(request: request, context: context)
-    }
-
     let medicinePipeline = MedicinePipeline(
         catalogLoader: medicineCatalogLoader,
         cache: medicineCache,
@@ -86,19 +75,31 @@ public func makeSlowWalkApplication(
         knowledgeSearcher:
             configuredKnowledgeSearcher
     )
-    router.post("/api/v1/medicine/search") { request, context in
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.medicineSearch.path)
+    ) {
+        request,
+        context in
         try await medicineController.search(
             request: request,
             context: context
         )
     }
-    router.post("/api/v1/medicine/resolve") { request, context in
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.medicineResolve.path)
+    ) {
+        request,
+        context in
         try await medicineController.resolve(
             request: request,
             context: context
         )
     }
-    router.post("/api/v1/medicine/assess") { request, context in
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.medicineAssess.path)
+    ) {
+        request,
+        context in
         try await medicineController.assess(
             request: request,
             context: context
@@ -120,7 +121,9 @@ public func makeSlowWalkApplication(
         dateProvider: dateProvider,
         uuidProvider: uuidProvider
     )
-    router.post("/api/v1/location/assess") {
+    router.post(
+        RouterPath(SlowWalkAPI.Endpoint.locationAssess.path)
+    ) {
         request,
         context in
         try await locationController.handle(

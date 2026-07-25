@@ -57,6 +57,7 @@ public struct MedicinePipelineController: Sendable {
 
         if let rejection = try validateTransport(
             apiVersion: input.apiVersion,
+            endpoint: .medicineSearch,
             requestID: input.requestID,
             details: validator.validate(input),
             request: request,
@@ -135,6 +136,7 @@ public struct MedicinePipelineController: Sendable {
 
         if let rejection = try validateTransport(
             apiVersion: input.apiVersion,
+            endpoint: .medicineResolve,
             requestID: input.requestID,
             details: validator.validate(input),
             request: request,
@@ -152,7 +154,9 @@ public struct MedicinePipelineController: Sendable {
                     requestID: input.requestID,
                     resolution: result.resolution,
                     cacheHit: result.cacheHit,
-                    cacheStatus: result.cacheStatus,
+                    resolutionCacheStatus: result.cacheStatus,
+                    knowledgeCacheStatus:
+                        result.knowledgeResult?.cacheStatus,
                     sourceDataVersion: result.sourceDataVersion,
                     generatedAt: result.generatedAt,
                     apiVersion: SlowWalkAPI.version,
@@ -168,7 +172,7 @@ public struct MedicinePipelineController: Sendable {
 
             case .ambiguous:
                 return try resolutionRejection(
-                    code: "medicine_ambiguous",
+                    code: .medicineAmbiguous,
                     message: "More than one medicine matched the recognized text.",
                     status: .conflict,
                     requestID: input.requestID,
@@ -178,7 +182,7 @@ public struct MedicinePipelineController: Sendable {
 
             case .notFound:
                 return try resolutionRejection(
-                    code: "medicine_not_found",
+                    code: .medicineNotFound,
                     message: "No verified medicine matched the recognized text.",
                     status: .notFound,
                     requestID: input.requestID,
@@ -188,7 +192,7 @@ public struct MedicinePipelineController: Sendable {
 
             case .recognitionFailed:
                 return try resolutionRejection(
-                    code: "medicine_recognition_failed",
+                    code: .medicineRecognitionFailed,
                     message: "The medicine text could not be recognized reliably.",
                     status: .unprocessableContent,
                     requestID: input.requestID,
@@ -198,7 +202,7 @@ public struct MedicinePipelineController: Sendable {
 
             case .insufficientEvidence:
                 return try resolutionRejection(
-                    code: "medicine_insufficient_evidence",
+                    code: .medicineInsufficientEvidence,
                     message: "The available recognition evidence is insufficient.",
                     status: .unprocessableContent,
                     requestID: input.requestID,
@@ -248,6 +252,7 @@ public struct MedicinePipelineController: Sendable {
 
         if let rejection = try validateTransport(
             apiVersion: input.apiVersion,
+            endpoint: .medicineAssess,
             requestID: input.requestID,
             details: validator.validate(input),
             request: request,
@@ -258,10 +263,16 @@ public struct MedicinePipelineController: Sendable {
         }
 
         do {
+            let userProfile = mapUserProfile(
+                input.userProfile
+            )
+            let recentRecords = try input.recentRecords.map(
+                mapMedicationRecord
+            )
             let result = try await pipeline.assess(
                 input: input.input,
-                userProfile: input.userProfile,
-                recentRecords: input.recentRecords
+                userProfile: userProfile,
+                recentRecords: recentRecords
             )
             let output = MedicineAssessmentResponseDTO(
                 requestID: input.requestID,
@@ -269,7 +280,9 @@ public struct MedicinePipelineController: Sendable {
                 assessment: result.assessment,
                 actionCard: result.actionCard,
                 cacheHit: result.cacheHit,
-                cacheStatus: result.cacheStatus,
+                resolutionCacheStatus: result.cacheStatus,
+                knowledgeCacheStatus:
+                    result.knowledgeResult?.cacheStatus,
                 sourceDataVersion: result.sourceDataVersion,
                 generatedAt: result.generatedAt,
                 apiVersion: SlowWalkAPI.version,
@@ -286,6 +299,25 @@ public struct MedicinePipelineController: Sendable {
             return try jsonResponse(
                 output,
                 status: .ok,
+                request: request,
+                context: context
+            )
+        } catch HealthContextDTOError.invalidStableEnum {
+            return try rejectionResponse(
+                code: .invalidMedicationRecord,
+                message:
+                    "Medication history contains an unsupported event or source value.",
+                requestID: input.requestID,
+                details: [
+                    APIErrorDetailDTO(
+                        field: "recentRecords",
+                        code: "invalid_stable_enum",
+                        message:
+                            "Medication record eventType and source must use supported API values."
+                    ),
+                ],
+                status: .unprocessableContent,
+                operation: "medicine_assessment",
                 request: request,
                 context: context
             )
@@ -322,13 +354,9 @@ public struct MedicinePipelineController: Sendable {
         operation: String
     ) async throws -> DecodedMedicineRequest<Value> {
         guard hasJSONContentType(request) else {
-            let code = operation
-                == "medicine_knowledge_search"
-                ? "MALFORMED_REQUEST"
-                : "unsupported_media_type"
             return .rejection(
                 try rejectionResponse(
-                    code: code,
+                    code: .unsupportedMediaType,
                     message: "Content-Type must be application/json.",
                     requestID: fallbackRequestID,
                     details: [
@@ -357,12 +385,9 @@ public struct MedicinePipelineController: Sendable {
         } catch let decodingError as DecodingError {
             switch RequestDecodingFailure(error: decodingError) {
             case .malformedJSON:
-                let errorCode = operation != "medicine_resolution"
-                    ? "MALFORMED_REQUEST"
-                    : "invalid_json"
                 return .rejection(
                     try rejectionResponse(
-                        code: errorCode,
+                        code: .malformedRequest,
                         message: "The request body is not valid JSON.",
                         requestID: fallbackRequestID,
                         details: nil,
@@ -405,10 +430,7 @@ public struct MedicinePipelineController: Sendable {
             )
             return .rejection(
                 try rejectionResponse(
-                    code: operation
-                        == "medicine_knowledge_search"
-                        ? "MALFORMED_REQUEST"
-                        : "invalid_json",
+                    code: .malformedRequest,
                     message: "The request body could not be decoded.",
                     requestID: fallbackRequestID,
                     details: nil,
@@ -423,25 +445,19 @@ public struct MedicinePipelineController: Sendable {
 
     private func validateTransport(
         apiVersion: String,
+        endpoint: SlowWalkAPI.Endpoint,
         requestID: UUID,
         details: [APIErrorDetailDTO],
         request: Request,
         context: SlowWalkRequestContext,
         operation: String
     ) throws -> Response? {
-        guard apiVersion == SlowWalkAPI.version else {
-            let errorCode: String
-            if operation == "medicine_assessment" {
-                errorCode = "UNSUPPORTED_API_VERSION"
-            } else if operation
-                == "medicine_knowledge_search"
-            {
-                errorCode = "MALFORMED_REQUEST"
-            } else {
-                errorCode = "unsupported_api_version"
-            }
+        guard SlowWalkAPI.supports(
+            bodyVersion: apiVersion,
+            for: endpoint
+        ) else {
             return try rejectionResponse(
-                code: errorCode,
+                code: .unsupportedAPIVersion,
                 message: "The requested API version is not supported.",
                 requestID: requestID,
                 details: [
@@ -460,10 +476,7 @@ public struct MedicinePipelineController: Sendable {
 
         guard details.isEmpty else {
             return try rejectionResponse(
-                code: operation
-                    == "medicine_knowledge_search"
-                    ? "MALFORMED_REQUEST"
-                    : "validation_error",
+                code: .validationError,
                 message: "One or more request fields are invalid.",
                 requestID: requestID,
                 details: details,
@@ -479,64 +492,60 @@ public struct MedicinePipelineController: Sendable {
     private func decodingErrorCode(
         operation: String,
         detail: APIErrorDetailDTO
-    ) -> String {
-        if operation == "medicine_knowledge_search" {
-            return "MALFORMED_REQUEST"
-        }
+    ) -> APIErrorCode {
         guard operation == "medicine_assessment" else {
-            return "validation_error"
+            return .validationError
         }
         guard let field = detail.field else {
-            return "MALFORMED_REQUEST"
+            return .malformedRequest
         }
         if field == "userProfile"
             || field.hasPrefix("userProfile.") {
             if field == "userProfile.bodyMetrics"
                 || field.hasPrefix("userProfile.bodyMetrics.") {
-                return "INVALID_BODY_METRICS"
+                return .invalidBodyMetrics
             }
-            return "INVALID_USER_PROFILE"
+            return .invalidUserProfile
         }
         if field == "recentRecords"
             || field.hasPrefix("recentRecords.") {
-            return "INVALID_MEDICATION_RECORD"
+            return .invalidMedicationRecord
         }
-        return "MALFORMED_REQUEST"
+        return .malformedRequest
     }
 
     private func healthContextRejection(
         _ error: MedicationRiskContextBuildError,
         requestID: UUID,
         request: Request,
-        context: SlowWalkRequestContext,
-        operation: String = "medicine_knowledge_search"
+        context: SlowWalkRequestContext
     ) throws -> Response {
-        let code: String
+        let code: APIErrorCode
         let message: String
         let issues: [HealthContextValidationIssue]
         switch error {
         case .missingUserProfile:
-            code = "INVALID_USER_PROFILE"
+            code = .invalidUserProfile
             message = "The user health profile is required."
             issues = []
         case .invalidUserProfile(let values):
-            code = "INVALID_USER_PROFILE"
+            code = .invalidUserProfile
             message = "The user health profile is invalid."
             issues = values
         case .unsupportedProfileSchema(let values):
-            code = "UNSUPPORTED_PROFILE_SCHEMA"
+            code = .unsupportedProfileSchema
             message = "The user health profile schema is not supported."
             issues = values
         case .invalidMedicationRecord(let values):
-            code = "INVALID_MEDICATION_RECORD"
+            code = .invalidMedicationRecord
             message = "Medication history contains an invalid record."
             issues = values
         case .futureMedicationRecord(let values):
-            code = "FUTURE_MEDICATION_RECORD"
+            code = .futureMedicationRecord
             message = "Medication history contains a future record."
             issues = values
         case .invalidBodyMetrics(let values):
-            code = "INVALID_BODY_METRICS"
+            code = .invalidBodyMetrics
             message = "Body metrics failed data-quality validation."
             issues = values
         case .unresolvedMedicine, .medicineResolutionMismatch:
@@ -573,47 +582,47 @@ public struct MedicinePipelineController: Sendable {
         context: SlowWalkRequestContext,
         operation: String = "medicine_knowledge_search"
     ) throws -> Response {
-        let code: String
+        let code: APIErrorCode
         let message: String
         let status: HTTPResponse.Status
         switch error {
         case .knowledgeSourceUnavailable, .requestCancelled:
-            code = "KNOWLEDGE_SOURCE_UNAVAILABLE"
+            code = .knowledgeSourceUnavailable
             message =
                 "The medicine knowledge source is unavailable."
             status = .serviceUnavailable
         case .knowledgeSourceTimeout:
-            code = "KNOWLEDGE_SOURCE_TIMEOUT"
+            code = .knowledgeSourceTimeout
             message =
                 "The medicine knowledge request timed out."
             status = .gatewayTimeout
         case .invalidSourceResponse:
-            code = "INVALID_SOURCE_RESPONSE"
+            code = .invalidSourceResponse
             message =
                 "A medicine knowledge source returned an invalid response."
             status = .badGateway
         case .sourceVersionUnsupported:
-            code = "SOURCE_VERSION_UNSUPPORTED"
+            code = .sourceVersionUnsupported
             message =
                 "A medicine knowledge source version is unsupported."
             status = .badGateway
         case .medicineNotFound:
-            code = "MEDICINE_NOT_FOUND"
+            code = .medicineNotFound
             message =
                 "No trusted medicine source matched the query."
             status = .notFound
         case .sourceConflict:
-            code = "SOURCE_CONFLICT"
+            code = .sourceConflict
             message =
                 "Trusted medicine sources returned a conflict."
             status = .conflict
         case .offlineCacheUnavailable:
-            code = "OFFLINE_CACHE_UNAVAILABLE"
+            code = .offlineCacheUnavailable
             message =
                 "No usable offline medicine knowledge cache is available."
             status = .serviceUnavailable
         case .malformedRequest:
-            code = "MALFORMED_REQUEST"
+            code = .malformedRequest
             message =
                 "The medicine knowledge request is malformed."
             status = .badRequest
@@ -631,7 +640,7 @@ public struct MedicinePipelineController: Sendable {
     }
 
     private func resolutionRejection(
-        code: String,
+        code: APIErrorCode,
         message: String,
         status: HTTPResponse.Status,
         requestID: UUID,
@@ -667,7 +676,7 @@ public struct MedicinePipelineController: Sendable {
             ]
         )
         return try rejectionResponse(
-            code: "internal_error",
+            code: .internalError,
             message: "The server could not complete the medicine request.",
             requestID: requestID,
             details: nil,
@@ -675,6 +684,55 @@ public struct MedicinePipelineController: Sendable {
             operation: operation,
             request: request,
             context: context
+        )
+    }
+
+    private func mapUserProfile(
+        _ dto: UserHealthProfileDTO
+    ) -> UserHealthProfile {
+        UserHealthProfile(
+            id: dto.id,
+            age: dto.age,
+            allergies: dto.allergies,
+            diagnosedConditions: dto.diagnosedConditions,
+            currentMedicineIngredientIDs:
+                dto.currentMedicineIngredientIDs,
+            bodyMetrics: dto.bodyMetrics.map {
+                BodyMetrics(
+                    systolicBloodPressure:
+                        $0.systolicBloodPressure,
+                    diastolicBloodPressure:
+                        $0.diastolicBloodPressure,
+                    heartRate: $0.heartRate,
+                    measuredAt: $0.measuredAt,
+                    source: $0.source,
+                    deviceIdentifier:
+                        $0.deviceIdentifier
+                )
+            },
+            updatedAt: dto.updatedAt,
+            createdAt: dto.createdAt,
+            schemaVersion: dto.schemaVersion
+        )
+    }
+
+    private func mapMedicationRecord(
+        _ dto: MedicationRecordDTO
+    ) throws -> MedicationRecord {
+        guard let eventType = MedicationEventType(
+            rawValue: dto.eventType
+        ), let source = MedicationRecordSource(
+            rawValue: dto.source
+        ) else {
+            throw HealthContextDTOError.invalidStableEnum
+        }
+        return MedicationRecord(
+            id: dto.id,
+            medicineID: dto.medicineID,
+            activeIngredientIDs: dto.activeIngredientIDs,
+            recordedAt: dto.recordedAt,
+            eventType: eventType,
+            source: source
         )
     }
 
@@ -689,7 +747,7 @@ public struct MedicinePipelineController: Sendable {
     }
 
     private func rejectionResponse(
-        code: String,
+        code: APIErrorCode,
         message: String,
         requestID: UUID,
         details: [APIErrorDetailDTO]?,
@@ -702,7 +760,7 @@ public struct MedicinePipelineController: Sendable {
             "\(operation)_rejected",
             metadata: [
                 "slowwalk.api_request_id": .string(requestID.uuidString),
-                "slowwalk.error_code": .string(code),
+                "slowwalk.error_code": .string(code.rawValue),
                 "slowwalk.http_status": .string(String(status.code)),
             ]
         )

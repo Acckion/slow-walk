@@ -1,5 +1,6 @@
 import Foundation
 import SlowWalkAPIContracts
+import SlowWalkDomain
 import SlowWalkLocationRisk
 import XCTest
 
@@ -97,6 +98,15 @@ final class LocationRiskDTOTests: XCTestCase {
                 from: data
             )
         XCTAssertEqual(decoded, envelope)
+        let sharedLevel: RiskLevel =
+            decoded.response.assessment.level
+        XCTAssertEqual(sharedLevel, .green)
+        let json = try XCTUnwrap(
+            String(data: data, encoding: .utf8)
+        )
+        XCTAssertTrue(
+            json.contains("\"level\":\"green\"")
+        )
     }
 
     private var fixedUUID: UUID {
