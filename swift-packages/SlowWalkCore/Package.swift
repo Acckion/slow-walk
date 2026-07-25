@@ -17,6 +17,10 @@ let package = Package(
             name: "SlowWalkMedicineKnowledge",
             targets: ["SlowWalkMedicineKnowledge"]
         ),
+        .library(
+            name: "SlowWalkLocationRisk",
+            targets: ["SlowWalkLocationRisk"]
+        ),
     ],
     targets: [
         .target(name: "SlowWalkDomain"),
@@ -28,6 +32,7 @@ let package = Package(
             name: "SlowWalkAPIContracts",
             dependencies: [
                 "SlowWalkDomain",
+                "SlowWalkLocationRisk",
                 "SlowWalkMedicineKnowledge",
             ]
         ),
@@ -52,6 +57,10 @@ let package = Package(
                 "SlowWalkMedicineKnowledge",
             ]
         ),
+        .target(
+            name: "SlowWalkLocationRisk",
+            dependencies: ["SlowWalkDomain"]
+        ),
         .testTarget(
             name: "SlowWalkDomainTests",
             dependencies: ["SlowWalkDomain"]
@@ -64,6 +73,7 @@ let package = Package(
             name: "SlowWalkAPIContractsTests",
             dependencies: [
                 "SlowWalkDomain",
+                "SlowWalkLocationRisk",
                 "SlowWalkMedicineKnowledge",
                 "SlowWalkAPIContracts",
             ]
@@ -90,6 +100,15 @@ let package = Package(
                 "SlowWalkMedicineKnowledge",
                 "SlowWalkMedicinePipeline",
             ]
+        ),
+        .testTarget(
+            name: "SlowWalkLocationRiskTests",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkLocationRisk",
+                "SlowWalkAPIContracts",
+            ],
+            resources: [.process("Fixtures")]
         ),
     ]
 )
