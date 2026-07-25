@@ -13,32 +13,44 @@ public actor InMemoryMedicationHistoryRepository: MedicationHistoryRepository {
         storage = initialStorage
     }
 
-    public func record(id: UUID) async throws -> MedicationRecord? {
+    public func fetch(id: UUID) async throws -> MedicationRecord? {
         storage[id]
     }
 
-    public func records(
-        from startDate: Date?,
-        through endDate: Date?
-    ) async throws -> [MedicationRecord] {
-        if let startDate, let endDate, startDate > endDate {
-            throw DataInterfaceError.invalidDateRange(
-                start: startDate,
-                end: endDate
-            )
-        }
-
+    public func fetchAll() async throws -> [MedicationRecord] {
         return storage.values
-            .filter { record in
-                let isAfterStart = startDate.map { record.recordedAt >= $0 } ?? true
-                let isBeforeEnd = endDate.map { record.recordedAt <= $0 } ?? true
-                return isAfterStart && isBeforeEnd
-            }
             .sorted(by: Self.recordOrder)
     }
 
-    public func save(_ record: MedicationRecord) async throws {
+    public func fetch(
+        within interval: DateInterval
+    ) async throws -> [MedicationRecord] {
+        storage.values.filter {
+            $0.recordedAt >= interval.start
+                && $0.recordedAt <= interval.end
+        }
+        .sorted(by: Self.recordOrder)
+    }
+
+    public func append(_ record: MedicationRecord) async throws {
         storage[record.id] = record
+    }
+
+    public func delete(id: UUID) async throws {
+        guard storage.removeValue(forKey: id) != nil else {
+            throw DataInterfaceError.medicationRecordNotFound(id: id)
+        }
+    }
+
+    @discardableResult
+    public func removeDuplicates() async throws -> Int {
+        let result = MedicationRecordDeduplicator.deduplicate(
+            Array(storage.values)
+        )
+        storage = Dictionary(
+            uniqueKeysWithValues: result.records.map { ($0.id, $0) }
+        )
+        return result.removedCount
     }
 
     private static func recordOrder(

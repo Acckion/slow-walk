@@ -1,0 +1,8 @@
+{
+  "scenario": "etag_not_modified",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "httpStatus": 304,
+  "expectedSourceStatus": "corroborated",
+  "expectedCacheStatus": "revalidated",
+  "sourceDataVersion": "demo-304-v1"
+}

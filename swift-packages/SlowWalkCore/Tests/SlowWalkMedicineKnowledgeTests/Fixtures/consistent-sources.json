@@ -1,0 +1,8 @@
+{
+  "scenario": "consistent_sources",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "httpStatus": 200,
+  "expectedSourceStatus": "corroborated",
+  "expectedCacheStatus": "miss",
+  "sourceDataVersion": "demo-consistent-v1"
+}

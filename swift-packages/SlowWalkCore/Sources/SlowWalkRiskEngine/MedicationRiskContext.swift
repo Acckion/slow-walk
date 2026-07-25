@@ -12,6 +12,9 @@ public struct MedicationRiskContext: Sendable, Equatable, Hashable {
     public let scanEvent: MedicineScanEvent
     public let assessedAt: Date
     public let evidenceCompleteness: EvidenceCompleteness
+    public let healthContextWarnings: [HealthContextValidationIssue]
+    public let duplicateIngredientFindings: [DuplicateIngredientFinding]
+    public let sourceReferences: [SourceReference]
 
     public init(
         medicine: Medicine,
@@ -19,7 +22,10 @@ public struct MedicationRiskContext: Sendable, Equatable, Hashable {
         recentRecords: [MedicationRecord],
         scanEvent: MedicineScanEvent,
         assessedAt: Date,
-        evidenceCompleteness: EvidenceCompleteness
+        evidenceCompleteness: EvidenceCompleteness,
+        healthContextWarnings: [HealthContextValidationIssue] = [],
+        duplicateIngredientFindings: [DuplicateIngredientFinding] = [],
+        sourceReferences: [SourceReference]? = nil
     ) {
         self.medicine = medicine
         self.userProfile = userProfile
@@ -27,5 +33,9 @@ public struct MedicationRiskContext: Sendable, Equatable, Hashable {
         self.scanEvent = scanEvent
         self.assessedAt = assessedAt
         self.evidenceCompleteness = evidenceCompleteness
+        self.healthContextWarnings = healthContextWarnings
+        self.duplicateIngredientFindings = duplicateIngredientFindings
+        self.sourceReferences = sourceReferences
+            ?? medicine.sourceReferences
     }
 }

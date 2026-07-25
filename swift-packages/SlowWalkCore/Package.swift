@@ -13,6 +13,14 @@ let package = Package(
             name: "SlowWalkMedicinePipeline",
             targets: ["SlowWalkMedicinePipeline"]
         ),
+        .library(
+            name: "SlowWalkMedicineKnowledge",
+            targets: ["SlowWalkMedicineKnowledge"]
+        ),
+        .library(
+            name: "SlowWalkLocationRisk",
+            targets: ["SlowWalkLocationRisk"]
+        ),
     ],
     targets: [
         .target(name: "SlowWalkDomain"),
@@ -22,7 +30,11 @@ let package = Package(
         ),
         .target(
             name: "SlowWalkAPIContracts",
-            dependencies: ["SlowWalkDomain"]
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkLocationRisk",
+                "SlowWalkMedicineKnowledge",
+            ]
         ),
         .target(
             name: "SlowWalkDataInterfaces",
@@ -30,12 +42,24 @@ let package = Package(
             resources: [.process("Resources")]
         ),
         .target(
+            name: "SlowWalkMedicineKnowledge",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkDataInterfaces",
+            ]
+        ),
+        .target(
             name: "SlowWalkMedicinePipeline",
             dependencies: [
                 "SlowWalkDomain",
                 "SlowWalkRiskEngine",
                 "SlowWalkDataInterfaces",
+                "SlowWalkMedicineKnowledge",
             ]
+        ),
+        .target(
+            name: "SlowWalkLocationRisk",
+            dependencies: ["SlowWalkDomain"]
         ),
         .testTarget(
             name: "SlowWalkDomainTests",
@@ -47,11 +71,25 @@ let package = Package(
         ),
         .testTarget(
             name: "SlowWalkAPIContractsTests",
-            dependencies: ["SlowWalkDomain", "SlowWalkAPIContracts"]
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkLocationRisk",
+                "SlowWalkMedicineKnowledge",
+                "SlowWalkAPIContracts",
+            ]
         ),
         .testTarget(
             name: "SlowWalkDataInterfacesTests",
             dependencies: ["SlowWalkDomain", "SlowWalkDataInterfaces"]
+        ),
+        .testTarget(
+            name: "SlowWalkMedicineKnowledgeTests",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkDataInterfaces",
+                "SlowWalkMedicineKnowledge",
+            ],
+            resources: [.process("Fixtures")]
         ),
         .testTarget(
             name: "SlowWalkMedicinePipelineTests",
@@ -59,8 +97,18 @@ let package = Package(
                 "SlowWalkDomain",
                 "SlowWalkRiskEngine",
                 "SlowWalkDataInterfaces",
+                "SlowWalkMedicineKnowledge",
                 "SlowWalkMedicinePipeline",
             ]
+        ),
+        .testTarget(
+            name: "SlowWalkLocationRiskTests",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkLocationRisk",
+                "SlowWalkAPIContracts",
+            ],
+            resources: [.process("Fixtures")]
         ),
     ]
 )

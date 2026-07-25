@@ -1,5 +1,6 @@
 import Foundation
 import SlowWalkDomain
+import SlowWalkMedicineKnowledge
 
 /// API v1 request for deterministic medicine-name resolution.
 public struct MedicineResolutionRequestDTO: Codable, Sendable, Equatable, Hashable {
@@ -27,6 +28,8 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
     public let sourceDataVersion: String
     public let generatedAt: Date
     public let apiVersion: String
+    public let medicineKnowledge:
+        MedicineKnowledgeSearchResult?
 
     public init(
         requestID: UUID,
@@ -35,7 +38,9 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
         cacheStatus: MedicineResolutionCacheStatus,
         sourceDataVersion: String,
         generatedAt: Date,
-        apiVersion: String
+        apiVersion: String,
+        medicineKnowledge:
+            MedicineKnowledgeSearchResult? = nil
     ) {
         self.requestID = requestID
         self.resolution = resolution
@@ -44,6 +49,7 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
         self.sourceDataVersion = sourceDataVersion
         self.generatedAt = generatedAt
         self.apiVersion = apiVersion
+        self.medicineKnowledge = medicineKnowledge
     }
 }
 
@@ -85,6 +91,9 @@ public struct MedicineAssessmentResponseDTO: Codable, Sendable, Equatable, Hasha
     public let sourceDataVersion: String
     public let generatedAt: Date
     public let apiVersion: String
+    public let healthContextValidation: HealthContextValidationDTO?
+    public let medicineKnowledge:
+        MedicineKnowledgeSearchResult?
 
     public init(
         requestID: UUID,
@@ -95,7 +104,10 @@ public struct MedicineAssessmentResponseDTO: Codable, Sendable, Equatable, Hasha
         cacheStatus: MedicineResolutionCacheStatus,
         sourceDataVersion: String,
         generatedAt: Date,
-        apiVersion: String
+        apiVersion: String,
+        healthContextValidation: HealthContextValidationDTO? = nil,
+        medicineKnowledge:
+            MedicineKnowledgeSearchResult? = nil
     ) {
         self.requestID = requestID
         self.resolution = resolution
@@ -106,5 +118,7 @@ public struct MedicineAssessmentResponseDTO: Codable, Sendable, Equatable, Hasha
         self.sourceDataVersion = sourceDataVersion
         self.generatedAt = generatedAt
         self.apiVersion = apiVersion
+        self.healthContextValidation = healthContextValidation
+        self.medicineKnowledge = medicineKnowledge
     }
 }

@@ -11,6 +11,8 @@ public enum RiskReasonCode: String, Codable, Sendable, CaseIterable, Hashable {
     case bodyMetricsMissing = "body_metrics_missing"
     case bodyMetricsStale = "body_metrics_stale"
     case bodyMetricsInvalid = "body_metrics_invalid"
+    case healthContextWarning = "health_context_warning"
+    case knowledgeSourceWarning = "knowledge_source_warning"
 }
 
 /// A traceable explanation produced by one deterministic risk rule.

@@ -13,11 +13,11 @@ public actor InMemoryUserHealthProfileRepository: UserHealthProfileRepository {
         storage = initialStorage
     }
 
-    public func profile(id: UUID) async throws -> UserHealthProfile? {
+    public func fetch(id: UUID) async throws -> UserHealthProfile? {
         storage[id]
     }
 
-    public func allProfiles() async throws -> [UserHealthProfile] {
+    public func fetchAll() async throws -> [UserHealthProfile] {
         storage.values.sorted {
             $0.id.uuidString < $1.id.uuidString
         }
@@ -25,5 +25,18 @@ public actor InMemoryUserHealthProfileRepository: UserHealthProfileRepository {
 
     public func save(_ profile: UserHealthProfile) async throws {
         storage[profile.id] = profile
+    }
+
+    public func update(_ profile: UserHealthProfile) async throws {
+        guard storage[profile.id] != nil else {
+            throw DataInterfaceError.profileNotFound(id: profile.id)
+        }
+        storage[profile.id] = profile
+    }
+
+    public func delete(id: UUID) async throws {
+        guard storage.removeValue(forKey: id) != nil else {
+            throw DataInterfaceError.profileNotFound(id: id)
+        }
     }
 }

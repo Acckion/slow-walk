@@ -1,6 +1,7 @@
 import Foundation
 import SlowWalkDataInterfaces
 import SlowWalkDomain
+import SlowWalkMedicineKnowledge
 import SlowWalkMedicinePipeline
 import SlowWalkRiskEngine
 
@@ -44,7 +45,8 @@ func makePipelineProfile(
             systolicBloodPressure: 120,
             diastolicBloodPressure: 75,
             heartRate: 68,
-            measuredAt: pipelineTestDate.addingTimeInterval(-60)
+            measuredAt: pipelineTestDate.addingTimeInterval(-60),
+            source: "demo_data"
         ),
         updatedAt: pipelineTestDate.addingTimeInterval(-60)
     )
@@ -127,7 +129,9 @@ func makeAssessment(
 
 func makePipeline(
     cache: any MedicineCache = InMemoryMedicineCache(),
-    date: Date = pipelineTestDate
+    date: Date = pipelineTestDate,
+    knowledgeSearcher:
+        (any MedicineKnowledgeSearching)? = nil
 ) -> MedicinePipeline {
     MedicinePipeline(
         catalogLoader: BundledDemoMedicineCatalogLoader(),
@@ -135,6 +139,7 @@ func makePipeline(
         dateProvider: FixedClock(fixedDate: date),
         uuidProvider: FixedUUIDProvider(
             fixedUUID: pipelineTestUUID
-        )
+        ),
+        knowledgeSearcher: knowledgeSearcher
     )
 }

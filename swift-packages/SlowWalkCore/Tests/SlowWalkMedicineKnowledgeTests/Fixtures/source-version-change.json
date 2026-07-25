@@ -1,0 +1,8 @@
+{
+  "scenario": "source_version_change",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "httpStatus": 200,
+  "expectedSourceStatus": "authoritative",
+  "expectedCacheStatus": "source_version_changed",
+  "sourceDataVersion": "demo-version-v2"
+}

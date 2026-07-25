@@ -1,0 +1,9 @@
+{
+  "demoNotice": "DEMO DATA — NOT FOR CLINICAL USE",
+  "systolicBloodPressure": 120,
+  "diastolicBloodPressure": 80,
+  "heartRate": 70,
+  "measuredAt": "2025-07-23T23:55:00Z",
+  "source": "demo_data",
+  "deviceIdentifier": "synthetic-device-01"
+}

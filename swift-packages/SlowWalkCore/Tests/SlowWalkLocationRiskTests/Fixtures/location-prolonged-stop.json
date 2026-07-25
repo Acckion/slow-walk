@@ -1,0 +1,51 @@
+{
+  "scenario": "prolonged-stop",
+  "disclaimer": [
+    "DEMO LOCATION SAFETY CONFIGURATION",
+    "NOT A PRODUCTION NAVIGATION STANDARD"
+  ],
+  "request": {
+    "destination": {
+      "id": "fictional-destination-e",
+      "name": "虚构目的地 E",
+      "point": {
+        "latitude": 10.0,
+        "longitude": 20.0
+      },
+      "geofenceRadiusMeters": 50.0
+    },
+    "recentSamples": [
+      {
+        "point": {
+          "latitude": 10.0,
+          "longitude": 20.01
+        },
+        "recordedAt": "2026-07-25T11:45:00Z",
+        "horizontalAccuracyMeters": 10.0,
+        "source": "demo"
+      },
+      {
+        "point": {
+          "latitude": 10.0,
+          "longitude": 20.01001
+        },
+        "recordedAt": "2026-07-25T11:52:30Z",
+        "horizontalAccuracyMeters": 10.0,
+        "source": "demo"
+      },
+      {
+        "point": {
+          "latitude": 10.0,
+          "longitude": 20.01
+        },
+        "recordedAt": "2026-07-25T12:00:00Z",
+        "horizontalAccuracyMeters": 10.0,
+        "source": "demo"
+      }
+    ],
+    "requestID": "00000000-0000-0000-0000-000000000105",
+    "apiVersion": "v1"
+  },
+  "expectedRiskLevel": "orange",
+  "expectedErrorCode": null
+}

@@ -1,0 +1,7 @@
+{
+  "scenario": "expired_cache_offline_fallback",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "expectedSourceStatus": "stale_offline",
+  "expectedCacheStatus": "stale_offline",
+  "sourceDataVersion": "demo-expired-v1"
+}

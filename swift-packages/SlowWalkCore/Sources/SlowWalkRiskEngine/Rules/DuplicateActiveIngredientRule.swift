@@ -13,7 +13,13 @@ public struct DuplicateActiveIngredientRule: MedicationRiskRule {
         let candidateIngredients = RuleSupport.normalizedSet(
             context.medicine.activeIngredientIDs
         )
-        let duplicates = currentIngredients.intersection(candidateIngredients).sorted()
+        let contextDuplicates = Set(
+            context.duplicateIngredientFindings.map(\.ingredientID)
+        )
+        let duplicates = currentIngredients
+            .intersection(candidateIngredients)
+            .union(contextDuplicates)
+            .sorted()
 
         guard !duplicates.isEmpty else {
             return nil
