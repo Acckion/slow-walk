@@ -67,7 +67,10 @@ public actor MedicineAssessmentCoordinator {
         let clock = self.clock
         let apiVersion = self.apiVersion
 
-        let task = Task {
+        let task = Task<
+            MedicineAssessmentViewState,
+            Never
+        > {
             do {
                 try Task.checkCancellation()
                 let observations = try await recognizer

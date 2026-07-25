@@ -69,7 +69,10 @@ public actor LocationAssessmentCoordinator {
         let minimumSampleCount =
             self.minimumSampleCount
 
-        let task = Task {
+        let task = Task<
+            LocationAssessmentViewState,
+            Never
+        > {
             do {
                 try Task.checkCancellation()
                 try await sampleProvider.startSampling()
