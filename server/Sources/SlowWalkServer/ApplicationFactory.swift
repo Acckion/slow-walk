@@ -1,5 +1,6 @@
 import Hummingbird
 import SlowWalkDataInterfaces
+import SlowWalkLocationRisk
 import SlowWalkMedicineKnowledge
 import SlowWalkMedicinePipeline
 import SlowWalkRiskEngine
@@ -13,7 +14,11 @@ public func makeSlowWalkApplication(
         BundledDemoMedicineCatalogLoader(),
     medicineCache: any MedicineCache = InMemoryMedicineCache(),
     medicineKnowledgeSearcher:
-        (any MedicineKnowledgeSearching)? = nil
+        (any MedicineKnowledgeSearching)? = nil,
+    locationRiskAssessor:
+        (any LocationRiskAssessing)? = nil,
+    locationRiskConfiguration:
+        LocationRiskConfiguration = .demo
 ) throws -> some ApplicationProtocol {
     // Validate the bundled catalog at composition time. A missing or unsafe
     // resource prevents startup instead of silently serving an empty catalog.
@@ -95,6 +100,30 @@ public func makeSlowWalkApplication(
     }
     router.post("/api/v1/medicine/assess") { request, context in
         try await medicineController.assess(
+            request: request,
+            context: context
+        )
+    }
+
+    let configuredLocationRiskAssessor:
+        any LocationRiskAssessing =
+        locationRiskAssessor
+        ?? LocationRiskEngine(
+            clock: dateProvider,
+            configuration: locationRiskConfiguration
+        )
+    let locationController = LocationAssessmentController(
+        assessor: configuredLocationRiskAssessor,
+        validator: LocationAssessmentRequestValidator(
+            configuration: locationRiskConfiguration
+        ),
+        dateProvider: dateProvider,
+        uuidProvider: uuidProvider
+    )
+    router.post("/api/v1/location/assess") {
+        request,
+        context in
+        try await locationController.handle(
             request: request,
             context: context
         )
