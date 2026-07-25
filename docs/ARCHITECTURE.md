@@ -26,10 +26,13 @@ SlowWalkMedicineKnowledge
   ├──→ SlowWalkDataInterfaces ──→ SlowWalkDomain
   └──→ SlowWalkDomain
 
-iOS App
-  ├──→ SlowWalkAPIContracts
+SlowWalkClientCore
   ├──→ SlowWalkDomain
-  ├──→ SlowWalkLocationRisk
+  ├──→ SlowWalkAPIContracts
+  └──→ SlowWalkLocationRisk（仅使用 canonical location value types）
+
+iOS App
+  ├──→ SlowWalkClientCore
   └──→ Apple platform adapters (outside SlowWalkCore)
 ```
 
@@ -142,6 +145,27 @@ Domain 和 RiskEngine 不反向依赖该模块。
 仅依赖 `SlowWalkDomain` 与 Foundation，不导入 `CoreLocation`、MapKit、
 SwiftUI 或 UIKit。
 
+### SlowWalkClientCore
+
+职责：
+
+- 定义平台中立的 `MedicineTextRecognizing`、`MedicineAssessmentRequesting`、
+  `LocationSampleProviding` 与 `LocationAssessmentRequesting`。
+- 将 `[RecognizedTextObservation]` 稳定映射为 `MedicineRecognitionInput`，但不
+  生成 candidate、resolution 或 risk。
+- 使用 `LocationHistoryBuffer` actor 按最大数量和时间窗口保留 bounded
+  `[LocationSample]`，支持乱序 callback、精确去重和 privacy clear。
+- 构造 canonical medicine/location request DTO，并把 response 映射为不依赖
+  SwiftUI 的 View state 与非颜色单一表达的风险注意语义。
+- 由纯 Swift coordinator 持有 operation cancellation；所有时间来自注入的
+  `Clock`，不自动重试不可恢复的 validation error。
+
+依赖 `SlowWalkDomain`、`SlowWalkAPIContracts` 与 `SlowWalkLocationRisk`。
+对 `SlowWalkLocationRisk` 的直接依赖仅用于当前 canonical `Destination`、
+`LocationSample` value types；Client Core 不调用或复制 `LocationRiskEngine`。
+该 target 不导入 SwiftUI、UIKit、Vision、CoreLocation、MapKit、AVFoundation、
+Hummingbird 或具体 HTTP transport，并由 Linux Core workflow 编译和测试。
+
 ## 外层适配器
 
 ### SlowWalkServer
@@ -166,32 +190,41 @@ SwiftUI 或 UIKit。
 
 iOS 层负责：
 
-- SwiftUI 页面、无障碍和导航。
-- Vision OCR、相机、CoreLocation、系统语音与权限。
+- SwiftUI 页面、无障碍和导航，消费 `SlowWalkClientCore` View state。
+- 在 Mac/Xcode 中实现 Vision OCR、相机、CoreLocation、URLSession、系统语音
+  与权限 adapter。
 - SwiftData 或本地 JSON 缓存实现。
 - 调用 Swift 服务端并显示可解释的风险行动卡。
 
-iOS 可以依赖核心公开模块；核心模块不能反向依赖 iOS。Apple 平台文件只放在
-`ios/`，不加入跨平台 SwiftPM target。
+iOS 可以依赖核心公开模块；核心模块不能反向依赖 iOS。`VisionMedicineTextRecognizer`、
+`CoreLocationSampleProvider`、`URLSessionMedicineAssessmentClient` 与
+`URLSessionLocationAssessmentClient` 当前只是下一阶段约定的 adapter 名称，尚未
+实现或经 Mac/Xcode 验证。Apple 平台文件只放在 `ios/`，不加入跨平台 SwiftPM
+target。
 
 ## 数据流
 
 ```text
 相机或文字输入
-  → Vision OCR 结果与置信度
-  → 药品名称/别名标准化
+  → OCRImageInput（图片只停留在 adapter 调用栈）
+  → [RecognizedTextObservation]
+  → MedicineRecognitionInput
+  → MedicineAssessmentRequestDTO
+  → 服务端药品名称/别名标准化
   → 白名单知识源 + 版本/时间验证 + 冲突/缓存状态
   → 用户档案 + 近期用药记录 + 身体指标数据质量
   → 确定性风险规则
   → 最高风险 + 全部原因 + 稳定建议动作
-  → iOS 风险行动卡 / API v1 响应
+  → MedicineAssessmentResponseDTO
+  → MedicineAssessmentViewState
 
 位置样本
-  → 数据质量
-  → 距离/geofence/趋势
-  → 行为规则
-  → 共享 RiskLevel + 位置专属 reasons/actions
-  → iOS 位置行动卡 / API v1 响应
+  → LocationSampleProviding
+  → bounded LocationHistoryBuffer
+  → LocationAssessmentRequestDTO
+  → 服务端数据质量 + 距离/geofence/趋势 + 行为规则
+  → LocationAssessmentResponseDTO
+  → LocationAssessmentViewState
 ```
 
 识别失败或来源不足会沿数据流保留下来，不能在中间层被转换为“无风险”。
@@ -210,6 +243,8 @@ GitHub Actions Linux 容器能运行 SwiftPM/XCTest，但不能编译 SwiftUI、
 中验证核心，也会迫使服务端链接无关框架。分离后：
 
 - 核心规则可以在 GitHub Actions Linux 容器中快速测试。
+- 客户端 use-case contract、状态、轨迹窗口和 cancellation 也由 Linux XCTest
+  验证。
 - iOS 集成可以在 Mac/Xcode 独立演进。
 - 服务端和客户端共享同一组领域语义与 DTO。
 - 平台权限、生命周期和持久化变化不会污染业务规则。
@@ -218,8 +253,11 @@ GitHub Actions Linux 容器能运行 SwiftPM/XCTest，但不能编译 SwiftUI、
 
 - 面向跨任务使用的值类型声明 `Sendable`。
 - Repository 共享可变状态需要 actor 或等价隔离。
+- 客户端 bounded location history 使用 actor 隔离，不保留无限轨迹。
 - 依赖通过初始化器注入，不建立全局单例。
 - 时间窗口一律通过 Clock/Date provider 计算。
+- Coordinator 使用结构化 `async/await` 与显式 cancellation，不使用
+  `Task.detached`。
 - 测试使用固定时间与固定 UUID，避免依赖执行顺序。
 
 ## 医疗安全不变量
