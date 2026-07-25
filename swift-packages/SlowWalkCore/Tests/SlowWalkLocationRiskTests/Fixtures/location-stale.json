@@ -1,0 +1,42 @@
+{
+  "scenario": "stale",
+  "disclaimer": [
+    "DEMO LOCATION SAFETY CONFIGURATION",
+    "NOT A PRODUCTION NAVIGATION STANDARD"
+  ],
+  "request": {
+    "destination": {
+      "id": "fictional-destination-d",
+      "name": "虚构目的地 D",
+      "point": {
+        "latitude": 10.0,
+        "longitude": 20.0
+      },
+      "geofenceRadiusMeters": 50.0
+    },
+    "recentSamples": [
+      {
+        "point": {
+          "latitude": 10.0,
+          "longitude": 20.004
+        },
+        "recordedAt": "2026-07-25T10:00:00Z",
+        "horizontalAccuracyMeters": 10.0,
+        "source": "demo"
+      },
+      {
+        "point": {
+          "latitude": 10.0,
+          "longitude": 20.003
+        },
+        "recordedAt": "2026-07-25T10:01:00Z",
+        "horizontalAccuracyMeters": 10.0,
+        "source": "demo"
+      }
+    ],
+    "requestID": "00000000-0000-0000-0000-000000000104",
+    "apiVersion": "v1"
+  },
+  "expectedRiskLevel": null,
+  "expectedErrorCode": "LOCATION_DATA_STALE"
+}
