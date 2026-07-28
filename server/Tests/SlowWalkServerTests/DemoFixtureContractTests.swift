@@ -168,6 +168,7 @@ final class DemoFixtureContractTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
             .appendingPathComponent("demo-fixtures")
     }
 }

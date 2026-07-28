@@ -1,6 +1,6 @@
 # Medicine MVP 接口冻结核验
 
-核验日期：2026-07-28  
+核验日期：2026-07-28
 核验范围：成员 C / `feature/demo-fixtures`
 
 ## 冻结结论
@@ -90,4 +90,3 @@ POST /api/v1/medicine/assess
 
 该端点对 resolved、ambiguous、识别失败、证据不足、健康档案错误和知识来源异常均
 已有服务端测试。旧 `/api/v1/risk/assess` 不属于正式客户端调用路径。
-

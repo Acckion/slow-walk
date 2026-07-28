@@ -1,6 +1,6 @@
 # Day 1 成员 C 测试记录
 
-记录日期：2026-07-28  
+记录日期：2026-07-28
 分支：`feature/demo-fixtures`
 
 ## 本地 Fixture 验证
@@ -27,12 +27,11 @@
 
 ## Server
 
-本机状态：未完成本地运行。
+结果：71/71 通过，0 failures。
 
-原因：本地没有 Hummingbird checkout，SwiftPM 通过 Git HTTPS 下载依赖时连接
-GitHub 超时。没有将网络失败记录为代码失败，也没有改写 Server 依赖。
-
-新增 `DemoFixtureContractTests` 将由本分支 GitHub Actions 执行，覆盖：
+Server 与 Core 有相同的本机 platform manifest 边界，因此测试在 `/tmp` 验证副本
+中运行；Server 源码、测试、Fixture 和 Hummingbird 2.25.1 依赖均与当前分支一致。
+新增 4 项 `DemoFixtureContractTests` 已实际执行并通过，覆盖：
 
 - canonical endpoint 与 API version
 - `RiskLevel` wire values
@@ -51,4 +50,3 @@ GitHub 超时。没有将网络失败记录为代码失败，也没有改写 Ser
 
 两个 workflow 均使用官方 `swift:6.3.2-jammy` 容器。上述结果是分支开发前的基线，
 不是本功能分支最终 CI 结果；最终结果在推送后补充。
-

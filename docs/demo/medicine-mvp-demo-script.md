@@ -1,6 +1,6 @@
 # Medicine MVP 第一版演示视频脚本
 
-目标时长：2 分 30 秒至 3 分钟  
+目标时长：2 分 30 秒至 3 分钟
 主场景：`normal` → `ambiguous` → `healthWarning` → `knowledgeWarning` →
 `redRisk` → `timeout`
 
@@ -127,4 +127,3 @@
 - VoiceOver 至少朗读一次风险等级、标题、主要动作和来源。
 - 画面中不得出现剂量、疗程、最大剂量或“确认安全”等表述。
 - 不录入真实姓名、健康数据、位置或药盒照片。
-
