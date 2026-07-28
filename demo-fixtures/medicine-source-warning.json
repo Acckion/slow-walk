@@ -1,0 +1,151 @@
+{
+  "fixtureID": "knowledgeWarning",
+  "disclaimer": "DEMO DATA — NOT FOR CLINICAL USE",
+  "request": {
+    "apiVersion": "v1",
+    "input": {
+      "capturedAt": "2026-07-25T07:59:00Z",
+      "languageCode": "en",
+      "rawConfidence": 0.98,
+      "recognizedTexts": [
+        "Acetaminophen"
+      ]
+    },
+    "recentRecords": [],
+    "requestID": "00000000-0000-0000-0000-000000000104",
+    "userProfile": {
+      "age": 72,
+      "allergies": [],
+      "bodyMetrics": {
+        "deviceIdentifier": "demo-device",
+        "diastolicBloodPressure": 80,
+        "heartRate": 70,
+        "measuredAt": "2026-07-25T07:55:00Z",
+        "source": "demo_data",
+        "systolicBloodPressure": 120
+      },
+      "createdAt": "2026-07-25T07:55:00Z",
+      "currentMedicineIngredientIDs": [],
+      "diagnosedConditions": [],
+      "id": "00000000-0000-0000-0000-000000000011",
+      "schemaVersion": 1,
+      "updatedAt": "2026-07-25T07:55:00Z"
+    }
+  },
+  "response": {
+    "actionCard": {
+      "generatedAt": "2026-07-25T08:00:00Z",
+      "mustConfirmMedicine": false,
+      "primaryInstruction": "Pause and review the available information.",
+      "recommendedActions": [
+        "consult_healthcare_professional",
+        "review_medicine_sources"
+      ],
+      "riskLevel": "yellow",
+      "sourceReferences": [
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "optionalURL": null,
+          "retrievedAt": "2026-07-24T00:00:00Z",
+          "sourceName": "SlowWalk Synthetic Demo Catalog",
+          "versionOrDate": "slowwalk-demo-catalog-v1"
+        }
+      ],
+      "title": "Acetaminophen",
+      "warnings": [
+        "DEMO DATA — NOT FOR CLINICAL USE",
+        "Knowledge source requires review."
+      ]
+    },
+    "apiVersion": "v1",
+    "assessment": {
+      "assessedAt": "2026-07-25T08:00:00Z",
+      "evidenceCompleteness": "partial",
+      "level": "yellow",
+      "reasons": [
+        {
+          "code": "knowledge_source_warning",
+          "evidence": "The demo source returned a governance warning.",
+          "message": "Knowledge source requires review.",
+          "ruleIdentifier": "knowledge-source-governance"
+        }
+      ],
+      "recommendedActions": [
+        "consult_healthcare_professional",
+        "review_medicine_sources"
+      ],
+      "requiresFamilyAttention": false,
+      "requiresProfessionalAdvice": true
+    },
+    "cacheHit": true,
+    "generatedAt": "2026-07-25T08:00:00Z",
+    "healthContextValidation": {
+      "configurationNotices": [],
+      "status": "valid",
+      "warnings": []
+    },
+    "knowledgeCacheStatus": "stale_offline",
+    "medicineKnowledge": null,
+    "requestID": "00000000-0000-0000-0000-000000000104",
+    "resolution": {
+      "candidates": [],
+      "evidence": {
+        "discardedNoise": [],
+        "dosageForms": [],
+        "languageCode": "en",
+        "matcherVersion": "resolver-v1",
+        "normalizedQuery": "acetaminophen",
+        "normalizedText": "acetaminophen",
+        "rawConfidence": 0.98,
+        "recognizedTexts": [
+          "Acetaminophen"
+        ],
+        "removedSpecifications": [],
+        "sourceDataVersions": [
+          "slowwalk-demo-catalog-v1"
+        ]
+      },
+      "requiresUserConfirmation": false,
+      "selectedMedicine": {
+        "activeIngredientIDs": [
+          "acetaminophen"
+        ],
+        "aliases": [
+          "Paracetamol",
+          "对乙酰氨基酚"
+        ],
+        "canonicalName": "Acetaminophen",
+        "contraindicationTags": [],
+        "dataVersion": "slowwalk-demo-catalog-v1",
+        "dosageTextFromSource": null,
+        "id": "demo-acetaminophen",
+        "medicineCategory": "antipyretic",
+        "sourceReferences": [
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "optionalURL": null,
+            "retrievedAt": "2026-07-24T00:00:00Z",
+            "sourceName": "SlowWalk Synthetic Demo Catalog",
+            "versionOrDate": "slowwalk-demo-catalog-v1"
+          }
+        ],
+        "warnings": [
+          "DEMO DATA — NOT FOR CLINICAL USE"
+        ]
+      },
+      "status": "resolved"
+    },
+    "resolutionCacheStatus": "hit",
+    "sourceDataVersion": "slowwalk-demo-catalog-v1"
+  },
+  "expectation": {
+    "allowsOrdinaryExplanation": true,
+    "expectedActionCardPrimaryInstruction": "Pause and review the available information.",
+    "expectedActionCardTitle": "Acetaminophen",
+    "expectedPresentationVariant": "knowledgeWarning",
+    "expectedRiskLevel": "yellow",
+    "expectedViewState": "result",
+    "recommendContactFamily": false,
+    "recommendContactHealthcareProfessional": true
+  }
+}
