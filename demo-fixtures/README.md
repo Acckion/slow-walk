@@ -34,4 +34,3 @@ to prevent fixture drift.
 `expectedViewState` names the existing `MedicineAssessmentViewState` case.
 `expectedPresentationVariant` is presentation metadata, not a new Core public
 API. No fixture contains supported dosage instructions.
-

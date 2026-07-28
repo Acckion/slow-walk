@@ -42,4 +42,3 @@ The timeout is a client transport scenario, not an HTTP response fixture.
 `ClientTransportError.timedOut`; `ClientFailureMapper` then creates the stable
 recoverable failure state. Do not encode a fabricated `APIErrorDTO`, risk
 level, or medicine instruction for this scenario.
-
