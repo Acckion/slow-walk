@@ -21,6 +21,10 @@ let package = Package(
             name: "SlowWalkLocationRisk",
             targets: ["SlowWalkLocationRisk"]
         ),
+        .library(
+            name: "SlowWalkClientCore",
+            targets: ["SlowWalkClientCore"]
+        ),
     ],
     targets: [
         .target(name: "SlowWalkDomain"),
@@ -60,6 +64,14 @@ let package = Package(
         .target(
             name: "SlowWalkLocationRisk",
             dependencies: ["SlowWalkDomain"]
+        ),
+        .target(
+            name: "SlowWalkClientCore",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkAPIContracts",
+                "SlowWalkLocationRisk",
+            ]
         ),
         .testTarget(
             name: "SlowWalkDomainTests",
@@ -109,6 +121,15 @@ let package = Package(
                 "SlowWalkAPIContracts",
             ],
             resources: [.process("Fixtures")]
+        ),
+        .testTarget(
+            name: "SlowWalkClientCoreTests",
+            dependencies: [
+                "SlowWalkDomain",
+                "SlowWalkAPIContracts",
+                "SlowWalkLocationRisk",
+                "SlowWalkClientCore",
+            ]
         ),
     ]
 )
