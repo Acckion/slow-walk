@@ -9,54 +9,88 @@ import SwiftUI
 struct CareSettingsView: View {
     @Environment(AppEnvironment.self) private var environment
 
-    /// Session-only, so nothing suggests a saved preference.
-    @State private var preferredName: String = ""
-    @State private var prefersLargerText = false
-    @State private var prefersSpokenReminders = false
-
     var body: some View {
         Form {
             Section {
                 DemoDataBanner()
+                    .slowWalkReadableContent()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
 
             Section("称呼") {
-                TextField(
-                    "希望我们怎么称呼您",
-                    text: $preferredName,
-                    prompt: Text(environment.plan.preferredName)
+                LabeledContent {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(environment.plan.preferredName)
+                            .font(.body.weight(.semibold))
+                        Text("演示内容，只读")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } label: {
+                    Label("当前称呼", systemImage: "person.text.rectangle")
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    "当前称呼，\(environment.plan.preferredName)，演示内容，只读"
                 )
-                .accessibilityLabel("希望我们怎么称呼您")
-                Text("称呼由您决定，我们不会代替您设定。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+                .slowWalkReadableContent()
 
-            Section("提示方式") {
-                // Neither switch is connected yet. Leaving them tappable would
-                // present a setting that silently does nothing, so they are
-                // disabled and the reason is stated on screen.
-                Toggle("使用更大的字号", isOn: $prefersLargerText)
-                    .disabled(true)
-                Toggle("重要提示同时朗读", isOn: $prefersSpokenReminders)
-                    .disabled(true)
-                Text("这两项尚未接入。字号目前跟随系统的“显示与文字大小”设置，朗读功能将在后续阶段接入。")
+                Text("当前称呼来自演示计划，本阶段暂不可修改。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .slowWalkReadableContent()
+            }
+
+            Section("提示方式") {
+                LabeledContent {
+                    Text("跟随系统")
+                        .foregroundStyle(.secondary)
+                } label: {
+                    Label("文字大小", systemImage: "textformat.size")
+                }
+                .slowWalkReadableContent()
+
+                LabeledContent {
+                    Text("尚未接入")
+                        .foregroundStyle(.secondary)
+                } label: {
+                    Label("语音提醒", systemImage: "speaker.wave.2")
+                }
+                .slowWalkReadableContent()
+
+                Text("字号目前跟随系统的“显示与文字大小”设置。语音提醒将在后续阶段接入。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .slowWalkReadableContent()
             }
 
             Section("紧急联系人") {
-                Text("尚未接入。可以联系谁由您自己决定。")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-            }
+                LabeledContent {
+                    Text("尚未接入")
+                        .foregroundStyle(.secondary)
+                } label: {
+                    Label("联系人", systemImage: "person.crop.circle.badge.exclamationmark")
+                }
+                .slowWalkReadableContent()
 
-            Section("关于") {
-                NotADiagnosisNotice()
-                Text("本阶段的设置只在本次运行内有效，尚未保存到设备。")
+                Text("可以联系谁由您自己决定。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .slowWalkReadableContent()
+            }
+
+            Section("说明") {
+                NavigationLink {
+                    SafetyInformationView()
+                } label: {
+                    Label("安全与使用说明", systemImage: "shield.lefthalf.filled")
+                }
+                .accessibilityHint("查看演示数据、功能边界和数据保存说明。")
+                .slowWalkReadableContent()
             }
         }
     }

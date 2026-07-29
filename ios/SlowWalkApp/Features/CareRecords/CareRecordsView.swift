@@ -13,55 +13,100 @@ struct CareRecordsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+        List {
+            Section {
                 DemoDataBanner()
+                    .slowWalkReadableContent()
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
 
-                if events.isEmpty {
-                    emptyState
-                } else {
+            if events.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        "还没有记录",
+                        systemImage: "clock.badge.questionmark",
+                        description: Text("开始一次陪伴之后，这里会按时间记录每一步。")
+                    )
+                    .slowWalkReadableContent()
+                }
+            } else {
+                Section {
                     ForEach(events) { event in
                         row(for: event)
+                            .slowWalkReadableContent()
                     }
+                } header: {
+                    sectionHeader("陪伴过程")
                 }
-
-                Text("本阶段记录只保存在内存中，重新启动后会清空。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
             }
-            .padding()
-        }
-    }
 
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("还没有记录")
-                .font(.headline)
-            Text("开始一次陪伴之后，这里会按时间记录每一步。")
-                .font(.body)
-                .foregroundStyle(.secondary)
+            Section {
+                SlowWalkNotice(
+                    title: "记录保存在本次运行中",
+                    message: "本阶段记录只保存在内存中，重新启动后会清空。",
+                    systemImage: "internaldrive"
+                )
+                .slowWalkReadableContent()
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            } header: {
+                sectionHeader("记录说明")
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .listStyle(.insetGrouped)
     }
 
     private func row(for event: CareRecordEvent) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(Self.timeFormatter.string(from: event.occurredAt))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(Self.description(for: event.kind))
-                .font(.body)
-                .fixedSize(horizontal: false, vertical: true)
+        let time = event.occurredAt.formatted(Self.timeStyle)
+
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: Self.systemImage(for: event.kind))
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: SlowWalkLayout.minimumTapTarget)
+                .frame(
+                    minHeight: SlowWalkLayout.minimumTapTarget,
+                    alignment: .top
+                )
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(time)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(Self.description(for: event.kind))
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(Self.timeFormatter.string(from: event.occurredAt))，"
-                + Self.description(for: event.kind)
-        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(time)，\(Self.description(for: event.kind))")
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private static func systemImage(for kind: CareRecordEventKind) -> String {
+        switch kind {
+        case .dayPlanItemStarted:
+            "calendar.badge.clock"
+        case .medicineReadStarted:
+            "camera.viewfinder"
+        case .medicineReadDidNotSucceed:
+            "arrow.clockwise.circle"
+        case .medicineReadFoundCandidates:
+            "list.bullet.rectangle"
+        case .medicineConfirmed:
+            "checkmark.circle"
+        case .careActionShown:
+            "rectangle.and.text.magnifyingglass"
+        case .companionFinished:
+            "flag.checkered"
+        }
     }
 
     // MARK: - Wording
@@ -103,11 +148,7 @@ struct CareRecordsView: View {
         }
     }
 
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter
-    }()
+    private static let timeStyle = Date.FormatStyle(date: .omitted, time: .shortened)
 }
 
 #Preview {
