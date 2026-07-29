@@ -40,6 +40,7 @@
       "mustConfirmMedicine": false,
       "primaryInstruction": "Do not take this medicine until a healthcare professional confirms the next step.",
       "recommendedActions": [
+        "do_not_take_until_medicine_confirmed",
         "consult_healthcare_professional",
         "notify_family_member"
       ],
@@ -47,16 +48,21 @@
       "sourceReferences": [
         {
           "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
-          "optionalURL": null,
-          "retrievedAt": "2026-07-24T00:00:00Z",
-          "sourceName": "SlowWalk Synthetic Demo Catalog",
-          "versionOrDate": "slowwalk-demo-catalog-v1"
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Authoritative Medicine Source",
+          "versionOrDate": "demo-authoritative-v1"
+        },
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Secondary Medicine Source",
+          "versionOrDate": "demo-secondary-v1"
         }
       ],
       "title": "Acetaminophen",
       "warnings": [
         "DEMO DATA — NOT FOR CLINICAL USE",
-        "The medicine contains an ingredient listed in the health profile allergies."
+        "The medicine label matches information in the allergy profile."
       ]
     },
     "apiVersion": "v1",
@@ -67,13 +73,14 @@
       "reasons": [
         {
           "code": "allergy_match",
-          "evidence": "Matched ingredient: acetaminophen.",
-          "message": "The medicine contains an ingredient listed in the health profile allergies.",
-          "ruleIdentifier": "allergy-match-v1"
+          "evidence": "Matched normalized labels: acetaminophen.",
+          "message": "The medicine label matches information in the allergy profile.",
+          "ruleIdentifier": "allergy-match"
         }
       ],
       "recommendedActions": [
         "consult_healthcare_professional",
+        "do_not_take_until_medicine_confirmed",
         "notify_family_member"
       ],
       "requiresFamilyAttention": true,
@@ -82,20 +89,180 @@
     "cacheHit": false,
     "generatedAt": "2026-07-25T08:00:00Z",
     "healthContextValidation": {
-      "configurationNotices": [],
+      "configurationNotices": [
+        "DEMO DATA QUALITY CONFIGURATION — NOT A CLINICAL DIAGNOSTIC STANDARD",
+        "NOT FOR CLINICAL USE"
+      ],
       "status": "valid",
       "warnings": []
     },
     "knowledgeCacheStatus": "miss",
-    "medicineKnowledge": null,
+    "medicineKnowledge": {
+      "cacheStatus": "miss",
+      "candidates": [
+        {
+          "completeness": 0.95,
+          "conflicts": [],
+          "governanceVerdict": {
+            "allowsDosageDisplay": true,
+            "completeness": 0.95,
+            "freshnessStatus": "current",
+            "provenanceStatus": "verified",
+            "requiresConfirmation": false,
+            "requiresConservativeAction": false,
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "validationStatus": "valid",
+            "warnings": []
+          },
+          "medicine": {
+            "activeIngredientIDs": [
+              "acetaminophen"
+            ],
+            "aliases": [
+              "Paracetamol",
+              "对乙酰氨基酚"
+            ],
+            "canonicalName": "Acetaminophen",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-acetaminophen",
+            "medicineCategory": "antipyretic",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          },
+          "requiresConfirmation": false,
+          "sourceIdentifiers": [
+            "mock-authoritative-medicine-source",
+            "mock-secondary-medicine-source"
+          ],
+          "validationStatus": "valid",
+          "warnings": []
+        }
+      ],
+      "completeness": 0.95,
+      "generatedAt": "2026-07-25T08:00:00Z",
+      "governanceVerdict": {
+        "allowsDosageDisplay": true,
+        "completeness": 0.95,
+        "freshnessStatus": "current",
+        "provenanceStatus": "verified",
+        "requiresConfirmation": false,
+        "requiresConservativeAction": false,
+        "sourceReferences": [
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Authoritative Medicine Source",
+            "versionOrDate": "demo-authoritative-v1"
+          },
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Secondary Medicine Source",
+            "versionOrDate": "demo-secondary-v1"
+          }
+        ],
+        "validationStatus": "valid",
+        "warnings": []
+      },
+      "isOffline": false,
+      "normalizedQuery": "acetaminophen",
+      "sourceReferences": [
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Authoritative Medicine Source",
+          "versionOrDate": "demo-authoritative-v1"
+        },
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Secondary Medicine Source",
+          "versionOrDate": "demo-secondary-v1"
+        }
+      ],
+      "sourceStatus": "corroborated",
+      "sourceVersions": {
+        "mock-authoritative-medicine-source": "demo-authoritative-v1",
+        "mock-secondary-medicine-source": "demo-secondary-v1"
+      },
+      "warnings": []
+    },
     "requestID": "00000000-0000-0000-0000-000000000105",
     "resolution": {
-      "candidates": [],
+      "candidates": [
+        {
+          "matchReasons": [
+            "canonical_exact",
+            "canonical_normalized"
+          ],
+          "matchScore": 1,
+          "medicine": {
+            "activeIngredientIDs": [
+              "acetaminophen"
+            ],
+            "aliases": [
+              "Paracetamol",
+              "对乙酰氨基酚"
+            ],
+            "canonicalName": "Acetaminophen",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-acetaminophen",
+            "medicineCategory": "antipyretic",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          }
+        }
+      ],
       "evidence": {
         "discardedNoise": [],
         "dosageForms": [],
         "languageCode": "en",
-        "matcherVersion": "resolver-v1",
+        "matcherVersion": "slowwalk-resolver-v1",
         "normalizedQuery": "acetaminophen",
         "normalizedText": "acetaminophen",
         "rawConfidence": 0.98,
@@ -104,7 +271,7 @@
         ],
         "removedSpecifications": [],
         "sourceDataVersions": [
-          "slowwalk-demo-catalog-v1"
+          "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
         ]
       },
       "requiresUserConfirmation": false,
@@ -118,17 +285,21 @@
         ],
         "canonicalName": "Acetaminophen",
         "contraindicationTags": [],
-        "dataVersion": "slowwalk-demo-catalog-v1",
-        "dosageTextFromSource": null,
+        "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
         "id": "demo-acetaminophen",
         "medicineCategory": "antipyretic",
         "sourceReferences": [
           {
             "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
-            "optionalURL": null,
-            "retrievedAt": "2026-07-24T00:00:00Z",
-            "sourceName": "SlowWalk Synthetic Demo Catalog",
-            "versionOrDate": "slowwalk-demo-catalog-v1"
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Authoritative Medicine Source",
+            "versionOrDate": "demo-authoritative-v1"
+          },
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Secondary Medicine Source",
+            "versionOrDate": "demo-secondary-v1"
           }
         ],
         "warnings": [
@@ -138,7 +309,7 @@
       "status": "resolved"
     },
     "resolutionCacheStatus": "miss",
-    "sourceDataVersion": "slowwalk-demo-catalog-v1"
+    "sourceDataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
   },
   "expectation": {
     "allowsOrdinaryExplanation": false,

@@ -34,10 +34,11 @@
   },
   "response": {
     "actionCard": {
-      "generatedAt": "2026-07-25T08:00:00Z",
-      "mustConfirmMedicine": false,
+      "generatedAt": "2026-07-25T08:20:00Z",
+      "mustConfirmMedicine": true,
       "primaryInstruction": "Pause and review the available information.",
       "recommendedActions": [
+        "do_not_take_until_medicine_confirmed",
         "consult_healthcare_professional",
         "review_medicine_sources"
       ],
@@ -45,29 +46,37 @@
       "sourceReferences": [
         {
           "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
-          "optionalURL": null,
-          "retrievedAt": "2026-07-24T00:00:00Z",
-          "sourceName": "SlowWalk Synthetic Demo Catalog",
-          "versionOrDate": "slowwalk-demo-catalog-v1"
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Authoritative Medicine Source",
+          "versionOrDate": "demo-authoritative-v1"
+        },
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Secondary Medicine Source",
+          "versionOrDate": "demo-secondary-v1"
         }
       ],
       "title": "Acetaminophen",
       "warnings": [
         "DEMO DATA — NOT FOR CLINICAL USE",
-        "Knowledge source requires review."
+        "Offline cached data is stale and is not current authoritative data.",
+        "A whitelisted source was unavailable.",
+        "Live sources were unavailable. Stale cached demo data is being used and is not current authoritative data.",
+        "Medicine knowledge requires source review, so a green result is not permitted."
       ]
     },
     "apiVersion": "v1",
     "assessment": {
-      "assessedAt": "2026-07-25T08:00:00Z",
-      "evidenceCompleteness": "partial",
+      "assessedAt": "2026-07-25T08:20:00Z",
+      "evidenceCompleteness": "insufficient",
       "level": "yellow",
       "reasons": [
         {
           "code": "knowledge_source_warning",
-          "evidence": "The demo source returned a governance warning.",
-          "message": "Knowledge source requires review.",
-          "ruleIdentifier": "knowledge-source-governance"
+          "evidence": "sourceStatus=stale_offline;cacheStatus=stale_offline;warnings=KNOWLEDGE_SOURCE_UNAVAILABLE,KNOWLEDGE_SOURCE_UNAVAILABLE,OFFLINE_CACHE_USED",
+          "message": "Medicine knowledge requires source review, so a green result is not permitted.",
+          "ruleIdentifier": "medicine-knowledge-source-safety"
         }
       ],
       "recommendedActions": [
@@ -77,23 +86,280 @@
       "requiresFamilyAttention": false,
       "requiresProfessionalAdvice": true
     },
-    "cacheHit": true,
-    "generatedAt": "2026-07-25T08:00:00Z",
+    "cacheHit": false,
+    "generatedAt": "2026-07-25T08:20:00Z",
     "healthContextValidation": {
-      "configurationNotices": [],
-      "status": "valid",
-      "warnings": []
+      "configurationNotices": [
+        "DEMO DATA QUALITY CONFIGURATION — NOT A CLINICAL DIAGNOSTIC STANDARD",
+        "NOT FOR CLINICAL USE"
+      ],
+      "status": "valid_with_warnings",
+      "warnings": [
+        {
+          "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+          "field": "medicineKnowledge",
+          "message": "A whitelisted source was unavailable.",
+          "ruleIdentifier": "medicine-knowledge-source-safety",
+          "severity": "warning"
+        },
+        {
+          "code": "OFFLINE_CACHE_USED",
+          "field": "medicineKnowledge",
+          "message": "Live sources were unavailable. Stale cached demo data is being used and is not current authoritative data.",
+          "ruleIdentifier": "medicine-knowledge-source-safety",
+          "severity": "warning"
+        }
+      ]
     },
     "knowledgeCacheStatus": "stale_offline",
-    "medicineKnowledge": null,
+    "medicineKnowledge": {
+      "cacheStatus": "stale_offline",
+      "candidates": [
+        {
+          "completeness": 0.5,
+          "conflicts": [],
+          "governanceVerdict": {
+            "allowsDosageDisplay": false,
+            "completeness": 0.5,
+            "freshnessStatus": "stale",
+            "provenanceStatus": "verified",
+            "requiresConfirmation": true,
+            "requiresConservativeAction": true,
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "validationStatus": "warning",
+            "warnings": [
+              {
+                "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+                "message": "A whitelisted source was unavailable.",
+                "sourceIdentifiers": [
+                  "mock-authoritative-medicine-source"
+                ]
+              },
+              {
+                "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+                "message": "A whitelisted source was unavailable.",
+                "sourceIdentifiers": [
+                  "mock-secondary-medicine-source"
+                ]
+              },
+              {
+                "code": "OFFLINE_CACHE_USED",
+                "message": "Live sources were unavailable. Stale cached demo data is being used and is not current authoritative data.",
+                "sourceIdentifiers": []
+              }
+            ]
+          },
+          "medicine": {
+            "activeIngredientIDs": [
+              "acetaminophen"
+            ],
+            "aliases": [
+              "Paracetamol",
+              "对乙酰氨基酚"
+            ],
+            "canonicalName": "Acetaminophen",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-acetaminophen",
+            "medicineCategory": "antipyretic",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE",
+              "Offline cached data is stale and is not current authoritative data."
+            ]
+          },
+          "requiresConfirmation": true,
+          "sourceIdentifiers": [
+            "mock-authoritative-medicine-source",
+            "mock-secondary-medicine-source"
+          ],
+          "validationStatus": "warning",
+          "warnings": [
+            {
+              "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+              "message": "A whitelisted source was unavailable.",
+              "sourceIdentifiers": [
+                "mock-authoritative-medicine-source"
+              ]
+            },
+            {
+              "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+              "message": "A whitelisted source was unavailable.",
+              "sourceIdentifiers": [
+                "mock-secondary-medicine-source"
+              ]
+            },
+            {
+              "code": "OFFLINE_CACHE_USED",
+              "message": "Live sources were unavailable. Stale cached demo data is being used and is not current authoritative data.",
+              "sourceIdentifiers": []
+            }
+          ]
+        }
+      ],
+      "completeness": 0.5,
+      "generatedAt": "2026-07-25T08:20:00Z",
+      "governanceVerdict": {
+        "allowsDosageDisplay": false,
+        "completeness": 0.5,
+        "freshnessStatus": "stale",
+        "provenanceStatus": "verified",
+        "requiresConfirmation": true,
+        "requiresConservativeAction": true,
+        "sourceReferences": [
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Authoritative Medicine Source",
+            "versionOrDate": "demo-authoritative-v1"
+          },
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Secondary Medicine Source",
+            "versionOrDate": "demo-secondary-v1"
+          }
+        ],
+        "validationStatus": "warning",
+        "warnings": [
+          {
+            "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+            "message": "A whitelisted source was unavailable.",
+            "sourceIdentifiers": [
+              "mock-authoritative-medicine-source"
+            ]
+          },
+          {
+            "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+            "message": "A whitelisted source was unavailable.",
+            "sourceIdentifiers": [
+              "mock-secondary-medicine-source"
+            ]
+          },
+          {
+            "code": "OFFLINE_CACHE_USED",
+            "message": "Live sources were unavailable. Stale cached demo data is being used and is not current authoritative data.",
+            "sourceIdentifiers": []
+          }
+        ]
+      },
+      "isOffline": true,
+      "normalizedQuery": "acetaminophen",
+      "sourceReferences": [
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Authoritative Medicine Source",
+          "versionOrDate": "demo-authoritative-v1"
+        },
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Secondary Medicine Source",
+          "versionOrDate": "demo-secondary-v1"
+        }
+      ],
+      "sourceStatus": "stale_offline",
+      "sourceVersions": {
+        "mock-authoritative-medicine-source": "demo-authoritative-v1",
+        "mock-secondary-medicine-source": "demo-secondary-v1"
+      },
+      "warnings": [
+        {
+          "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+          "message": "A whitelisted source was unavailable.",
+          "sourceIdentifiers": [
+            "mock-authoritative-medicine-source"
+          ]
+        },
+        {
+          "code": "KNOWLEDGE_SOURCE_UNAVAILABLE",
+          "message": "A whitelisted source was unavailable.",
+          "sourceIdentifiers": [
+            "mock-secondary-medicine-source"
+          ]
+        },
+        {
+          "code": "OFFLINE_CACHE_USED",
+          "message": "Live sources were unavailable. Stale cached demo data is being used and is not current authoritative data.",
+          "sourceIdentifiers": []
+        }
+      ]
+    },
     "requestID": "00000000-0000-0000-0000-000000000104",
     "resolution": {
-      "candidates": [],
+      "candidates": [
+        {
+          "matchReasons": [
+            "canonical_exact",
+            "canonical_normalized"
+          ],
+          "matchScore": 1,
+          "medicine": {
+            "activeIngredientIDs": [
+              "acetaminophen"
+            ],
+            "aliases": [
+              "Paracetamol",
+              "对乙酰氨基酚"
+            ],
+            "canonicalName": "Acetaminophen",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-acetaminophen",
+            "medicineCategory": "antipyretic",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE",
+              "Offline cached data is stale and is not current authoritative data."
+            ]
+          }
+        }
+      ],
       "evidence": {
         "discardedNoise": [],
         "dosageForms": [],
         "languageCode": "en",
-        "matcherVersion": "resolver-v1",
+        "matcherVersion": "slowwalk-resolver-v1",
         "normalizedQuery": "acetaminophen",
         "normalizedText": "acetaminophen",
         "rawConfidence": 0.98,
@@ -102,10 +368,10 @@
         ],
         "removedSpecifications": [],
         "sourceDataVersions": [
-          "slowwalk-demo-catalog-v1"
+          "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
         ]
       },
-      "requiresUserConfirmation": false,
+      "requiresUserConfirmation": true,
       "selectedMedicine": {
         "activeIngredientIDs": [
           "acetaminophen"
@@ -116,35 +382,40 @@
         ],
         "canonicalName": "Acetaminophen",
         "contraindicationTags": [],
-        "dataVersion": "slowwalk-demo-catalog-v1",
-        "dosageTextFromSource": null,
+        "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
         "id": "demo-acetaminophen",
         "medicineCategory": "antipyretic",
         "sourceReferences": [
           {
             "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
-            "optionalURL": null,
-            "retrievedAt": "2026-07-24T00:00:00Z",
-            "sourceName": "SlowWalk Synthetic Demo Catalog",
-            "versionOrDate": "slowwalk-demo-catalog-v1"
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Authoritative Medicine Source",
+            "versionOrDate": "demo-authoritative-v1"
+          },
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Secondary Medicine Source",
+            "versionOrDate": "demo-secondary-v1"
           }
         ],
         "warnings": [
-          "DEMO DATA — NOT FOR CLINICAL USE"
+          "DEMO DATA — NOT FOR CLINICAL USE",
+          "Offline cached data is stale and is not current authoritative data."
         ]
       },
       "status": "resolved"
     },
-    "resolutionCacheStatus": "hit",
-    "sourceDataVersion": "slowwalk-demo-catalog-v1"
+    "resolutionCacheStatus": "expired",
+    "sourceDataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
   },
   "expectation": {
-    "allowsOrdinaryExplanation": true,
+    "allowsOrdinaryExplanation": false,
     "expectedActionCardPrimaryInstruction": "Pause and review the available information.",
     "expectedActionCardTitle": "Acetaminophen",
     "expectedPresentationVariant": "knowledgeWarning",
     "expectedRiskLevel": "yellow",
-    "expectedViewState": "result",
+    "expectedViewState": "requiresMedicineConfirmation",
     "recommendContactFamily": false,
     "recommendContactHealthcareProfessional": true
   }

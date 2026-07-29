@@ -39,35 +39,56 @@
       "primaryInstruction": "Pause and review the available information.",
       "recommendedActions": [
         "consult_healthcare_professional",
+        "review_medicine_sources",
         "remeasure_body_metrics"
       ],
       "riskLevel": "yellow",
       "sourceReferences": [
         {
           "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
-          "optionalURL": null,
-          "retrievedAt": "2026-07-24T00:00:00Z",
-          "sourceName": "SlowWalk Synthetic Demo Catalog",
-          "versionOrDate": "slowwalk-demo-catalog-v1"
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Authoritative Medicine Source",
+          "versionOrDate": "demo-authoritative-v1"
+        },
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Secondary Medicine Source",
+          "versionOrDate": "demo-secondary-v1"
         }
       ],
       "title": "Acetaminophen",
       "warnings": [
         "DEMO DATA — NOT FOR CLINICAL USE",
-        "Body metrics may be out of date. Measure them again before relying on them."
+        "The measurement is older than the demo recency limit.",
+        "Body metrics are older than the configured demo age limit.",
+        "Health-context data-quality warnings require review.",
+        "Available information is incomplete or internally inconsistent."
       ]
     },
     "apiVersion": "v1",
     "assessment": {
       "assessedAt": "2026-07-25T08:00:00Z",
-      "evidenceCompleteness": "complete",
+      "evidenceCompleteness": "partial",
       "level": "yellow",
       "reasons": [
         {
           "code": "body_metrics_stale",
-          "evidence": "The latest body metrics are older than the demo freshness window.",
-          "message": "Body metrics may be out of date. Measure them again before relying on them.",
-          "ruleIdentifier": "body-metrics-data-quality-v1"
+          "evidence": "The rule checks recency only and applies no diagnostic threshold.",
+          "message": "Body metrics are older than the configured demo age limit.",
+          "ruleIdentifier": "body-metrics-data-quality"
+        },
+        {
+          "code": "health_context_warning",
+          "evidence": "Validation codes: STALE_BODY_METRICS.",
+          "message": "Health-context data-quality warnings require review.",
+          "ruleIdentifier": "health-context-validation"
+        },
+        {
+          "code": "missing_evidence",
+          "evidence": "Caller marked evidence as partial.",
+          "message": "Available information is incomplete or internally inconsistent.",
+          "ruleIdentifier": "missing-evidence"
         }
       ],
       "recommendedActions": [
@@ -80,28 +101,188 @@
     "cacheHit": false,
     "generatedAt": "2026-07-25T08:00:00Z",
     "healthContextValidation": {
-      "configurationNotices": [],
+      "configurationNotices": [
+        "DEMO DATA QUALITY CONFIGURATION — NOT A CLINICAL DIAGNOSTIC STANDARD",
+        "NOT FOR CLINICAL USE"
+      ],
       "status": "valid_with_warnings",
       "warnings": [
         {
           "code": "STALE_BODY_METRICS",
           "field": "bodyMetrics.measuredAt",
-          "message": "Body metrics may be out of date. Measure them again before relying on them.",
-          "ruleIdentifier": "health-context-v1",
+          "message": "The measurement is older than the demo recency limit.",
+          "ruleIdentifier": "body-metrics-recency",
           "severity": "warning"
         }
       ]
     },
     "knowledgeCacheStatus": "miss",
-    "medicineKnowledge": null,
+    "medicineKnowledge": {
+      "cacheStatus": "miss",
+      "candidates": [
+        {
+          "completeness": 0.95,
+          "conflicts": [],
+          "governanceVerdict": {
+            "allowsDosageDisplay": true,
+            "completeness": 0.95,
+            "freshnessStatus": "current",
+            "provenanceStatus": "verified",
+            "requiresConfirmation": false,
+            "requiresConservativeAction": false,
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "validationStatus": "valid",
+            "warnings": []
+          },
+          "medicine": {
+            "activeIngredientIDs": [
+              "acetaminophen"
+            ],
+            "aliases": [
+              "Paracetamol",
+              "对乙酰氨基酚"
+            ],
+            "canonicalName": "Acetaminophen",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-acetaminophen",
+            "medicineCategory": "antipyretic",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          },
+          "requiresConfirmation": false,
+          "sourceIdentifiers": [
+            "mock-authoritative-medicine-source",
+            "mock-secondary-medicine-source"
+          ],
+          "validationStatus": "valid",
+          "warnings": []
+        }
+      ],
+      "completeness": 0.95,
+      "generatedAt": "2026-07-25T08:00:00Z",
+      "governanceVerdict": {
+        "allowsDosageDisplay": true,
+        "completeness": 0.95,
+        "freshnessStatus": "current",
+        "provenanceStatus": "verified",
+        "requiresConfirmation": false,
+        "requiresConservativeAction": false,
+        "sourceReferences": [
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Authoritative Medicine Source",
+            "versionOrDate": "demo-authoritative-v1"
+          },
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Secondary Medicine Source",
+            "versionOrDate": "demo-secondary-v1"
+          }
+        ],
+        "validationStatus": "valid",
+        "warnings": []
+      },
+      "isOffline": false,
+      "normalizedQuery": "acetaminophen",
+      "sourceReferences": [
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Authoritative Medicine Source",
+          "versionOrDate": "demo-authoritative-v1"
+        },
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Secondary Medicine Source",
+          "versionOrDate": "demo-secondary-v1"
+        }
+      ],
+      "sourceStatus": "corroborated",
+      "sourceVersions": {
+        "mock-authoritative-medicine-source": "demo-authoritative-v1",
+        "mock-secondary-medicine-source": "demo-secondary-v1"
+      },
+      "warnings": []
+    },
     "requestID": "00000000-0000-0000-0000-000000000103",
     "resolution": {
-      "candidates": [],
+      "candidates": [
+        {
+          "matchReasons": [
+            "canonical_exact",
+            "canonical_normalized"
+          ],
+          "matchScore": 1,
+          "medicine": {
+            "activeIngredientIDs": [
+              "acetaminophen"
+            ],
+            "aliases": [
+              "Paracetamol",
+              "对乙酰氨基酚"
+            ],
+            "canonicalName": "Acetaminophen",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-acetaminophen",
+            "medicineCategory": "antipyretic",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          }
+        }
+      ],
       "evidence": {
         "discardedNoise": [],
         "dosageForms": [],
         "languageCode": "en",
-        "matcherVersion": "resolver-v1",
+        "matcherVersion": "slowwalk-resolver-v1",
         "normalizedQuery": "acetaminophen",
         "normalizedText": "acetaminophen",
         "rawConfidence": 0.98,
@@ -110,7 +291,7 @@
         ],
         "removedSpecifications": [],
         "sourceDataVersions": [
-          "slowwalk-demo-catalog-v1"
+          "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
         ]
       },
       "requiresUserConfirmation": false,
@@ -124,17 +305,21 @@
         ],
         "canonicalName": "Acetaminophen",
         "contraindicationTags": [],
-        "dataVersion": "slowwalk-demo-catalog-v1",
-        "dosageTextFromSource": null,
+        "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
         "id": "demo-acetaminophen",
         "medicineCategory": "antipyretic",
         "sourceReferences": [
           {
             "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
-            "optionalURL": null,
-            "retrievedAt": "2026-07-24T00:00:00Z",
-            "sourceName": "SlowWalk Synthetic Demo Catalog",
-            "versionOrDate": "slowwalk-demo-catalog-v1"
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Authoritative Medicine Source",
+            "versionOrDate": "demo-authoritative-v1"
+          },
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Secondary Medicine Source",
+            "versionOrDate": "demo-secondary-v1"
           }
         ],
         "warnings": [
@@ -144,7 +329,7 @@
       "status": "resolved"
     },
     "resolutionCacheStatus": "miss",
-    "sourceDataVersion": "slowwalk-demo-catalog-v1"
+    "sourceDataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
   },
   "expectation": {
     "allowsOrdinaryExplanation": true,

@@ -40,36 +40,313 @@
       "title": "Unable to confirm the medicine",
       "warnings": [
         "Do not take this medicine until its identity is confirmed.",
-        "More than one medicine matched the recognized text."
+        "More than one medicine matched the recognized text.",
+        "No body-metrics record was supplied.",
+        "The profile contains limited health-context evidence."
       ]
     },
     "apiVersion": "v1",
-    "assessment": null,
     "cacheHit": false,
     "generatedAt": "2026-07-25T08:00:00Z",
     "healthContextValidation": {
-      "configurationNotices": [],
+      "configurationNotices": [
+        "DEMO DATA QUALITY CONFIGURATION — NOT A CLINICAL DIAGNOSTIC STANDARD",
+        "NOT FOR CLINICAL USE"
+      ],
       "status": "valid_with_warnings",
       "warnings": [
         {
-          "code": "MISSING_BODY_METRICS",
+          "code": "BODY_METRICS_MISSING",
           "field": "bodyMetrics",
-          "message": "Body metrics are unavailable.",
-          "ruleIdentifier": "health-context-v1",
+          "message": "No body-metrics record was supplied.",
+          "ruleIdentifier": "body-metrics-presence",
+          "severity": "warning"
+        },
+        {
+          "code": "PROFILE_EVIDENCE_INCOMPLETE",
+          "message": "The profile contains limited health-context evidence.",
+          "ruleIdentifier": "profile-evidence-completeness",
           "severity": "warning"
         }
       ]
     },
     "knowledgeCacheStatus": "miss",
-    "medicineKnowledge": null,
+    "medicineKnowledge": {
+      "cacheStatus": "miss",
+      "candidates": [
+        {
+          "completeness": 0.95,
+          "conflicts": [],
+          "governanceVerdict": {
+            "allowsDosageDisplay": true,
+            "completeness": 0.95,
+            "freshnessStatus": "current",
+            "provenanceStatus": "verified",
+            "requiresConfirmation": false,
+            "requiresConservativeAction": false,
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "validationStatus": "valid",
+            "warnings": []
+          },
+          "medicine": {
+            "activeIngredientIDs": [
+              "chlorpheniramine"
+            ],
+            "aliases": [
+              "Chlorphenamine",
+              "Cold Relief",
+              "扑尔敏",
+              "氯苯那敏"
+            ],
+            "canonicalName": "Chlorpheniramine",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-chlorpheniramine",
+            "medicineCategory": "cold_and_flu",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          },
+          "requiresConfirmation": false,
+          "sourceIdentifiers": [
+            "mock-authoritative-medicine-source",
+            "mock-secondary-medicine-source"
+          ],
+          "validationStatus": "valid",
+          "warnings": []
+        },
+        {
+          "completeness": 0.95,
+          "conflicts": [],
+          "governanceVerdict": {
+            "allowsDosageDisplay": true,
+            "completeness": 0.95,
+            "freshnessStatus": "current",
+            "provenanceStatus": "verified",
+            "requiresConfirmation": false,
+            "requiresConservativeAction": false,
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "validationStatus": "valid",
+            "warnings": []
+          },
+          "medicine": {
+            "activeIngredientIDs": [
+              "dextromethorphan"
+            ],
+            "aliases": [
+              "Cold Relief",
+              "右美沙芬"
+            ],
+            "canonicalName": "Dextromethorphan",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-dextromethorphan",
+            "medicineCategory": "cold_and_flu",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          },
+          "requiresConfirmation": false,
+          "sourceIdentifiers": [
+            "mock-authoritative-medicine-source",
+            "mock-secondary-medicine-source"
+          ],
+          "validationStatus": "valid",
+          "warnings": []
+        }
+      ],
+      "completeness": 0.95,
+      "generatedAt": "2026-07-25T08:00:00Z",
+      "governanceVerdict": {
+        "allowsDosageDisplay": true,
+        "completeness": 0.95,
+        "freshnessStatus": "current",
+        "provenanceStatus": "verified",
+        "requiresConfirmation": false,
+        "requiresConservativeAction": false,
+        "sourceReferences": [
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Authoritative Medicine Source",
+            "versionOrDate": "demo-authoritative-v1"
+          },
+          {
+            "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+            "retrievedAt": "2026-07-25T08:00:00Z",
+            "sourceName": "Mock Secondary Medicine Source",
+            "versionOrDate": "demo-secondary-v1"
+          }
+        ],
+        "validationStatus": "valid",
+        "warnings": []
+      },
+      "isOffline": false,
+      "normalizedQuery": "cold relief",
+      "sourceReferences": [
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Authoritative Medicine Source",
+          "versionOrDate": "demo-authoritative-v1"
+        },
+        {
+          "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+          "retrievedAt": "2026-07-25T08:00:00Z",
+          "sourceName": "Mock Secondary Medicine Source",
+          "versionOrDate": "demo-secondary-v1"
+        }
+      ],
+      "sourceStatus": "corroborated",
+      "sourceVersions": {
+        "mock-authoritative-medicine-source": "demo-authoritative-v1",
+        "mock-secondary-medicine-source": "demo-secondary-v1"
+      },
+      "warnings": []
+    },
     "requestID": "00000000-0000-0000-0000-000000000102",
     "resolution": {
-      "candidates": [],
+      "candidates": [
+        {
+          "matchReasons": [
+            "alias_exact",
+            "alias_normalized"
+          ],
+          "matchScore": 0.99,
+          "matchedAlias": "Cold Relief",
+          "medicine": {
+            "activeIngredientIDs": [
+              "chlorpheniramine"
+            ],
+            "aliases": [
+              "Chlorphenamine",
+              "Cold Relief",
+              "扑尔敏",
+              "氯苯那敏"
+            ],
+            "canonicalName": "Chlorpheniramine",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-chlorpheniramine",
+            "medicineCategory": "cold_and_flu",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          }
+        },
+        {
+          "matchReasons": [
+            "alias_exact",
+            "alias_normalized"
+          ],
+          "matchScore": 0.99,
+          "matchedAlias": "Cold Relief",
+          "medicine": {
+            "activeIngredientIDs": [
+              "dextromethorphan"
+            ],
+            "aliases": [
+              "Cold Relief",
+              "右美沙芬"
+            ],
+            "canonicalName": "Dextromethorphan",
+            "contraindicationTags": [],
+            "dataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1",
+            "id": "demo-dextromethorphan",
+            "medicineCategory": "cold_and_flu",
+            "sourceReferences": [
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Authoritative Medicine Source",
+                "versionOrDate": "demo-authoritative-v1"
+              },
+              {
+                "documentTitle": "DEMO DATA — NOT FOR CLINICAL USE",
+                "retrievedAt": "2026-07-25T08:00:00Z",
+                "sourceName": "Mock Secondary Medicine Source",
+                "versionOrDate": "demo-secondary-v1"
+              }
+            ],
+            "warnings": [
+              "DEMO DATA — NOT FOR CLINICAL USE"
+            ]
+          }
+        }
+      ],
       "evidence": {
         "discardedNoise": [],
         "dosageForms": [],
         "languageCode": "en",
-        "matcherVersion": "resolver-v1",
+        "matcherVersion": "slowwalk-resolver-v1",
         "normalizedQuery": "cold relief",
         "normalizedText": "cold relief",
         "rawConfidence": 0.98,
@@ -78,15 +355,14 @@
         ],
         "removedSpecifications": [],
         "sourceDataVersions": [
-          "slowwalk-demo-catalog-v1"
+          "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
         ]
       },
       "requiresUserConfirmation": true,
-      "selectedMedicine": null,
       "status": "ambiguous"
     },
     "resolutionCacheStatus": "miss",
-    "sourceDataVersion": "slowwalk-demo-catalog-v1"
+    "sourceDataVersion": "mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1"
   },
   "expectation": {
     "allowsOrdinaryExplanation": false,
