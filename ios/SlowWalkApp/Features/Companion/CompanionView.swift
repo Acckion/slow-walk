@@ -6,13 +6,19 @@ import SwiftUI
 /// what to do first, and — when it helps — why. The step-specific controls
 /// follow underneath.
 struct CompanionView: View {
+    private enum AccessibilityFocus: Hashable {
+        case stepHeader
+    }
+
     @Environment(AppEnvironment.self) private var environment
+    @AccessibilityFocusState private var accessibilityFocus: AccessibilityFocus?
+    @State private var isShowingEndEarlyConfirmation = false
 
     private var session: CompanionSessionModel { environment.companion }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 24) {
                 DemoDataBanner()
                 stepHeader
                 stepControls
@@ -21,46 +27,73 @@ struct CompanionView: View {
                 }
                 NotADiagnosisNotice()
             }
+            .slowWalkReadableContent()
             .padding()
+        }
+        .onChange(of: session.state) { _, _ in
+            // Resetting first ensures VoiceOver announces each new step even
+            // though the same header view remains on screen.
+            accessibilityFocus = nil
+            Task { @MainActor in
+                await Task.yield()
+                accessibilityFocus = .stepHeader
+            }
+        }
+        .alert(
+            "结束这次陪伴？",
+            isPresented: $isShowingEndEarlyConfirmation
+        ) {
+            Button("继续陪伴", role: .cancel) {}
+            Button(CompanionCopy.endEarlyTitle, role: .destructive) {
+                session.endEarly()
+            }
+        } message: {
+            Text("已经产生的陪伴记录会保留到本次运行结束。")
         }
     }
 
     // MARK: - Header
 
     private var stepHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(session.stepLabel)
                 .font(.title2)
                 .fontWeight(.semibold)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($accessibilityFocus, equals: .stepHeader)
 
-            Text(session.situation)
-                .font(.body)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("发生了什么")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text(session.situation)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            Text(session.nextStep)
-                .font(.body)
-                .fontWeight(.medium)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("现在先做什么")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Text(session.nextStep)
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if let reason = session.reason {
-                Text(reason)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("为什么这样做")
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(reason)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            [
-                session.stepLabel,
-                session.situation,
-                session.nextStep,
-                session.reason,
-            ]
-            .compactMap(\.self)
-            .joined(separator: " ")
-        )
     }
 
     // MARK: - Step controls
@@ -70,7 +103,7 @@ struct CompanionView: View {
         switch session.state {
         case .notStarted:
             primaryButton(CompanionCopy.startCompanionTitle) {
-                session.startCompanion()
+                guard session.startCompanion() else { return }
             }
 
         case .preDepartureCheck:
@@ -89,7 +122,7 @@ struct CompanionView: View {
             confirmationControls(prompt)
 
         case let .showingRiskAction(confirmed):
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 CareActionPresentationSlot(confirmedMedicine: confirmed)
                 primaryButton(CompanionCopy.acknowledgeCareActionTitle) {
                     session.acknowledgeCareAction()
@@ -112,15 +145,16 @@ struct CompanionView: View {
     }
 
     private var readingIndicator: some View {
-        HStack(spacing: 10) {
-            ProgressView()
-                .accessibilityHidden(true)
-            Text("正在读取，请稍等")
+        ProgressView {
+            Text("正在读取药盒上的文字，请稍等")
                 .font(.body)
         }
+        .controlSize(.large)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("正在读取药盒上的文字，请稍等。")
+        .padding(.vertical, 12)
+        .accessibilityLabel("正在读取药盒上的文字")
+        .accessibilityValue("读取中")
+        .accessibilityHint("请稍等，读取完成后会显示下一步。")
     }
 
     /// Recovery paths after a read that did not succeed.
@@ -139,23 +173,42 @@ struct CompanionView: View {
                         session.chooseFromFrequentList()
                     }
                 case .contactSomeone:
-                    VStack(alignment: .leading, spacing: 4) {
-                        secondaryButton(option.title) {
-                            // Contacting someone is a later stage; the button
-                            // is present so the recovery path is visible and
-                            // reviewable now.
-                        }
-                        .disabled(true)
-                        Text(CompanionCopy.contactSomeoneHint)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Text("本阶段尚未接入联系功能。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
+                    unavailableContact(option)
                 }
             }
         }
+    }
+
+    private func unavailableContact(_ option: CompanionRecoveryOption) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(option.title)
+                    .font(.headline)
+                Text(CompanionCopy.contactSomeoneHint)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("本阶段尚未接入联系功能。")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground),
+            in: RoundedRectangle(
+                cornerRadius: SlowWalkLayout.cornerRadius,
+                style: .continuous
+            )
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(option.title)。\(CompanionCopy.contactSomeoneHint) 本阶段尚未接入联系功能。"
+        )
     }
 
     private func confirmationControls(_ prompt: MedicineConfirmationPrompt) -> some View {
@@ -167,19 +220,24 @@ struct CompanionView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(candidate.displayName)
                             .font(.title3)
+                            .fontWeight(.semibold)
                         Text(candidate.recognitionHint)
-                            .font(.subheadline)
+                            .font(.body)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: SlowWalkLayout.minimumTapTarget)
                     .padding()
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.bordered)
-                .accessibilityLabel("选择 \(candidate.displayName)，\(candidate.recognitionHint)")
+                .accessibilityLabel("选择 \(candidate.displayName)")
+                .accessibilityHint(candidate.recognitionHint)
             }
 
             Text("如果都对不上，可以重新拍一次。")
-                .font(.footnote)
+                .font(.body)
                 .foregroundStyle(.secondary)
 
             secondaryButton(CompanionCopy.retryPhotoTitle) {
@@ -190,24 +248,26 @@ struct CompanionView: View {
 
     private var completedControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("这次陪伴的记录已经保存。")
+            Label("这次陪伴的记录已经保存。", systemImage: "checkmark.circle.fill")
                 .font(.body)
-            secondaryButton(CompanionCopy.startCompanionTitle) {
-                session.startCompanion()
+                .accessibilityElement(children: .combine)
+            primaryButton(CompanionCopy.startCompanionTitle) {
+                guard session.startCompanion() else { return }
             }
         }
     }
 
     private var endEarlyButton: some View {
-        Button(CompanionCopy.endEarlyTitle) {
-            session.endEarly()
+        Button {
+            isShowingEndEarlyConfirmation = true
+        } label: {
+            Label(CompanionCopy.endEarlyTitle, systemImage: "xmark.circle")
+                .font(.body)
+                .frame(minHeight: SlowWalkLayout.minimumTapTarget)
         }
-        .font(.body)
-        // A bare text button is roughly text-height; pad it so the tap target
-        // clears 44pt at the default text size.
-        .padding(.vertical, 12)
-        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-        .accessibilityHint("结束这次陪伴，记录会保存下来。")
+        .buttonStyle(.borderless)
+        .foregroundStyle(.red)
+        .accessibilityHint("先显示确认选项，已经产生的记录会保留到本次运行结束。")
     }
 
     // MARK: - Button helpers
@@ -216,15 +276,11 @@ struct CompanionView: View {
         _ title: String,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-        }
-        .buttonStyle(.borderedProminent)
-        .accessibilityLabel(title)
+        SlowWalkPrimaryActionButton(
+            title: title,
+            accessibilityHint: nil,
+            action: action
+        )
     }
 
     private func secondaryButton(
@@ -234,8 +290,11 @@ struct CompanionView: View {
         Button(action: action) {
             Text(title)
                 .font(.body)
+                .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.bordered)
         .accessibilityLabel(title)
