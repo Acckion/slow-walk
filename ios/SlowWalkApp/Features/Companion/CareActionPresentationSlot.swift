@@ -29,8 +29,6 @@ struct CareActionPresentationSlot: View {
                 .fontWeight(.semibold)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Divider()
-
             Text("正式的用药提示卡由 SlowWalkPresentation 提供，本阶段尚未接入。")
                 .font(.body)
                 .foregroundStyle(.primary)
@@ -55,18 +53,6 @@ struct CareActionPresentationSlot: View {
             .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(
-            Color(uiColor: .secondarySystemBackground),
-            in: RoundedRectangle(cornerRadius: SlowWalkLayout.cornerRadius)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: SlowWalkLayout.cornerRadius)
-                .strokeBorder(
-                    .separator,
-                    style: StrokeStyle(lineWidth: 1, dash: [6, 4])
-                )
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             """

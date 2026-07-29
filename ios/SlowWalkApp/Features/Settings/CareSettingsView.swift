@@ -14,8 +14,6 @@ struct CareSettingsView: View {
             Section {
                 DemoDataBanner()
                     .slowWalkReadableContent()
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
             }
 
             Section("称呼") {

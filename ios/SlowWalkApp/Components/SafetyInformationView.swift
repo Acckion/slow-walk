@@ -7,8 +7,6 @@ struct SafetyInformationView: View {
             Section {
                 DemoDataBanner()
                     .slowWalkReadableContent()
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
             }
 
             Section {
@@ -78,35 +76,14 @@ private struct SafetyInformationRow: View {
     let message: String
     let systemImage: String
 
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     var body: some View {
-        Group {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    icon
-                    text
-                }
-            } else {
-                HStack(alignment: .top, spacing: 12) {
-                    icon
-                    text
-                }
-            }
+        Label {
+            text
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(.tint)
         }
         .accessibilityElement(children: .combine)
-    }
-
-    private var icon: some View {
-        Image(systemName: systemImage)
-            .font(.title3)
-            .foregroundStyle(.tint)
-            .frame(width: SlowWalkLayout.minimumTapTarget)
-            .frame(
-                minHeight: SlowWalkLayout.minimumTapTarget,
-                alignment: .top
-            )
-            .accessibilityHidden(true)
     }
 
     private var text: some View {

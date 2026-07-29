@@ -4,8 +4,6 @@ import SwiftUI
 enum SlowWalkLayout {
     static let contentMaxWidth: CGFloat = 680
     static let minimumTapTarget: CGFloat = 44
-    static let primaryActionMinimumHeight: CGFloat = 56
-    static let cornerRadius: CGFloat = 8
 }
 
 private struct SlowWalkReadableContentModifier: ViewModifier {

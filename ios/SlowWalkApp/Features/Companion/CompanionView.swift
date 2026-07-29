@@ -17,19 +17,56 @@ struct CompanionView: View {
     private var session: CompanionSessionModel { environment.companion }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+        List {
+            Section {
                 DemoDataBanner()
-                stepHeader
+                    .slowWalkReadableContent()
+            }
+
+            Section {
+                stepSummaryRow(
+                    title: "发生了什么",
+                    value: session.situation,
+                    systemImage: "info.circle"
+                )
+                stepSummaryRow(
+                    title: "现在先做什么",
+                    value: session.nextStep,
+                    systemImage: "arrow.forward.circle",
+                    isEmphasized: true
+                )
+                if let reason = session.reason {
+                    stepSummaryRow(
+                        title: "为什么这样做",
+                        value: reason,
+                        systemImage: "questionmark.circle"
+                    )
+                }
+            } header: {
+                Text(session.stepLabel)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused(
+                        $accessibilityFocus,
+                        equals: .stepHeader
+                    )
+            }
+
+            Section("当前操作") {
                 stepControls
-                if session.canEndEarly {
+            }
+
+            if session.canEndEarly {
+                Section {
                     endEarlyButton
                 }
-                NotADiagnosisNotice()
             }
-            .slowWalkReadableContent()
-            .padding()
+
+            Section {
+                NotADiagnosisNotice()
+                    .slowWalkReadableContent()
+            }
         }
+        .listStyle(.insetGrouped)
         .onChange(of: session.state) { _, _ in
             // Resetting first ensures VoiceOver announces each new step even
             // though the same header view remains on screen.
@@ -52,48 +89,30 @@ struct CompanionView: View {
         }
     }
 
-    // MARK: - Header
-
-    private var stepHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(session.stepLabel)
-                .font(.title2)
-                .fontWeight(.semibold)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityFocused($accessibilityFocus, equals: .stepHeader)
-
+    private func stepSummaryRow(
+        title: String,
+        value: String,
+        systemImage: String,
+        isEmphasized: Bool = false
+    ) -> some View {
+        Label {
             VStack(alignment: .leading, spacing: 4) {
-                Text("发生了什么")
+                Text(title)
                     .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Text(session.situation)
+                Text(value)
                     .font(.body)
+                    .fontWeight(isEmphasized ? .semibold : .regular)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("现在先做什么")
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Text(session.nextStep)
-                    .font(.body)
-                    .fontWeight(.semibold)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let reason = session.reason {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("为什么这样做")
-                        .font(.headline)
-                        .accessibilityAddTraits(.isHeader)
-                    Text(reason)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(.tint)
+                .accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+        .slowWalkReadableContent()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title)，\(value)")
     }
 
     // MARK: - Step controls
@@ -102,12 +121,18 @@ struct CompanionView: View {
     private var stepControls: some View {
         switch session.state {
         case .notStarted:
-            primaryButton(CompanionCopy.startCompanionTitle) {
+            primaryActionButton(
+                CompanionCopy.startCompanionTitle,
+                systemImage: "figure.walk"
+            ) {
                 guard session.startCompanion() else { return }
             }
 
         case .preDepartureCheck:
-            primaryButton(CompanionCopy.beginMedicineReadTitle) {
+            primaryActionButton(
+                CompanionCopy.beginMedicineReadTitle,
+                systemImage: "text.viewfinder"
+            ) {
                 session.beginMedicineRead()
             }
 
@@ -122,20 +147,28 @@ struct CompanionView: View {
             confirmationControls(prompt)
 
         case let .showingRiskAction(confirmed):
-            VStack(alignment: .leading, spacing: 12) {
-                CareActionPresentationSlot(confirmedMedicine: confirmed)
-                primaryButton(CompanionCopy.acknowledgeCareActionTitle) {
-                    session.acknowledgeCareAction()
-                }
+            CareActionPresentationSlot(confirmedMedicine: confirmed)
+                .slowWalkReadableContent()
+            primaryActionButton(
+                CompanionCopy.acknowledgeCareActionTitle,
+                systemImage: "checkmark.circle"
+            ) {
+                session.acknowledgeCareAction()
             }
 
         case .travelling:
-            primaryButton(CompanionCopy.approachStopTitle) {
+            primaryActionButton(
+                CompanionCopy.approachStopTitle,
+                systemImage: "bus"
+            ) {
                 session.approachStop()
             }
 
         case .approachingStop:
-            primaryButton(CompanionCopy.arriveSafelyTitle) {
+            primaryActionButton(
+                CompanionCopy.arriveSafelyTitle,
+                systemImage: "mappin.and.ellipse"
+            ) {
                 session.arriveSafely()
             }
 
@@ -151,7 +184,8 @@ struct CompanionView: View {
         }
         .controlSize(.large)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 12)
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+        .slowWalkReadableContent()
         .accessibilityLabel("正在读取药盒上的文字")
         .accessibilityValue("读取中")
         .accessibilityHint("请稍等，读取完成后会显示下一步。")
@@ -160,30 +194,26 @@ struct CompanionView: View {
     /// Recovery paths after a read that did not succeed.
     ///
     /// No medicine conclusion is offered here — only ways forward.
+    @ViewBuilder
     private var recoveryControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(session.recoveryOptions) { option in
-                switch option {
-                case .retryPhoto:
-                    primaryButton(option.title) {
-                        session.retryMedicineRead()
-                    }
-                case .chooseFromList:
-                    secondaryButton(option.title) {
-                        session.chooseFromFrequentList()
-                    }
-                case .contactSomeone:
-                    unavailableContact(option)
+        ForEach(session.recoveryOptions) { option in
+            switch option {
+            case .retryPhoto:
+                primaryActionButton(option.title, systemImage: "camera") {
+                    session.retryMedicineRead()
                 }
+            case .chooseFromList:
+                secondaryActionButton(option.title, systemImage: "list.bullet") {
+                    session.chooseFromFrequentList()
+                }
+            case .contactSomeone:
+                unavailableContact(option)
             }
         }
     }
 
     private func unavailableContact(_ option: CompanionRecoveryOption) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "person.crop.circle.badge.exclamationmark")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
+        Label {
             VStack(alignment: .leading, spacing: 4) {
                 Text(option.title)
                     .font(.headline)
@@ -195,28 +225,26 @@ struct CompanionView: View {
                     .font(.subheadline)
                     .fontWeight(.semibold)
             }
+        } icon: {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(
-            Color(uiColor: .secondarySystemGroupedBackground),
-            in: RoundedRectangle(
-                cornerRadius: SlowWalkLayout.cornerRadius,
-                style: .continuous
-            )
-        )
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+        .slowWalkReadableContent()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(option.title)。\(CompanionCopy.contactSomeoneHint) 本阶段尚未接入联系功能。"
         )
     }
 
+    @ViewBuilder
     private func confirmationControls(_ prompt: MedicineConfirmationPrompt) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(prompt.candidates) { candidate in
-                Button {
-                    session.confirmMedicine(candidate)
-                } label: {
+        ForEach(prompt.candidates) { candidate in
+            Button {
+                session.confirmMedicine(candidate)
+            } label: {
+                Label {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(candidate.displayName)
                             .font(.title3)
@@ -226,77 +254,89 @@ struct CompanionView: View {
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(minHeight: SlowWalkLayout.minimumTapTarget)
-                    .padding()
-                    .contentShape(Rectangle())
+                } icon: {
+                    Image(systemName: "pills")
+                        .accessibilityHidden(true)
                 }
-                .buttonStyle(.bordered)
-                .accessibilityLabel("选择 \(candidate.displayName)")
-                .accessibilityHint(candidate.recognitionHint)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+                .contentShape(Rectangle())
             }
+            .accessibilityLabel("选择 \(candidate.displayName)")
+            .accessibilityHint(candidate.recognitionHint)
+            .slowWalkReadableContent()
+        }
 
-            Text("如果都对不上，可以重新拍一次。")
-                .font(.body)
-                .foregroundStyle(.secondary)
+        Text("如果都对不上，可以重新拍一次。")
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .slowWalkReadableContent()
 
-            secondaryButton(CompanionCopy.retryPhotoTitle) {
-                session.retakeMedicinePhoto()
-            }
+        secondaryActionButton(
+            CompanionCopy.retryPhotoTitle,
+            systemImage: "camera"
+        ) {
+            session.retakeMedicinePhoto()
         }
     }
 
+    @ViewBuilder
     private var completedControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("这次陪伴的记录已经保存。", systemImage: "checkmark.circle.fill")
-                .font(.body)
-                .accessibilityElement(children: .combine)
-            primaryButton(CompanionCopy.startCompanionTitle) {
-                guard session.startCompanion() else { return }
-            }
+        Label("这次陪伴的记录已经保存。", systemImage: "checkmark.circle.fill")
+            .font(.body)
+            .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+            .accessibilityElement(children: .combine)
+            .slowWalkReadableContent()
+        primaryActionButton(
+            CompanionCopy.startCompanionTitle,
+            systemImage: "arrow.clockwise"
+        ) {
+            guard session.startCompanion() else { return }
         }
     }
 
     private var endEarlyButton: some View {
-        Button {
+        Button(role: .destructive) {
             isShowingEndEarlyConfirmation = true
         } label: {
             Label(CompanionCopy.endEarlyTitle, systemImage: "xmark.circle")
                 .font(.body)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.red)
+        .slowWalkReadableContent()
         .accessibilityHint("先显示确认选项，已经产生的记录会保留到本次运行结束。")
     }
 
-    // MARK: - Button helpers
-
-    private func primaryButton(
+    private func primaryActionButton(
         _ title: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        SlowWalkPrimaryActionButton(
-            title: title,
-            accessibilityHint: nil,
-            action: action
-        )
-    }
-
-    private func secondaryButton(
-        _ title: String,
+        systemImage: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.body)
-                .fontWeight(.semibold)
+            Label(title, systemImage: systemImage)
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: SlowWalkLayout.minimumTapTarget)
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .slowWalkReadableContent()
+        .accessibilityLabel(title)
+    }
+
+    private func secondaryActionButton(
+        _ title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
+        .controlSize(.large)
+        .slowWalkReadableContent()
         .accessibilityLabel(title)
     }
 }

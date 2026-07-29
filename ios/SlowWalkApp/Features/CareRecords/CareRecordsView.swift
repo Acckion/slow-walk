@@ -17,8 +17,6 @@ struct CareRecordsView: View {
             Section {
                 DemoDataBanner()
                     .slowWalkReadableContent()
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
             }
 
             if events.isEmpty {
@@ -42,14 +40,23 @@ struct CareRecordsView: View {
             }
 
             Section {
-                SlowWalkNotice(
-                    title: "记录保存在本次运行中",
-                    message: "本阶段记录只保存在内存中，重新启动后会清空。",
-                    systemImage: "internaldrive"
-                )
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("记录保存在本次运行中")
+                            .font(.headline)
+                        Text("本阶段记录只保存在内存中，重新启动后会清空。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "internaldrive")
+                        .foregroundStyle(.tint)
+                }
                 .slowWalkReadableContent()
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    "记录保存在本次运行中。本阶段记录只保存在内存中，重新启动后会清空。"
+                )
             } header: {
                 sectionHeader("记录说明")
             }
@@ -60,26 +67,18 @@ struct CareRecordsView: View {
     private func row(for event: CareRecordEvent) -> some View {
         let time = event.occurredAt.formatted(Self.timeStyle)
 
-        return HStack(alignment: .top, spacing: 12) {
-            Image(systemName: Self.systemImage(for: event.kind))
-                .font(.title3)
-                .foregroundStyle(.tint)
-                .frame(width: SlowWalkLayout.minimumTapTarget)
-                .frame(
-                    minHeight: SlowWalkLayout.minimumTapTarget,
-                    alignment: .top
-                )
-                .accessibilityHidden(true)
-
+        return Label {
             VStack(alignment: .leading, spacing: 4) {
                 Text(time)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Text(Self.description(for: event.kind))
-                    .font(.body)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        } icon: {
+            Image(systemName: Self.systemImage(for: event.kind))
+                .foregroundStyle(.tint)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(time)，\(Self.description(for: event.kind))")

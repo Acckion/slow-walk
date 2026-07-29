@@ -7,11 +7,21 @@ import SwiftUI
 struct DemoDataBanner: View {
     var body: some View {
         // The English marker is mandated verbatim by the development guide.
-        SlowWalkNotice(
-            title: CompanionCopy.demoDataNotice,
-            message: "演示数据，不用于临床用途",
-            systemImage: "exclamationmark.triangle.fill",
-            accessibilityLabel: "演示数据，不用于临床用途。"
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(CompanionCopy.demoDataNotice)
+                    .font(.headline)
+                Text("演示数据，不用于临床用途")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(CompanionCopy.demoDataNotice)。演示数据，不用于临床用途。"
         )
     }
 }
@@ -19,28 +29,43 @@ struct DemoDataBanner: View {
 /// The app's standing reminder that SlowWalk gives reminders, not diagnoses.
 struct NotADiagnosisNotice: View {
     var body: some View {
-        SlowWalkNotice(
-            title: "使用说明",
-            message: "SlowWalk 提供风险提示，不做医疗诊断。",
-            systemImage: "shield.lefthalf.filled"
-        )
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("使用说明")
+                    .font(.headline)
+                Text("SlowWalk 提供风险提示，不做医疗诊断。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: "shield.lefthalf.filled")
+                .foregroundStyle(.tint)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("使用说明。SlowWalk 提供风险提示，不做医疗诊断。")
     }
 }
 
 #Preview("Light") {
-    VStack(spacing: 16) {
-        DemoDataBanner()
-        NotADiagnosisNotice()
+    Form {
+        Section {
+            DemoDataBanner()
+        }
+        Section {
+            NotADiagnosisNotice()
+        }
     }
-    .padding()
 }
 
 #Preview("Dark AX5") {
-    VStack(spacing: 16) {
-        DemoDataBanner()
-        NotADiagnosisNotice()
+    Form {
+        Section {
+            DemoDataBanner()
+        }
+        Section {
+            NotADiagnosisNotice()
+        }
     }
-    .padding()
     .preferredColorScheme(.dark)
     .dynamicTypeSize(.accessibility5)
 }
