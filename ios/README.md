@@ -2,9 +2,10 @@
 
 此目录保存 Apple 平台专属源码。可由 Linux 验证的客户端 use-case protocol、
 View state、request builder、协调器、mock 与 bounded location history 已统一放入
-`SlowWalkClientCore`。当前仓库在 Windows 上只维护边界和最小 SwiftUI app shell，
-不声称已经编译或验证 SwiftUI、Vision、CoreLocation、AVFoundation、SwiftData、
-ActivityKit、相机权限或真机行为。
+`SlowWalkClientCore`。正式 Xcode 工程已经落地，并已完成无签名 generic iOS
+Simulator 构建；该结果只验证最小 SwiftUI app shell 与核心 Package 接入，不代表
+已经验证 Vision、CoreLocation、AVFoundation、SwiftData、ActivityKit、相机权限
+或真机行为。
 
 ## 计划结构
 
@@ -27,6 +28,36 @@ SlowWalkApp/
 ```
 
 当前只添加少量有行为意义的协议和 app shell，不用空 Swift 文件机械填充目录。
+
+## Xcode 工程
+
+- 工程：`ios/SlowWalkApp.xcodeproj`
+- Shared Scheme：`SlowWalkApp`
+- 最低系统版本：iOS 17.0
+- Bundle Identifier：`com.creaope.slowwalk`
+  - provisional，尚未注册正式 App ID
+- 本地 Package：`../swift-packages/SlowWalkCore`
+- App Target 显式依赖：
+  - `SlowWalkDomain`
+  - `SlowWalkAPIContracts`
+  - `SlowWalkClientCore`
+- Swift Language Mode：Swift 6
+- Strict Concurrency Checking：Complete
+- 本阶段未配置真机签名。
+
+无签名模拟器构建命令：
+
+```bash
+xcodebuild \
+  -project ios/SlowWalkApp.xcodeproj \
+  -scheme SlowWalkApp \
+  -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath /tmp/slowwalk-ios-derived-data \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  build
+```
 
 ## 依赖边界
 
@@ -72,10 +103,10 @@ LocationSampleProviding
 
 ## Mac/Xcode 集成清单
 
-1. 在 Xcode 中创建正式 iOS App 工程，不手写 `pbxproj`。
-2. 以本地 Package 方式添加 `../swift-packages/SlowWalkCore`。
-3. 将 `SlowWalkApp/` 源码加入 iOS target，并设置稳定 deployment target。
-4. 开启严格并发检查，处理所有 actor/sendability 诊断。
+1. 已在 Xcode 中创建正式 iOS App 工程，未手写 `pbxproj`。
+2. 已以本地 Package 方式添加 `../swift-packages/SlowWalkCore`。
+3. 已将 `SlowWalkApp/` 源码加入 iOS target，并将 deployment target 设为 iOS 17.0。
+4. 已使用 Swift 6 Complete strict concurrency 完成 app shell 模拟器编译。
 5. 配置相机、位置、语音等用途说明与最小权限。
 6. 在 Mac/Xcode 中实现并验证：
    - `VisionMedicineTextRecognizer`
@@ -98,6 +129,7 @@ LocationSampleProviding
 - 日后引入真实数据前必须完成隐私清单、保留期限和删除流程评审。
 - 任何演示数据都标注 `DEMO DATA — NOT FOR CLINICAL USE`。
 
-上述四个 Apple adapter 当前仅有接口预期和命名，尚未实现。当前也尚未在
-Mac/Xcode 验证 SwiftUI、Vision、CoreLocation、URLSession adapter 或 Apple 平台
-strict concurrency；Linux CI 通过不能替代 simulator/真机验证。
+上述四个 Apple adapter 当前仅有接口预期和命名，尚未实现。当前已经在 Mac/Xcode
+验证最小 SwiftUI shell、三个核心产品的直接 import 与 Apple 平台 Swift 6 编译；
+尚未验证 Vision、CoreLocation、URLSession adapter、权限或真机行为。模拟器构建
+不能替代真机验证。

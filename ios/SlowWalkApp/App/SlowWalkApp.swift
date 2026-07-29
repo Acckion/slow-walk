@@ -1,4 +1,7 @@
 import SwiftUI
+import SlowWalkDomain
+import SlowWalkAPIContracts
+import SlowWalkClientCore
 
 @main
 struct SlowWalkApp: App {
