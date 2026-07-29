@@ -8,8 +8,8 @@ import SwiftUI
 struct TodayView: View {
     @Environment(AppEnvironment.self) private var environment
 
-    /// Moves the app to the Companion tab. Today starts the session so the
-    /// person sees the flow already underway when they arrive.
+    /// Moves the app to the Companion tab, either after Today has started a new
+    /// session or to return to one already underway.
     let onStartCompanion: () -> Void
 
     private var plan: TodayPlan { environment.plan }
@@ -77,10 +77,7 @@ struct TodayView: View {
     }
 
     private var primaryAction: some View {
-        Button {
-            environment.companion.startCompanion()
-            onStartCompanion()
-        } label: {
+        Button(action: startOrContinueCompanion) {
             Text(summary.primaryActionTitle)
                 .font(.title3)
                 .fontWeight(.semibold)
@@ -90,6 +87,19 @@ struct TodayView: View {
         .buttonStyle(.borderedProminent)
         .accessibilityLabel(summary.primaryActionTitle)
         .accessibilityHint("进入陪伴流程，逐步完成今天的安排。")
+    }
+
+    /// Backs the primary action, which reads either "开始陪伴" or "继续陪伴".
+    ///
+    /// A session underway is only navigated to, since starting is refused from
+    /// every active step. Otherwise the tab changes only if one really started.
+    private func startOrContinueCompanion() {
+        if summary.isSessionUnderway {
+            onStartCompanion()
+            return
+        }
+        guard environment.companion.startCompanion() else { return }
+        onStartCompanion()
     }
 
     private var currentStatusCard: some View {

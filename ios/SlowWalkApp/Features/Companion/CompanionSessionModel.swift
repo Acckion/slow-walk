@@ -16,6 +16,7 @@ final class CompanionSessionModel {
 
     /// Guards against a stale simulated read landing after the person has
     /// already moved on (retried, chosen from the list, or ended the session).
+    /// Only `invalidatePendingRead()` moves it.
     private var readGeneration = 0
 
     init(
@@ -57,13 +58,21 @@ final class CompanionSessionModel {
 
     // MARK: - Intents
 
-    func startCompanion() {
-        guard send(.startCompanion) else { return }
+    /// Starts a session, reporting whether one actually started.
+    ///
+    /// The answer matters to the caller: Today navigates to the Companion tab
+    /// on the back of this call, and must not move the person when the
+    /// transition was refused. The record is written only once a session has
+    /// really begun, so a refused start leaves the timeline untouched.
+    @discardableResult
+    func startCompanion() -> Bool {
+        guard send(.startCompanion) else { return false }
         if let outing = plan.outing {
             records.append(.dayPlanItemStarted(title: outing.title))
         } else {
             records.append(.dayPlanItemStarted(title: "今日用药"))
         }
+        return true
     }
 
     func beginMedicineRead() {
@@ -77,8 +86,11 @@ final class CompanionSessionModel {
     }
 
     func chooseFromFrequentList() {
-        readGeneration += 1
-        _ = send(.chooseFromFrequentList(MedicineCandidate.demoFrequentlyUsed))
+        let candidates = MedicineCandidate.demoFrequentlyUsed
+        guard send(.chooseFromFrequentList(candidates)) else { return }
+        // The read is being abandoned in favour of the list, so its result
+        // must not arrive later and overwrite this choice.
+        invalidatePendingRead()
     }
 
     /// Goes back to reading when none of the offered candidates match.
@@ -103,11 +115,11 @@ final class CompanionSessionModel {
     }
 
     func acknowledgeCareAction() {
-        _ = send(.acknowledgeCareAction)
+        guard send(.acknowledgeCareAction) else { return }
     }
 
     func approachStop() {
-        _ = send(.approachStop)
+        guard send(.approachStop) else { return }
     }
 
     func arriveSafely() {
@@ -116,20 +128,35 @@ final class CompanionSessionModel {
     }
 
     func endEarly() {
-        readGeneration += 1
         guard send(.endEarly) else { return }
+        // The session is over; nothing from the abandoned read may land after
+        // it and reopen a step the person has already left.
+        invalidatePendingRead()
         records.append(.companionFinished(.endedEarly))
     }
 
     // MARK: - Simulated read
 
+    /// Drops whatever simulated read is still in flight.
+    ///
+    /// Every abandonment of a read goes through here, so there is one place to
+    /// look for why a stale result was ignored. Call it only after the matching
+    /// transition succeeded: moving the generation for a refused or repeated
+    /// event would silently cancel a read that is still legitimately running.
+    private func invalidatePendingRead() {
+        readGeneration += 1
+    }
+
     private func recordReadStartedAndRun() {
         guard case let .scanningMedicine(attempt) = state else { return }
-        records.append(.medicineReadStarted(attemptNumber: attempt.attemptNumber))
 
-        readGeneration += 1
+        // Starting a read supersedes any earlier one. Invalidate first, then
+        // capture the generation this read owns.
+        invalidatePendingRead()
         let generation = readGeneration
         let attemptNumber = attempt.attemptNumber
+
+        records.append(.medicineReadStarted(attemptNumber: attemptNumber))
 
         Task { [weak self] in
             try? await Task.sleep(for: MockMedicineScanSimulator.simulatedReadDuration)
@@ -157,7 +184,10 @@ final class CompanionSessionModel {
     // MARK: - Transition
 
     /// Applies an event, returning whether it changed the state.
-    @discardableResult
+    ///
+    /// Deliberately not `@discardableResult`: a refused event must never be
+    /// followed by the side effects of a successful one, so every caller is
+    /// made to answer whether the transition happened.
     private func send(_ event: CompanionFlowEvent) -> Bool {
         guard let next = CompanionFlowReducer.nextState(from: state, on: event) else {
             return false

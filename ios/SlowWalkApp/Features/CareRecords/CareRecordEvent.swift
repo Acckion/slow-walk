@@ -16,6 +16,11 @@ enum CareRecordEventKind: Equatable, Hashable {
     case companionFinished(CompanionCompletion)
 }
 
+/// One recorded event, held in memory for the demo flow only.
+///
+/// This is not a persistence format. A versioned schema has to exist before
+/// this type or `CareRecordEventKind` gains `Codable` or a SwiftData model,
+/// and migration, privacy, retention and deletion settled along with it.
 struct CareRecordEvent: Identifiable, Equatable, Hashable {
     let id: UUID
     let occurredAt: Date
