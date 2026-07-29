@@ -4,6 +4,30 @@
 主场景：`normal` → `ambiguous` → `healthWarning` → `knowledgeWarning` →
 `redRisk` → `timeout`
 
+## 录制前状态声明（2026-07-29）
+
+**当前状态：本脚本是彩排口径，尚不可正式录制。**
+
+已完成能力：
+
+- 五个 JSON fixture 的 response 是真实服务端 Pipeline 的 canonical
+  golden output，由 `MedicineDemoFixtureGoldenTests` 全量 DTO equality 锁定。
+- `MedicineAssessmentCoordinator` 可把 fixture response 驱动为正确的
+  View state（`result` / `requiresMedicineConfirmation` / `failed`）。
+- 服务端 `POST /api/v1/medicine/assess` 路由与全部风险规则真实可用。
+
+未完成依赖：
+
+- SwiftUI Medicine ActionCard 页面尚未实现，iOS 目录目前只有占位 app
+  shell，没有任何已接通的卡片 UI。
+- `SlowWalkPresentation` 模块计划中、尚未创建。
+- 无真实 OCR、相机、VoiceOver 录制口径或真机验证。
+
+何时才可正式录制：SwiftUI ActionCard 与确认页在 app 内真实接通、
+`DEMO DATA — NOT FOR CLINICAL USE` 在页面可见、且本脚本中的文案与真实 UI
+逐字核对通过之后。在此之前按本脚本录制的任何视频都属于彩排，不得作为
+交付证据。
+
 ## 0:00–0:15 开场
 
 画面：
@@ -29,7 +53,7 @@
 
 - 标题 `Acetaminophen`
 - `Review the verified source information before use.`
-- 来源名称和版本
+- 来源名称和版本（Mock Authoritative / Mock Secondary Medicine Source）
 - 非颜色的“常规查看”语义
 
 旁白重点：药名来自服务端解析，客户端不能自行提交药品事实。
@@ -46,8 +70,11 @@
 
 - 黄色提示
 - `Unable to confirm the medicine`
+- 动作顺序：`do_not_take_until_medicine_confirmed`、
+  `retake_medicine_photo`、`consult_healthcare_professional`
 - 不允许普通药品说明
-- 不展示任一候选药品的来源或剂量
+- 不展示任一候选药品的来源或剂量（response 中保留两个真实候选供确认
+  流程使用，但 UI 不得把它们解释成安全结果）
 
 旁白重点：无法唯一确认药品时，系统不会把不确定性解释成安全。
 
@@ -56,11 +83,13 @@
 操作：
 
 1. 选择 `healthWarning`。
-2. 展开风险原因，展示身体指标已过期。
+2. 展开风险原因，展示身体指标已过演示新鲜度窗口。
 
 必须出现：
 
 - 黄色风险
+- 原因文案 `Body metrics are older than the configured demo age limit.`
+- 证据完整度为 `partial`，不得读作 complete
 - 重新测量身体指标
 - 建议联系专业人员
 - 不建议自动通知家属
@@ -72,14 +101,18 @@
 操作：
 
 1. 选择 `knowledgeWarning`。
-2. 展开知识来源警告和缓存状态。
+2. 展示需要确认药品页面（stale offline 知识不允许直接出结果）。
+3. 展开知识来源警告和缓存状态。
 
 必须出现：
 
-- 黄色风险
-- `Knowledge source requires review.`
+- 黄色风险与 `mustConfirmMedicine`
+- 原因文案
+  `Medicine knowledge requires source review, so a green result is not permitted.`
+- 警告 `Live sources were unavailable. Stale cached demo data is being used and is not current authoritative data.`
+- `knowledgeCacheStatus: stale_offline`，`cacheHit: false`
 - 查看来源与咨询专业人员
-- 缓存命中不等同于信息新鲜或医学安全
+- 缓存状态只说明技术状态，过期缓存不等于信息新鲜或医学安全
 
 ## 1:50–2:15 redRisk
 
@@ -87,13 +120,16 @@
 
 1. 选择 `redRisk`。
 2. 展示过敏成分命中原因。
-3. 聚焦“联系专业人员”和“通知家属”动作。
+3. 聚焦“不要服用”“联系专业人员”和“通知家属”动作。
 
 必须出现：
 
 - 红色以及文字/图标的立即关注语义
 - `Do not take this medicine until a healthcare professional confirms the next step.`
-- 可解释的规则原因
+- 动作顺序：`do_not_take_until_medicine_confirmed`、
+  `consult_healthcare_professional`、`notify_family_member`
+- 原因文案
+  `The medicine label matches information in the allergy profile.`
 - 来源追溯
 
 旁白重点：风险等级由确定性规则计算，大模型不参与最终等级判断。
@@ -118,12 +154,14 @@
 
 旁白：
 
-> Day 1 闭环已经把稳定 Fixture、协调器状态和可访问的 SwiftUI 风险卡片连通。
+> Day 1 已经冻结了稳定 Fixture、协调器状态和真实服务端 golden test。
+> SwiftUI 风险卡片接通后将按本脚本正式录制。
 > 当前所有药品和健康数据均为合成演示数据，不可用于临床。
 
 ## 拍摄检查
 
 - 开启较大 Dynamic Type 再录一段关键卡片。
-- VoiceOver 至少朗读一次风险等级、标题、主要动作和来源。
+- VoiceOver 至少朗读一次风险等级、标题、主要动作和来源（正式录制前
+  检查项，当前无已接通 UI 可验证）。
 - 画面中不得出现剂量、疗程、最大剂量或“确认安全”等表述。
 - 不录入真实姓名、健康数据、位置或药盒照片。

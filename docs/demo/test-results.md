@@ -1,52 +1,77 @@
 # Day 1 成员 C 测试记录
 
-记录日期：2026-07-28
-分支：`feature/demo-fixtures`
+记录日期：2026-07-29
+分支：`fix/pr7-canonical-fixtures-k3`（PR #7 修复轨道）
 
 ## 本地 Fixture 验证
 
 结果：通过。
 
-- 5 个 JSON 文件均通过 `jq` 语法检查。
+- 5 个 JSON 文件均通过语法检查。
 - 5 个 request 均成功解码为 `MedicineAssessmentRequestDTO`。
 - 5 个 response 均成功解码为 `MedicineAssessmentResponseDTO`。
 - request/response `requestID` 一致。
 - Fixture 未包含可展示的剂量内容。
+- 5 个 response 现在是真实服务端 Pipeline 的 canonical golden output，
+  由 `MedicineDemoFixtureGoldenTests` 以 fixture request 驱动真实
+  composition root 并做全量 DTO equality，无任何字段归一化。
+
+## Golden test 防自证说明
+
+- expected 只来自 fixture.response；actual 只来自真实 Pipeline。
+- 测试不复制生产算法，也不从 fixture.response 反向构造输出。
+- 失败证明（手工 mutation probe，非仓库内自动化测试）：在 `/tmp` 下的
+  隔离克隆中，把修复前 HEAD 的五个 fixture 放回 `demo-fixtures/`，经同一
+  golden harness 比较，**5/5 均被拒绝**（`XCTAssertEqual failed`）。另外
+  单独把修复后 fixture 的深层字段人工改写（`medicine-red-risk.json` 的
+  `actionCard.mustConfirmMedicine`、`medicine-source-warning.json` 的
+  `medicineKnowledge.candidates[0].completeness`），两次改写均被拒绝，
+  说明比较覆盖到最深层叶子字段。修复后的原始 fixture 全部通过。
+- 上述 probe 只在隔离克隆内进行，审查工作区未被修改；probe 本身尚未作为
+  仓库内自动化测试提交，重跑需要手工重建隔离克隆。
 
 ## Core
 
 结果：281/281 通过，0 failures。
 
-本机 Apple Swift 独立运行仓库中的 Core Package 时，既有
-`Package.swift` 未声明 macOS deployment platform，会在并发 API 可用性检查阶段
-失败。成员 C 无权修改 Core，因此在 `/tmp` 验证副本中只增加
-`platforms: [.macOS(.v14)]` 后执行完整 `swift test`。源码、测试和资源均来自当前
-分支，没有修改仓库中的 Core 文件。
-
-该临时调整属于验证环境适配，不是本分支交付物。Linux CI 不需要此调整。
+本机 Apple Swift 直接运行仓库中的 Core Package 时，既有
+`Package.swift` 未声明 macOS deployment platform，会在并发 API 可用性检查
+阶段失败（Linux CI 无此问题）。本次本地验证使用命令行
+`-Xswiftc -target -Xswiftc arm64-apple-macosx14.0` 覆盖部署目标执行完整
+`swift test`。源码、测试和资源均来自当前分支，没有修改仓库中的任何 Core
+文件。Linux CI 仍是权威检查。
 
 ## Server
 
-结果：71/71 通过，0 failures。
+结果：80/80 通过，0 failures（与 Core 相同的本机 platform manifest
+边界，使用相同的 target 覆盖；未修改仓库文件）。
 
-Server 与 Core 有相同的本机 platform manifest 边界，因此测试在 `/tmp` 验证副本
-中运行；Server 源码、测试、Fixture 和 Hummingbird 2.25.1 依赖均与当前分支一致。
-新增 4 项 `DemoFixtureContractTests` 已实际执行并通过，覆盖：
+相比修复基线 71 项新增 9 项，全部实际执行并通过：
 
-- canonical endpoint 与 API version
-- `RiskLevel` wire values
-- `APIErrorCode` 大写编码
-- 五个 Fixture 的 canonical DTO 解码
-- 风险等级、ActionCard 文案、联系动作和 ViewState 预期
+- `MedicineDemoFixtureGoldenTests`（2 项）：4 个在线场景与 1 个
+  stale-offline 知识警告场景的全量 DTO golden equality。
+- `DemoFixtureContractTests` 新增 7 项：Coordinator 语义一致性、动作
+  内容与顺序冻结、canonical 版本/配置字符串、候选与状态一致性、证据
+  完整度与警告一致性、知识/缓存联合状态、disclaimer 责任边界。
+- Fixture 路径解析改为从测试文件向上搜索 `demo-fixtures/README.md`
+  锚点；缺失 fixture 是明确失败，不是静默跳过。
 
-## 最新 develop CI 基线
+## 最新 CI 基线
 
-核验提交：`develop@31fbd8930f73b84168abb34bb54d282f4712011d`
+核验提交：本分支 `db58ceceba5942a357857cb4db531f193ff0198d`
 
-| Workflow | Run | 结果 | 测试 |
-| --- | --- | --- | --- |
-| Swift Core | [30335451251](https://github.com/creaope/slow-work/actions/runs/30335451251) | success | 281/281 |
-| Swift Server | [30335451258](https://github.com/creaope/slow-work/actions/runs/30335451258) | success | 67/67 |
+| Workflow | Run | 结果 |
+| --- | --- | --- |
+| Swift Core | [30369761730](https://github.com/creaope/slow-walk/actions/runs/30369761730) | success |
+| Swift Server | [30369761447](https://github.com/creaope/slow-walk/actions/runs/30369761447) | success |
 
-两个 workflow 均使用官方 `swift:6.3.2-jammy` 容器。上述结果是分支开发前的基线，
-不是本功能分支最终 CI 结果；最终结果在推送后补充。
+最新 develop 基线（合并 PR #4 后）：
+
+| Workflow | Run | 结果 |
+| --- | --- | --- |
+| Swift Core | [30410860272](https://github.com/creaope/slow-walk/actions/runs/30410860272) | success |
+| Swift Server | [30410860265](https://github.com/creaope/slow-walk/actions/runs/30410860265) | success |
+
+两个 workflow 均使用官方 `swift:6.3.2-jammy` 容器。上述 success 是修复前
+代码的结果：原测试只验证 fixture 与自身 expectation 自洽，不能证明
+fixture 正确。本分支修复后的最终结果在推送后补充。

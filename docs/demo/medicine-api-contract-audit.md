@@ -1,7 +1,8 @@
 # Medicine MVP 接口冻结核验
 
-核验日期：2026-07-28
-核验范围：成员 C / `feature/demo-fixtures`
+核验日期：2026-07-29
+核验范围：成员 C / `feature/demo-fixtures`（PR #7 修复轨道
+`fix/pr7-canonical-fixtures-k3`）
 
 ## 冻结结论
 
@@ -9,8 +10,8 @@
 
 | 项目 | 冻结值 | 代码来源 |
 | --- | --- | --- |
-| App 名称 | `SlowWalkApp` | Day 1 任务约定 |
-| 展示模块 | `SlowWalkPresentation` | Day 1 任务约定 |
+| App 名称 | `SlowWalkApp` | `ios/SlowWalkApp`（占位 shell，已存在） |
+| 展示模块 | `SlowWalkPresentation` | **计划中，尚未创建**；仓库中不存在该模块，不得引用为已实现 |
 | 请求协议 | `MedicineAssessmentRequesting` | `SlowWalkClientCore` |
 | 协调器 | `MedicineAssessmentCoordinator` | `SlowWalkClientCore` |
 | 状态来源 | `MedicineAssessmentViewState` | `SlowWalkClientCore` |
@@ -26,6 +27,19 @@ expectedPresentationVariant = Presentation 展示变体
 ```
 
 这只是 Fixture 元数据，不改变 Core public API。
+
+Coordinator 的实际映射（`MedicineAssessmentCoordinator.assess`）：
+
+- `resolution.status == .ambiguous` 或其他非 resolved →
+  `requiresMedicineConfirmation`
+- resolved 但 `resolution.requiresUserConfirmation == true` →
+  `requiresMedicineConfirmation`（`serverRequiresConfirmation`）
+- resolved 且无需确认 → `result`
+- 抛错（如 timeout）→ `failed`
+
+因此 `knowledgeWarning` 的 `expectedViewState` 是
+`requiresMedicineConfirmation`：真实 Pipeline 在 stale offline 知识状态下把
+`requiresUserConfirmation` 置为 `true`。
 
 ## Canonical DTO
 
@@ -90,3 +104,24 @@ POST /api/v1/medicine/assess
 
 该端点对 resolved、ambiguous、识别失败、证据不足、健康档案错误和知识来源异常均
 已有服务端测试。旧 `/api/v1/risk/assess` 不属于正式客户端调用路径。
+
+## Fixture canonical 字符串核验
+
+以下值取自生产源码并经 golden test 全量 DTO equality 冻结：
+
+| 字段 | 真实值 | 来源 |
+| --- | --- | --- |
+| `resolution.evidence.matcherVersion` | `slowwalk-resolver-v1` | `ResolverConfiguration.standard` |
+| `sourceDataVersion` | `mock-authoritative-medicine-source=demo-authoritative-v1;mock-secondary-medicine-source=demo-secondary-v1` | `MedicineKnowledgeSearchResult.sourceDataVersion` |
+| 过敏规则 `ruleIdentifier` | `allergy-match` | `AllergyMatchRule.identifier` |
+| 身体指标规则 `ruleIdentifier` | `body-metrics-data-quality` | `BodyMetricsDataQualityRule.identifier` |
+| 健康上下文规则 `ruleIdentifier` | `health-context-validation` | `HealthContextValidationRule.identifier` |
+| 知识安全规则 `ruleIdentifier` | `medicine-knowledge-source-safety` | `MedicinePipeline.applyKnowledgeSafety` |
+| 指标过期 warning code | `STALE_BODY_METRICS`（rule `body-metrics-recency`） | `BodyMetricsQualityAssessor` |
+| 指标缺失 warning code | `BODY_METRICS_MISSING`（rule `body-metrics-presence`） | `BodyMetricsQualityAssessor` |
+| `configurationNotices` | `DEMO DATA QUALITY CONFIGURATION — NOT A CLINICAL DIAGNOSTIC STANDARD` + `NOT FOR CLINICAL USE` | `MedicationRiskContextBuilder` |
+
+早期 Fixture 中出现的 `allergy-match-v1`、`health-context-v1`、
+`body-metrics-data-quality-v1`、`knowledge-source-governance`、`resolver-v1`、
+`MISSING_BODY_METRICS` 均为手工编造值，生产代码中不存在，已由 golden test
+替换并锁定。
