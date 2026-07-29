@@ -71,4 +71,3 @@ struct SlowWalkPrimaryActionButton: View {
     .padding()
     .dynamicTypeSize(.accessibility5)
 }
-
