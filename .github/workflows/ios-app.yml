@@ -1,0 +1,62 @@
+name: iOS App
+
+on:
+  push:
+    branches:
+      - develop
+      - "feature/**"
+      - "test/**"
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: macOS Xcode Simulator
+    # Pinned rather than `macos-latest`: the `macos-latest` label was migrated
+    # to macos-26 only in July 2026, and the macos-15 image it previously
+    # pointed at defaults to Xcode 16.4, which cannot build this project.
+    # Verified on this image: Xcode 26.6 (17F113), Swift 6.3.3, iOS 26.5
+    # simulator runtime. The default Xcode drifts with image updates, so the
+    # simulator destination is discovered rather than hardcoded.
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Show project targets and schemes
+        run: xcodebuild -project ios/SlowWalkApp.xcodeproj -list
+
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          set -euo pipefail
+          udid="$(xcrun simctl list devices available --json \
+            | python3 .github/scripts/select-ios-simulator.py)"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      - name: Test iOS app
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project ios/SlowWalkApp.xcodeproj \
+            -scheme SlowWalkApp \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
