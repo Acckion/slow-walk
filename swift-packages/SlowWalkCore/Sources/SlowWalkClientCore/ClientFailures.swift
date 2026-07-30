@@ -104,6 +104,15 @@ public enum ClientFailureMapper {
         _ error: any Error
     ) -> ClientFailure {
         if let apiError = error as? ClientAPIError {
+            if apiError.error.code == .knowledgeSourceTimeout {
+                return ClientFailure(
+                    kind: .timeout,
+                    apiErrorCode: apiError.error.code,
+                    requestID: apiError.error.requestID,
+                    endpoint: nil,
+                    isRecoverable: true
+                )
+            }
             return ClientFailure(
                 kind: .api,
                 apiErrorCode: apiError.error.code,
@@ -153,6 +162,16 @@ public enum ClientFailureMapper {
                 requestID: nil,
                 endpoint: nil,
                 isRecoverable: true
+            )
+        }
+
+        if error is MedicineAssessmentResponseValidationError {
+            return ClientFailure(
+                kind: .malformedResponse,
+                apiErrorCode: nil,
+                requestID: nil,
+                endpoint: .medicineAssess,
+                isRecoverable: false
             )
         }
 

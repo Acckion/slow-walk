@@ -89,11 +89,20 @@ func makeRecognitionMapper(
 }
 
 func makeMedicineResponse(
-    requestID: UUID = clientTestUUID(10),
+    requestID: UUID = clientTestUUID(40),
     status: MedicineResolutionStatus = .resolved,
     riskLevel: RiskLevel = .yellow,
+    assessmentRiskLevel: RiskLevel? = nil,
     requiresConfirmation: Bool = false,
-    knowledgeWarning: Bool = false
+    knowledgeWarning: Bool = false,
+    includeAssessment: Bool = true,
+    cardRequiresConfirmation: Bool? = nil,
+    selectedMedicineName: String? = nil,
+    apiVersion: String = SlowWalkAPI.version,
+    sourceDataVersion: String = "demo-v1",
+    generatedAt: Date = clientTestDate,
+    cardGeneratedAt: Date? = nil,
+    duplicateCandidate: Bool = false
 ) -> MedicineAssessmentResponseDTO {
     let source = SourceReference(
         sourceName: "SlowWalk demo catalog",
@@ -123,12 +132,29 @@ func makeMedicineResponse(
         matchedAlias: nil,
         matchReasons: [.canonicalExact]
     )
+    let selectedMedicine =
+        selectedMedicineName.map {
+            Medicine(
+                id: medicine.id,
+                canonicalName: $0,
+                aliases: medicine.aliases,
+                activeIngredientIDs: medicine.activeIngredientIDs,
+                medicineCategory: medicine.medicineCategory,
+                sourceReferences: medicine.sourceReferences,
+                dosageTextFromSource: medicine.dosageTextFromSource,
+                contraindicationTags: medicine.contraindicationTags,
+                warnings: medicine.warnings,
+                dataVersion: medicine.dataVersion
+            )
+        } ?? medicine
     let resolution = MedicineResolution(
         status: status,
         candidates:
-            status == .resolved ? [candidate] : [],
+            status == .resolved
+            ? (duplicateCandidate ? [candidate, candidate] : [candidate])
+            : [],
         selectedMedicine:
-            status == .resolved ? medicine : nil,
+            status == .resolved ? selectedMedicine : nil,
         evidence: MedicineResolutionEvidence(
             recognizedTexts: ["Demo Medicine"],
             normalizedText: "demo medicine",
@@ -155,9 +181,9 @@ func makeMedicineResponse(
             : "missing-evidence"
     )
     let assessment: RiskAssessment? =
-        status == .resolved
+        status == .resolved && includeAssessment
         ? RiskAssessment(
-            level: riskLevel,
+            level: assessmentRiskLevel ?? riskLevel,
             reasons: [reason],
             recommendedActions: [
                 .consultHealthcareProfessional,
@@ -188,9 +214,9 @@ func makeMedicineResponse(
         sourceReferences:
             status == .resolved ? [source] : [],
         mustConfirmMedicine:
-            status != .resolved
-                || requiresConfirmation,
-        generatedAt: clientTestDate
+            cardRequiresConfirmation
+            ?? (status != .resolved || requiresConfirmation),
+        generatedAt: cardGeneratedAt ?? generatedAt
     )
     return MedicineAssessmentResponseDTO(
         requestID: requestID,
@@ -200,9 +226,9 @@ func makeMedicineResponse(
         cacheHit: false,
         resolutionCacheStatus: .miss,
         knowledgeCacheStatus: nil,
-        sourceDataVersion: "demo-v1",
-        generatedAt: clientTestDate,
-        apiVersion: SlowWalkAPI.version,
+        sourceDataVersion: sourceDataVersion,
+        generatedAt: generatedAt,
+        apiVersion: apiVersion,
         healthContextValidation: nil,
         medicineKnowledge: nil
     )
