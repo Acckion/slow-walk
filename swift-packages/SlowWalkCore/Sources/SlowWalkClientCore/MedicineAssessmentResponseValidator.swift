@@ -39,7 +39,9 @@ public struct MedicineAssessmentResponseValidator: Sendable {
         switch response.resolution.status {
         case .resolved:
             guard let selected = response.resolution.selectedMedicine,
-                candidateIDs.contains(selected.id)
+                response.resolution.candidates.contains(where: {
+                    $0.medicine == selected
+                })
             else {
                 throw MedicineAssessmentResponseValidationError
                     .invalidResolution
@@ -62,7 +64,7 @@ public struct MedicineAssessmentResponseValidator: Sendable {
 
         if let assessment = response.assessment {
             guard response.resolution.status == .resolved,
-                assessment.level == response.actionCard.riskLevel
+                assessment.level <= response.actionCard.riskLevel
             else {
                 throw MedicineAssessmentResponseValidationError
                     .assessmentMismatch

@@ -92,10 +92,12 @@ func makeMedicineResponse(
     requestID: UUID = clientTestUUID(40),
     status: MedicineResolutionStatus = .resolved,
     riskLevel: RiskLevel = .yellow,
+    assessmentRiskLevel: RiskLevel? = nil,
     requiresConfirmation: Bool = false,
     knowledgeWarning: Bool = false,
     includeAssessment: Bool = true,
-    cardRequiresConfirmation: Bool? = nil
+    cardRequiresConfirmation: Bool? = nil,
+    selectedMedicineName: String? = nil
 ) -> MedicineAssessmentResponseDTO {
     let source = SourceReference(
         sourceName: "SlowWalk demo catalog",
@@ -125,12 +127,27 @@ func makeMedicineResponse(
         matchedAlias: nil,
         matchReasons: [.canonicalExact]
     )
+    let selectedMedicine =
+        selectedMedicineName.map {
+            Medicine(
+                id: medicine.id,
+                canonicalName: $0,
+                aliases: medicine.aliases,
+                activeIngredientIDs: medicine.activeIngredientIDs,
+                medicineCategory: medicine.medicineCategory,
+                sourceReferences: medicine.sourceReferences,
+                dosageTextFromSource: medicine.dosageTextFromSource,
+                contraindicationTags: medicine.contraindicationTags,
+                warnings: medicine.warnings,
+                dataVersion: medicine.dataVersion
+            )
+        } ?? medicine
     let resolution = MedicineResolution(
         status: status,
         candidates:
             status == .resolved ? [candidate] : [],
         selectedMedicine:
-            status == .resolved ? medicine : nil,
+            status == .resolved ? selectedMedicine : nil,
         evidence: MedicineResolutionEvidence(
             recognizedTexts: ["Demo Medicine"],
             normalizedText: "demo medicine",
@@ -159,7 +176,7 @@ func makeMedicineResponse(
     let assessment: RiskAssessment? =
         status == .resolved && includeAssessment
         ? RiskAssessment(
-            level: riskLevel,
+            level: assessmentRiskLevel ?? riskLevel,
             reasons: [reason],
             recommendedActions: [
                 .consultHealthcareProfessional

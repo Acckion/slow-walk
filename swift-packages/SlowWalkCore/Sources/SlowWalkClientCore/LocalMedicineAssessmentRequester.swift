@@ -18,6 +18,7 @@ public actor LocalMedicineAssessmentRequester:
 
     private let pipeline: MedicinePipeline
     private var pendingConfirmation: PendingConfirmation?
+    private var assessmentGeneration: UInt64 = 0
 
     public init(pipeline: MedicinePipeline = MedicinePipeline()) {
         self.pipeline = pipeline
@@ -31,18 +32,34 @@ public actor LocalMedicineAssessmentRequester:
         request: MedicineAssessmentRequestDTO
     ) async throws -> MedicineAssessmentResponseDTO {
         try Task.checkCancellation()
+        assessmentGeneration &+= 1
+        let operationGeneration = assessmentGeneration
         pendingConfirmation = nil
         try validateVersion(request)
 
-        let records = try request.recentRecords.map { try $0.domainModel() }
-        let result = try await pipeline.assess(
-            input: request.input,
-            userProfile: request.userProfile.domainModel,
-            recentRecords: records
-        )
-        try Task.checkCancellation()
+        let result: MedicinePipelineAssessmentResult
+        do {
+            let records = try request.recentRecords.map {
+                try $0.domainModel()
+            }
+            result = try await pipeline.assess(
+                input: request.input,
+                userProfile: request.userProfile.domainModel,
+                recentRecords: records
+            )
+            try Task.checkCancellation()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw canonicalClientError(
+                for: error,
+                requestID: request.requestID
+            )
+        }
 
-        if let context = result.confirmationContext {
+        if operationGeneration == assessmentGeneration,
+            let context = result.confirmationContext
+        {
             pendingConfirmation = PendingConfirmation(
                 request: request,
                 context: context
@@ -70,16 +87,33 @@ public actor LocalMedicineAssessmentRequester:
         }
 
         let request = pendingConfirmation.request
-        let records = try request.recentRecords.map { try $0.domainModel() }
-        let result = try await pipeline.assessConfirmedCandidate(
-            candidateID: command.candidateID,
-            context: pendingConfirmation.context,
-            userProfile: request.userProfile.domainModel,
-            recentRecords: records
-        )
-        try Task.checkCancellation()
+        let operationGeneration = assessmentGeneration
+        let result: MedicinePipelineAssessmentResult
+        do {
+            let records = try request.recentRecords.map {
+                try $0.domainModel()
+            }
+            result = try await pipeline.assessConfirmedCandidate(
+                candidateID: command.candidateID,
+                context: pendingConfirmation.context,
+                userProfile: request.userProfile.domainModel,
+                recentRecords: records
+            )
+            try Task.checkCancellation()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw canonicalClientError(
+                for: error,
+                requestID: request.requestID
+            )
+        }
 
-        self.pendingConfirmation = nil
+        if operationGeneration == assessmentGeneration,
+            self.pendingConfirmation?.request.requestID == request.requestID
+        {
+            self.pendingConfirmation = nil
+        }
         return makeResponse(from: result, request: request)
     }
 
@@ -123,6 +157,87 @@ public actor LocalMedicineAssessmentRequester:
             ),
             medicineKnowledge: result.knowledgeResult
         )
+    }
+
+    private func canonicalClientError(
+        for error: any Error,
+        requestID: UUID
+    ) -> any Error {
+        if let clientError = error as? ClientAPIError {
+            return clientError
+        }
+        if error is HealthContextDTOError {
+            return apiError(
+                code: .invalidMedicationRecord,
+                message:
+                    "Medication history contains an unsupported event or source value.",
+                requestID: requestID
+            )
+        }
+
+        guard let kind = MedicinePipelineFailureClassifier.classify(error) else {
+            return apiError(
+                code: .internalError,
+                message: "The medicine assessment could not be completed.",
+                requestID: requestID
+            )
+        }
+        let mapping = Self.apiMapping(for: kind)
+        return apiError(
+            code: mapping.code,
+            message: mapping.message,
+            requestID: requestID
+        )
+    }
+
+    private func apiError(
+        code: APIErrorCode,
+        message: String,
+        requestID: UUID
+    ) -> ClientAPIError {
+        ClientAPIError(
+            error: APIErrorDTO(
+                code: code,
+                message: message,
+                requestID: requestID,
+                details: nil
+            )
+        )
+    }
+
+    private static func apiMapping(
+        for kind: MedicinePipelineFailureKind
+    ) -> (code: APIErrorCode, message: String) {
+        switch kind {
+        case .invalidUserProfile:
+            (.invalidUserProfile, "The user health profile is invalid.")
+        case .unsupportedProfileSchema:
+            (.unsupportedProfileSchema, "The user health profile schema is not supported.")
+        case .invalidMedicationRecord:
+            (.invalidMedicationRecord, "Medication history contains an invalid record.")
+        case .futureMedicationRecord:
+            (.futureMedicationRecord, "Medication history contains a future record.")
+        case .invalidBodyMetrics:
+            (.invalidBodyMetrics, "Body metrics failed data-quality validation.")
+        case .knowledgeSourceUnavailable:
+            (.knowledgeSourceUnavailable, "The medicine knowledge source is unavailable.")
+        case .knowledgeSourceTimeout:
+            (.knowledgeSourceTimeout, "The medicine knowledge request timed out.")
+        case .invalidSourceResponse:
+            (.invalidSourceResponse, "A medicine knowledge source returned an invalid response.")
+        case .sourceVersionUnsupported:
+            (.sourceVersionUnsupported, "A medicine knowledge source version is unsupported.")
+        case .medicineNotFound:
+            (.medicineNotFound, "No trusted medicine source matched the query.")
+        case .sourceConflict:
+            (.sourceConflict, "Trusted medicine sources returned a conflict.")
+        case .offlineCacheUnavailable:
+            (.offlineCacheUnavailable, "No usable offline medicine knowledge cache is available.")
+        case .malformedRequest:
+            (.malformedRequest, "The medicine knowledge request is malformed.")
+        case .internalInvariant:
+            (.internalError, "The medicine assessment could not be completed.")
+        }
     }
 }
 

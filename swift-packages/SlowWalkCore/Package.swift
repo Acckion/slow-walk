@@ -132,6 +132,7 @@ let package = Package(
             dependencies: [
                 "SlowWalkDomain",
                 "SlowWalkAPIContracts",
+                "SlowWalkDataInterfaces",
                 "SlowWalkLocationRisk",
                 "SlowWalkMedicinePipeline",
                 "SlowWalkClientCore",
