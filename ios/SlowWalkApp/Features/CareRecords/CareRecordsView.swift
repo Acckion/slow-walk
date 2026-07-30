@@ -23,9 +23,16 @@ struct CareRecordsView: View {
                     }
                 }
 
-                Text("本阶段记录只保存在内存中，重新启动后会清空。")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                // From the app-level capability source, not a fixed string: if
+                // records ever become persistent, this line changes with the
+                // table instead of being corrected here.
+                Text(
+                    environment.capabilities
+                        .detail(of: .careRecordPersistence)
+                        ?? "记录只保存在内存中，重新启动后会清空。"
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             }
             .padding()
         }

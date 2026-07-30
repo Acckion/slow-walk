@@ -14,7 +14,8 @@ struct TodayStatusSummary: Equatable, Hashable {
 
     init(
         state: CompanionFlowState,
-        medicineState: MedicineAssessmentViewState
+        medicineState: MedicineAssessmentViewState,
+        capabilities: CapabilityCatalog
     ) {
         stepLabel = CompanionCopy.stepLabel(
             for: state,
@@ -22,7 +23,8 @@ struct TodayStatusSummary: Equatable, Hashable {
         )
         situation = CompanionCopy.situation(
             for: state,
-            medicineState: medicineState
+            medicineState: medicineState,
+            capabilities: capabilities
         )
         nextStep = CompanionCopy.nextStep(
             for: state,

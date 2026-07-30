@@ -12,6 +12,11 @@ enum CareRecordEventKind: Equatable, Hashable {
     case medicineAssessmentNeedsConfirmation(candidateCount: Int)
     case medicineAssessmentRequiresSourceReview
     case medicineConfirmed(medicineName: String)
+    /// A care action was actually shown to the person.
+    ///
+    /// This may only be written by something that presented a real assessment
+    /// result. It must never be written on the strength of a confirmed medicine
+    /// name: that put a claim in the timeline that nothing had produced.
     case careActionShown(medicineName: String)
     case medicineAssessmentFailed(isRecoverable: Bool)
     case companionFinished(CompanionCompletion)

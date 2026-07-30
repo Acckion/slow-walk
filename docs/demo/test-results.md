@@ -78,11 +78,14 @@ fixture 正确。本分支修复后的最终结果在推送后补充。
 
 ## 2026-07-30 device-first 重构验证
 
-- `SlowWalkCore`：300 项通过，0 failures。
-- `SlowWalkServer`：80 项通过，0 failures；本次没有修改 Server 运行代码。
-- `SlowWalkApp`：App 源码 target 完成无签名编译。
-- `SlowWalkAppTests`：基线 25 项加本分支 2 项测试，共 27 项测试源码 target
-  完成 Debug 编译。
-- 当前 Mac 没有可用的 iOS Simulator runtime，因此本次无法执行 iOS 测试或完成
-  标准 asset catalog Simulator Build；上述两项 Xcode 结果是临时排除
-  `Assets.xcassets` 后的源码编译验证，不冒充模拟器或真机运行结果。
+- 已合并并协调 `develop@1068f18`（PR #19）的能力目录与“无评估结果不得继续”安全约束；
+  当前实现使用真实的设备端 `MedicineAssessmentCoordinator` 链路，不再使用
+  “评估尚未接入”的临时状态机。
+- `SlowWalkCore`：307 项通过，0 failures。
+- `SlowWalkServer`：80 项通过，0 failures；位置请求校验改为复用共享实现，HTTP 行为不变。
+- `SlowWalkApp` 与 `SlowWalkAppTests`：42 项测试源码完成 iOS Simulator SDK、
+  arm64、Debug、无签名编译。
+- 当前 Mac 没有可用的 iOS Simulator runtime；Generic iOS 构建也明确报告
+  iOS 26.5 platform 未安装。因此本次无法执行 iOS 测试或完成标准 asset
+  catalog Build。上述 Xcode 结果是临时排除 `Assets.xcassets` 后的源码编译
+  验证，不冒充模拟器或真机运行结果。

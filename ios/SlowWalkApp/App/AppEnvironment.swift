@@ -16,14 +16,23 @@ import SlowWalkDomain
 final class AppEnvironment {
     let clock: any SlowWalkDomain.Clock
     let plan: TodayPlan
-    let capabilities: AppCapabilityManifest
     let careRecords: InMemoryCareRecordStore
     let companion: CompanionSessionModel
+
+    /// What this build can really do — the app's single capability source.
+    ///
+    /// Every screen that states a capability reads it from here, or from
+    /// `companion.capabilities`, which is this same value. `CapabilityCatalog`
+    /// has no static default anywhere else and no view names `.currentDemo`: the
+    /// default is chosen once, on this initialiser's parameter, so a test can
+    /// describe a different build by constructing one environment and have the
+    /// whole app — behaviour and wording together — follow it.
+    let capabilities: CapabilityCatalog
 
     init(
         clock: any SlowWalkDomain.Clock = AppSystemClock(),
         plan: TodayPlan = .demo,
-        capabilities: AppCapabilityManifest = .currentDemo
+        capabilities: CapabilityCatalog = .currentDemo
     ) {
         self.clock = clock
         self.plan = plan
@@ -45,7 +54,8 @@ final class AppEnvironment {
             records: store,
             coordinator: coordinator,
             medicineInput: .make(at: clock.now()),
-            plan: plan
+            plan: plan,
+            capabilities: capabilities
         )
     }
 

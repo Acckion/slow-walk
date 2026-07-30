@@ -45,6 +45,16 @@ struct CompanionSessionModelTests {
         #expect(session.startCompanion())
         #expect(!session.acknowledgeCareAction())
         #expect(session.state == .preDepartureCheck)
+
+        session.beginMedicineAssessment()
+        #expect(!session.acknowledgeCareAction())
+        #expect(session.state == .medicineAssessment)
+        #expect(
+            environment.careRecords.events.contains {
+                if case .careActionShown = $0.kind { return true }
+                return false
+            } == false
+        )
     }
 
     @Test func repeatedBeginStartsOnlyOneAssessment() async {
@@ -175,6 +185,17 @@ struct CompanionSessionModelTests {
 
         #expect(session.assessedMedicineID == "demo-acetaminophen")
         #expect(session.state == .medicineAssessment)
+    }
+
+    @Test func environmentAndSessionUseTheSameCapabilityCatalog() {
+        let environment = makeEnvironment()
+
+        #expect(environment.capabilities == .currentDemo)
+        #expect(environment.companion.capabilities == environment.capabilities)
+        #expect(
+            environment.capabilities.availability(of: .medicineRiskAssessment)
+                == .deviceLocal
+        )
     }
 
     @Test func riskIconsDoNotUseSuccessSymbolForWarnings() {

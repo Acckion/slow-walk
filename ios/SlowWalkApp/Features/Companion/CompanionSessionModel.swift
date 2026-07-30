@@ -12,6 +12,8 @@ final class CompanionSessionModel {
     private(set) var medicineState: MedicineAssessmentViewState = .idle
     private(set) var pendingAssessmentTask: Task<Void, Never>?
 
+    let capabilities: CapabilityCatalog
+
     private let records: any CareRecordStoring
     private let coordinator: MedicineAssessmentCoordinator
     private let medicineInput: DemoMedicineAssessmentInput
@@ -27,12 +29,14 @@ final class CompanionSessionModel {
         records: any CareRecordStoring,
         coordinator: MedicineAssessmentCoordinator,
         medicineInput: DemoMedicineAssessmentInput,
-        plan: TodayPlan
+        plan: TodayPlan,
+        capabilities: CapabilityCatalog
     ) {
         self.records = records
         self.coordinator = coordinator
         self.medicineInput = medicineInput
         self.plan = plan
+        self.capabilities = capabilities
         let observationTask = Task { [weak self, coordinator] in
             let updates = await coordinator.stateUpdates()
             for await update in updates {
@@ -49,7 +53,11 @@ final class CompanionSessionModel {
     }
 
     var situation: String {
-        CompanionCopy.situation(for: state, medicineState: medicineState)
+        CompanionCopy.situation(
+            for: state,
+            medicineState: medicineState,
+            capabilities: capabilities
+        )
     }
 
     var nextStep: String {

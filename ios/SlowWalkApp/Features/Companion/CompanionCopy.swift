@@ -3,7 +3,23 @@ import SlowWalkAPIContracts
 import SlowWalkClientCore
 import SlowWalkDomain
 
-/// Neutral, action-first wording for the companion flow.
+/// Every user-facing string for the companion flow.
+///
+/// Wording rules this file must keep (from the product requirements):
+/// - Never blame the person. A photo that could not be read is the app's
+///   limitation to state plainly, not the person's mistake.
+/// - Never infantilise. No "be good", no "listen to us", no pet names.
+/// - Never assume a family structure. No "ask your child" or "ask your
+///   daughter"; say "someone you trust" and let the person decide who.
+/// - Always say what happened, then what to do first, in that order.
+/// - On a failed read, offer a recovery path. Never offer a medicine
+///   conclusion, dosage, or safety verdict.
+/// - Never describe a capability this build does not have. A sentence about
+///   reading a photo, following a route, or reminding on arrival is a claim
+///   about the world; it may only be written when the `CapabilityCatalog` in
+///   force says the capability is real. Where wording depends on a capability,
+///   the catalog is passed in by the caller — this type holds none of its own,
+///   so the wording always describes the same build the flow is running.
 ///
 /// DEMO DATA — NOT FOR CLINICAL USE
 enum CompanionCopy {
@@ -35,13 +51,15 @@ enum CompanionCopy {
 
     static func situation(
         for state: CompanionFlowState,
-        medicineState: MedicineAssessmentViewState
+        medicineState: MedicineAssessmentViewState,
+        capabilities: CapabilityCatalog
     ) -> String {
         switch state {
         case .notStarted:
             "今天的陪伴还没有开始。"
         case .preDepartureCheck:
-            "先完成一次设备内用药演示评估。"
+            capabilities.detail(of: .medicineRiskAssessment)
+                ?? "先完成一次设备内用药演示评估。"
         case .medicineAssessment:
             medicineSituation(medicineState)
         case .travelling:

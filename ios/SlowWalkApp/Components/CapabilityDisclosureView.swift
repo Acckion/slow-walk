@@ -2,9 +2,11 @@ import SwiftUI
 
 /// A concise, visible boundary between the demo and connected Apple features.
 struct CapabilityDisclosureView: View {
+    let catalog: CapabilityCatalog
+
     var body: some View {
         Label {
-            Text("药盒文字和健康档案使用固定合成演示数据；出行进度由按钮模拟。尚未接入相机识别、真实定位或自动到站提醒。")
+            Text(disclosure)
                 .fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: "info.circle")
@@ -15,9 +17,18 @@ struct CapabilityDisclosureView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
+
+    private var disclosure: String {
+        let recognition = catalog.status(of: .medicineRecognition)
+        let assessment = catalog.status(of: .medicineRiskAssessment)
+        let location = catalog.status(of: .coreLocation)
+        return "\(recognition.displayName)：\(recognition.shortLabel)；"
+            + "\(assessment.displayName)：\(assessment.shortLabel)；"
+            + "\(location.displayName)：\(location.shortLabel)。"
+    }
 }
 
 #Preview {
-    CapabilityDisclosureView()
+    CapabilityDisclosureView(catalog: .currentDemo)
         .padding()
 }

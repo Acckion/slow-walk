@@ -15,7 +15,7 @@ struct CompanionView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 DemoDataBanner()
-                CapabilityDisclosureView()
+                CapabilityDisclosureView(catalog: session.capabilities)
                 stepHeader
                     .accessibilityFocused($stepHasAccessibilityFocus)
                 stepControls

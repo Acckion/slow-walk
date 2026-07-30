@@ -17,7 +17,8 @@ struct TodayView: View {
     private var summary: TodayStatusSummary {
         TodayStatusSummary(
             state: environment.companion.state,
-            medicineState: environment.companion.medicineState
+            medicineState: environment.companion.medicineState,
+            capabilities: environment.capabilities
         )
     }
 
