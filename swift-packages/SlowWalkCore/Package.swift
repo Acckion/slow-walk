@@ -75,6 +75,7 @@ let package = Package(
                 "SlowWalkDomain",
                 "SlowWalkAPIContracts",
                 "SlowWalkLocationRisk",
+                "SlowWalkMedicinePipeline",
             ]
         ),
         .testTarget(
@@ -132,6 +133,7 @@ let package = Package(
                 "SlowWalkDomain",
                 "SlowWalkAPIContracts",
                 "SlowWalkLocationRisk",
+                "SlowWalkMedicinePipeline",
                 "SlowWalkClientCore",
             ]
         ),

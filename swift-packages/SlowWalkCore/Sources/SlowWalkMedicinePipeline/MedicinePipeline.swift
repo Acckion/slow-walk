@@ -64,6 +64,39 @@ public struct MedicinePipelineAssessmentResult: Sendable, Equatable {
         self.healthContextValidation = healthContextValidation
         self.knowledgeResult = knowledgeResult
     }
+
+    /// Opaque evidence required to confirm one of this result's candidates.
+    public var confirmationContext: MedicineConfirmationContext? {
+        guard !resolution.candidates.isEmpty,
+              resolution.status != .resolved
+                || resolution.requiresUserConfirmation
+        else {
+            return nil
+        }
+        return MedicineConfirmationContext(result: self)
+    }
+}
+
+/// Pipeline-owned context for a candidate confirmation.
+///
+/// Its initializer is intentionally internal. Callers can inspect the offered
+/// candidates but cannot create a context from an arbitrary medicine.
+public struct MedicineConfirmationContext: Sendable, Equatable {
+    public let candidates: [MedicineCandidate]
+    public let sourceDataVersion: String
+
+    fileprivate let result: MedicinePipelineAssessmentResult
+
+    fileprivate init(result: MedicinePipelineAssessmentResult) {
+        candidates = result.resolution.candidates
+        sourceDataVersion = result.sourceDataVersion
+        self.result = result
+    }
+}
+
+public enum MedicineConfirmationError: Error, Sendable, Equatable {
+    case confirmationNotRequired
+    case candidateNotOffered
 }
 
 /// Orchestrates deterministic name resolution, cache use, and risk assessment.
@@ -136,6 +169,73 @@ public struct MedicinePipeline: Sendable {
             input: input,
             generatedAt: generatedAt
         )
+        return try makeAssessment(
+            input: input,
+            resolutionResult: resolutionResult,
+            preflight: preflight,
+            generatedAt: generatedAt
+        )
+    }
+
+    /// Reassesses an explicitly selected candidate using the original
+    /// recognition evidence retained by the pipeline.
+    public func assessConfirmedCandidate(
+        candidateID: String,
+        context: MedicineConfirmationContext,
+        userProfile: UserHealthProfile,
+        recentRecords: [MedicationRecord]
+    ) async throws -> MedicinePipelineAssessmentResult {
+        let prior = context.result
+        guard prior.confirmationContext != nil else {
+            throw MedicineConfirmationError.confirmationNotRequired
+        }
+        guard let candidate = prior.resolution.candidates.first(
+            where: { $0.medicine.id == candidateID }
+        ) else {
+            throw MedicineConfirmationError.candidateNotOffered
+        }
+
+        let preflight = try contextBuilder.validate(
+            userProfile: userProfile,
+            bodyMetrics: userProfile.bodyMetrics,
+            medicationRecords: recentRecords
+        )
+        let generatedAt = dateProvider.now()
+        let resolution = MedicineResolution(
+            status: .resolved,
+            candidates: prior.resolution.candidates,
+            selectedMedicine: candidate.medicine,
+            evidence: prior.resolution.evidence,
+            requiresUserConfirmation: false
+        )
+        let resolutionResult = MedicinePipelineResolutionResult(
+            resolution: resolution,
+            cacheStatus: prior.cacheStatus,
+            sourceDataVersion: prior.sourceDataVersion,
+            generatedAt: generatedAt,
+            cacheHit: prior.cacheHit,
+            knowledgeResult: prior.knowledgeResult
+        )
+        let input = MedicineRecognitionInput(
+            recognizedTexts: prior.resolution.evidence.recognizedTexts,
+            capturedAt: prior.scanEvent.scannedAt,
+            languageCode: prior.resolution.evidence.languageCode,
+            rawConfidence: prior.resolution.evidence.rawConfidence
+        )
+        return try makeAssessment(
+            input: input,
+            resolutionResult: resolutionResult,
+            preflight: preflight,
+            generatedAt: generatedAt
+        )
+    }
+
+    private func makeAssessment(
+        input: MedicineRecognitionInput,
+        resolutionResult: MedicinePipelineResolutionResult,
+        preflight: MedicationRiskContextPreflightResult,
+        generatedAt: Date
+    ) throws -> MedicinePipelineAssessmentResult {
         let scanEvent = makeScanEvent(
             input: input,
             resolution: resolutionResult.resolution

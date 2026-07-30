@@ -156,6 +156,16 @@ public enum ClientFailureMapper {
             )
         }
 
+        if error is MedicineAssessmentResponseValidationError {
+            return ClientFailure(
+                kind: .malformedResponse,
+                apiErrorCode: nil,
+                requestID: nil,
+                endpoint: .medicineAssess,
+                isRecoverable: false
+            )
+        }
+
         return ClientFailure(
             kind: .unknown,
             apiErrorCode: nil,

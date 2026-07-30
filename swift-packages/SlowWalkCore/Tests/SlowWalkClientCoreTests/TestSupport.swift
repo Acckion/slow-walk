@@ -89,7 +89,7 @@ func makeRecognitionMapper(
 }
 
 func makeMedicineResponse(
-    requestID: UUID = clientTestUUID(10),
+    requestID: UUID = clientTestUUID(40),
     status: MedicineResolutionStatus = .resolved,
     riskLevel: RiskLevel = .yellow,
     requiresConfirmation: Bool = false,

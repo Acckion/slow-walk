@@ -272,6 +272,95 @@ final class MedicineAssessmentCoordinatorTests:
         XCTAssertFalse(failure.isRecoverable)
     }
 
+    func testMismatchedResponseIsRejectedBeforePresentation()
+        async throws
+    {
+        let coordinator = try makeCoordinator(
+            requester: CapturingMedicineRequester(
+                response: makeMedicineResponse(
+                    requestID: clientTestUUID(99)
+                )
+            )
+        )
+
+        let state = await run(coordinator)
+
+        guard case let .failed(failure) = state else {
+            return XCTFail("Expected malformed response failure.")
+        }
+        XCTAssertEqual(failure.kind, .malformedResponse)
+        XCTAssertFalse(failure.isRecoverable)
+    }
+
+    func testLocalAmbiguousCandidateCanBeConfirmed()
+        async throws
+    {
+        let requester = LocalMedicineAssessmentRequester()
+        let coordinator = MedicineAssessmentCoordinator(
+            recognizer: MockMedicineTextRecognizer(
+                behavior: .observations([
+                    makeObservation(text: "Cold Relief"),
+                ])
+            ),
+            mapper: try makeRecognitionMapper(),
+            requester: requester,
+            confirmer: requester,
+            clock: FixedClientClock(date: clientTestDate),
+            apiVersion: SlowWalkAPI.version
+        )
+        let first = await run(
+            coordinator,
+            requestID: clientTestUUID(70)
+        )
+        guard case let .requiresMedicineConfirmation(requirement) = first,
+              let candidate = requirement.response?
+                .resolution.candidates.first
+        else {
+            return XCTFail("Expected an offered ambiguous candidate.")
+        }
+
+        let confirmed = await coordinator.confirmMedicine(
+            candidateID: candidate.medicine.id
+        )
+
+        guard case let .result(presentation) = confirmed else {
+            return XCTFail("Expected confirmed pipeline result.")
+        }
+        XCTAssertEqual(
+            presentation.response.resolution.selectedMedicine?.id,
+            candidate.medicine.id
+        )
+        XCTAssertEqual(
+            presentation.response.resolution.evidence.recognizedTexts,
+            ["Cold Relief"]
+        )
+    }
+
+    func testStateStreamPublishesAssessmentProgress() async throws {
+        let coordinator = try makeCoordinator(
+            requester: CapturingMedicineRequester(
+                response: makeMedicineResponse()
+            )
+        )
+        let stream = await coordinator.stateUpdates()
+        let collector = Task {
+            var values: [MedicineAssessmentViewState] = []
+            for await value in stream {
+                values.append(value)
+                if case .result = value { break }
+            }
+            return values
+        }
+
+        _ = await run(coordinator)
+        let values = await collector.value
+
+        XCTAssertTrue(values.contains(.idle))
+        XCTAssertTrue(values.contains { if case .recognizing = $0 { true } else { false } })
+        XCTAssertTrue(values.contains { if case .assessing = $0 { true } else { false } })
+        XCTAssertTrue(values.contains { if case .result = $0 { true } else { false } })
+    }
+
     func testEmptyOCRSkipsNetworkAndRequiresConfirmation()
         async throws
     {
