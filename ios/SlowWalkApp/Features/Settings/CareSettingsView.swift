@@ -52,6 +52,14 @@ struct CareSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("当前能力") {
+                LabeledContent("用药评估", value: "尚未接入")
+                LabeledContent("药盒文字", value: "预设演示输入")
+                LabeledContent("出行进度", value: "按钮模拟")
+                LabeledContent("相机、定位和联系人", value: "尚未接入")
+                LabeledContent("远程服务", value: "不依赖")
+            }
+
             Section("关于") {
                 NotADiagnosisNotice()
                 Text("本阶段的设置只在本次运行内有效，尚未保存到设备。")

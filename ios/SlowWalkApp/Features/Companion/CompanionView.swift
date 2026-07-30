@@ -14,6 +14,7 @@ struct CompanionView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 DemoDataBanner()
+                CapabilityDisclosureView()
                 stepHeader
                 stepControls
                 if session.canEndEarly {
@@ -91,9 +92,12 @@ struct CompanionView: View {
         case let .showingRiskAction(confirmed):
             VStack(alignment: .leading, spacing: 16) {
                 CareActionPresentationSlot(confirmedMedicine: confirmed)
-                primaryButton(CompanionCopy.acknowledgeCareActionTitle) {
-                    session.acknowledgeCareAction()
-                }
+                Label(
+                    "尚未获得真实评估结果，当前不能继续出发。",
+                    systemImage: "exclamationmark.shield"
+                )
+                .font(.body)
+                .foregroundStyle(.secondary)
             }
 
         case .travelling:
@@ -115,12 +119,12 @@ struct CompanionView: View {
         HStack(spacing: 10) {
             ProgressView()
                 .accessibilityHidden(true)
-            Text("正在读取，请稍等")
+            Text("正在处理演示输入，请稍等")
                 .font(.body)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("正在读取药盒上的文字，请稍等。")
+        .accessibilityLabel("正在处理预设的演示药盒文字，请稍等。")
     }
 
     /// Recovery paths after a read that did not succeed.

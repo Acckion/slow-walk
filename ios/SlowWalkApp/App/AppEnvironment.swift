@@ -15,16 +15,19 @@ import SlowWalkDomain
 final class AppEnvironment {
     let clock: any SlowWalkDomain.Clock
     let plan: TodayPlan
+    let capabilities: AppCapabilityManifest
     let careRecords: InMemoryCareRecordStore
     let companion: CompanionSessionModel
 
     init(
         clock: any SlowWalkDomain.Clock = AppSystemClock(),
         plan: TodayPlan = .demo,
+        capabilities: AppCapabilityManifest = .currentDemo,
         simulator: MockMedicineScanSimulator = .demo
     ) {
         self.clock = clock
         self.plan = plan
+        self.capabilities = capabilities
 
         let store = InMemoryCareRecordStore(clock: clock)
         careRecords = store

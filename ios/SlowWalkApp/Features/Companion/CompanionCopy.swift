@@ -24,7 +24,7 @@ enum CompanionCopy {
         case .preDepartureCheck:
             "出门前确认"
         case let .scanningMedicine(attempt):
-            attempt.isAwaitingRecovery ? "需要再试一次" : "正在读取药盒"
+            attempt.isAwaitingRecovery ? "需要再试一次" : "正在处理演示输入"
         case .awaitingMedicineConfirmation:
             "请确认药名"
         case .showingRiskAction:
@@ -52,14 +52,14 @@ enum CompanionCopy {
             if let setback = attempt.setback {
                 setbackSituation(setback)
             } else if attempt.attemptNumber == 1 {
-                "正在读取药盒上的文字。"
+                "正在处理预设的演示药盒文字。"
             } else {
-                "正在重新读取药盒上的文字。"
+                "正在重新处理预设的演示药盒文字。"
             }
         case let .awaitingMedicineConfirmation(prompt):
             switch prompt.origin {
             case .readFromPhoto:
-                "照片里读到了几个相近的药名，还不能确定是哪一个。"
+                "演示输入给出了几个相近的药名，还不能确定是哪一个。"
             case .chosenFromFrequentList:
                 "已经打开常用药名列表。"
             }
@@ -74,9 +74,9 @@ enum CompanionCopy {
                 "已按您选择的\(confirmed.candidate.displayName)继续。"
             }
         case .travelling:
-            "出行已经开始，路线正在记录。"
+            "出行演示已经开始；当前没有记录真实路线。"
         case .approachingStop:
-            "快到目的地了。"
+            "演示进度已设为接近目的地；这不是定位结果。"
         case let .completed(completion):
             switch completion {
             case .arrivedSafely:
@@ -96,21 +96,21 @@ enum CompanionCopy {
             "先确认要带的药，再出门。"
         case let .scanningMedicine(attempt):
             if attempt.setback != nil {
-                "可以重新拍一次，也可以直接从常用药名里选。"
+                "可以重新处理演示输入，也可以从演示药名里选。"
             } else {
-                "请把药盒正面朝上，稍等一下。"
+                "预设输入正在处理，请稍等一下。"
             }
         case let .awaitingMedicineConfirmation(prompt):
             switch prompt.origin {
             case .readFromPhoto:
-                "请看一下药盒，选出对得上的那一个。"
+                "请选择本次演示要确认的药名。"
             case .chosenFromFrequentList:
                 "请选出这次要用的药。"
             }
         case .showingRiskAction:
             "先看完下面的用药提示，再继续出发。"
         case .travelling:
-            "按原计划走，到站前会提前提醒。"
+            "使用下面的按钮模拟出行进度；本阶段不会自动提醒。"
         case .approachingStop:
             "可以先收好东西，准备下车。"
         case .completed:
@@ -141,16 +141,16 @@ enum CompanionCopy {
     private static func setbackSituation(_ setback: MedicineReadSetback) -> String {
         switch setback {
         case .textNotLegible:
-            "这张照片上的字没有看清，可能是光线或角度的关系。"
+            "这次演示输入没有得到清晰文字。"
         case .noMedicineNameFound:
-            "这张照片里没有找到药名，可能拍到的是侧面。"
+            "这次演示输入里没有找到药名。"
         }
     }
 
     // MARK: - Recovery and actions
 
-    static let retryPhotoTitle = "重新拍一次"
-    static let chooseFromListTitle = "从常用药名里选"
+    static let retryPhotoTitle = "重新处理演示输入"
+    static let chooseFromListTitle = "从演示药名里选"
     static let readAloudAgainTitle = "再说一遍"
     static let whyThisHappenedTitle = "看看原因"
     static let contactSomeoneTitle = "联系信任的人"
@@ -158,10 +158,10 @@ enum CompanionCopy {
 
     static let startCompanionTitle = "开始陪伴"
     static let continueCompanionTitle = "继续陪伴"
-    static let beginMedicineReadTitle = "确认要带的药"
+    static let beginMedicineReadTitle = "评估演示药品"
     static let acknowledgeCareActionTitle = "知道了，继续出发"
-    static let approachStopTitle = "模拟：即将到站"
-    static let arriveSafelyTitle = "已安全到达"
+    static let approachStopTitle = "模拟：接近目的地"
+    static let arriveSafelyTitle = "模拟：已安全到达"
     static let endEarlyTitle = "先结束这次陪伴"
 
     /// Why a person might contact someone, without naming a relative.
