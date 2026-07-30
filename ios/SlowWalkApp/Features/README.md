@@ -1,11 +1,11 @@
 # Feature 边界
 
-- `MedicineScanner`：相机/OCR 输入与候选药品确认，不计算风险。
-- `RiskResult`：显示等级、全部原因、来源和行动卡，不复制业务规则。
-- `HealthProfile`：采集和编辑用户明确提供的档案，不进行诊断。
-- `MedicationHistory`：展示记录并通过 Repository 保存。
-- `LocationGuard`：后续出行守护边界，本阶段不实现 GPS 行为。
+- `Today`：展示演示计划和当前流程摘要，不推断健康状态。
+- `Companion`：驱动陪伴导航，并直接消费 canonical
+  `MedicineAssessmentViewState`；候选、风险和 ActionCard 不建立 App 内副本。
+- `CareRecords`：展示本次运行的内存事件，不声称已经持久化。
+- `Settings`：披露当前能力和安全边界，不伪装尚未接入的设置。
 
-Feature 通过初始化器接收协议依赖。跨 Feature 的业务模型来自 SlowWalkCore，不建立
-共享可变全局状态。
-
+相机/Vision、真实定位、健康档案编辑、持久化和联系人能力尚未接入。后续 Feature
+仍通过组合根接收协议依赖；跨 Feature 的业务模型来自 SlowWalkCore，不建立第二套
+Medicine 状态或风险规则。

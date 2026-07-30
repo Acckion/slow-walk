@@ -6,13 +6,14 @@ import Foundation
 /// carry no risk level and no medicine conclusion.
 enum CareRecordEventKind: Equatable, Hashable {
     case dayPlanItemStarted(title: String)
-    case medicineReadStarted(attemptNumber: Int)
-    case medicineReadDidNotSucceed(MedicineReadSetback)
-    /// A read that produced candidates. The count is recorded, never a
-    /// conclusion about which medicine it is.
-    case medicineReadFoundCandidates(candidateCount: Int)
-    case medicineConfirmed(medicineName: String, origin: MedicineChoiceOrigin)
+    case medicineAssessmentStarted
+    /// Candidate identity stays in the short-lived coordinator context. The
+    /// timeline records only how many choices were shown.
+    case medicineAssessmentNeedsConfirmation(candidateCount: Int)
+    case medicineAssessmentRequiresSourceReview
+    case medicineConfirmed(medicineName: String)
     case careActionShown(medicineName: String)
+    case medicineAssessmentFailed(isRecoverable: Bool)
     case companionFinished(CompanionCompletion)
 }
 

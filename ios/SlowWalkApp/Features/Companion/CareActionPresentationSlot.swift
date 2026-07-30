@@ -1,66 +1,120 @@
+import SlowWalkAPIContracts
+import SlowWalkClientCore
+import SlowWalkDomain
 import SwiftUI
 
-/// Reserved position for the real medicine action card.
+/// Thin renderer for the canonical ActionCard returned by ClientCore.
 ///
-/// The formal `MedicineActionCard` is owned by `SlowWalkPresentation` and is
-/// being built separately. This slot exists so the companion flow can reach the
-/// step that shows a care action without this module inventing a second,
-/// competing version of it.
-///
-/// Deliberately absent, and to remain absent, so the two do not diverge:
-/// - risk levels, severity semantics, and any colour mapping
-/// - warnings, dosage, and source references
-/// - medicine wording drawn from a knowledge source
-///
-/// When `SlowWalkPresentation` is added to the app target, replace the body of
-/// this view with the real card and pass it the confirmed medicine plus the
-/// assessment response. Nothing else in the flow should need to change.
+/// Once the presentation package lands, this adapter can delegate directly to
+/// its `MedicineActionCardView`. It deliberately owns no risk rules or parallel
+/// medicine state.
 struct CareActionPresentationSlot: View {
-    let confirmedMedicine: ConfirmedMedicine
+    let presentation: MedicineAssessmentPresentation
+
+    private var card: SlowWalkDomain.ActionCard {
+        presentation.response.actionCard
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("用药提示")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 16) {
+            Label(
+                riskLabel,
+                systemImage: presentation.risk.requiresImmediateAttention
+                    ? "exclamationmark.octagon.fill"
+                    : "checkmark.shield.fill"
+            )
+            .font(.headline)
 
-            Text("已确认：\(confirmedMedicine.candidate.displayName)")
+            Text(card.title)
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Text(card.primaryInstruction)
                 .font(.body)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Text("正式的用药提示卡由 SlowWalkPresentation 提供，本阶段尚未接入。")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            if !card.recommendedActions.isEmpty {
+                Divider()
+                Text("建议下一步")
+                    .font(.headline)
+                ForEach(card.recommendedActions, id: \.self) { action in
+                    Label(action.slowWalkDisplayTitle, systemImage: "arrow.right.circle")
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
-            Text("这里不显示风险等级、剂量或用药结论。")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            if !card.warnings.isEmpty {
+                Divider()
+                Text("需要留意")
+                    .font(.headline)
+                ForEach(card.warnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !card.sourceReferences.isEmpty {
+                Divider()
+                Text("信息来源")
+                    .font(.headline)
+                ForEach(card.sourceReferences, id: \.self) { source in
+                    Text("\(source.sourceName)：\(source.documentTitle)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             Text(CompanionCopy.demoDataNotice)
-                .font(.caption)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(.separator, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            """
-            用药提示占位。已确认 \(confirmedMedicine.candidate.displayName)。
-            正式提示卡尚未接入，此处不显示风险等级或用药结论。
-            \(CompanionCopy.demoDataNotice)
-            """
-        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(.separator, lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var riskLabel: String {
+        switch presentation.risk.attention {
+        case .routine:
+            "风险提示：常规查看"
+        case .reviewRequired:
+            "风险提示：需要复核"
+        case .urgentAttention:
+            "风险提示：尽快关注"
+        case .immediateAttention:
+            "风险提示：立即关注"
+        }
     }
 }
 
-#Preview {
-    CareActionPresentationSlot(
-        confirmedMedicine: ConfirmedMedicine(
-            candidate: MedicineCandidate.demoCandidates[0],
-            origin: .readFromPhoto
-        )
-    )
-    .padding()
+extension RecommendedAction {
+    fileprivate var slowWalkDisplayTitle: String {
+        switch self {
+        case .followVerifiedSourceInformation:
+            "按照已核验的信息查看"
+        case .consultHealthcareProfessional:
+            "咨询医生或药师"
+        case .notifyFamilyMember:
+            "联系家属共同确认"
+        case .reviewMedicineSources:
+            "核对药品信息来源"
+        case .updateHealthProfile:
+            "补充健康资料"
+        case .retakeMedicinePhoto:
+            "重新读取药盒信息"
+        case .doNotTakeUntilMedicineConfirmed:
+            "确认药品前先不要服用"
+        case .reviewMedicationHistory:
+            "核对既往用药记录"
+        case .remeasureBodyMetrics:
+            "重新测量身体指标"
+        }
+    }
 }

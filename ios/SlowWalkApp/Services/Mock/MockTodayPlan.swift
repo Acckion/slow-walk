@@ -69,7 +69,7 @@ extension TodayPlan {
             ),
             TodayMedicineItem(
                 id: "demo-medicine-evening",
-                displayName: "降糖药",
+                displayName: "对乙酰氨基酚（演示）",
                 timeOfDayDescription: "晚饭后",
                 isTakenToday: false
             ),
@@ -81,40 +81,4 @@ extension TodayPlan {
             placeDescription: "市第一医院"
         )
     )
-}
-
-extension MedicineCandidate {
-    /// Candidates offered for confirmation in the demo flow.
-    ///
-    /// DEMO DATA — NOT FOR CLINICAL USE. Hints describe packaging only, never
-    /// an effect or a dosage.
-    static let demoCandidates: [MedicineCandidate] = [
-        MedicineCandidate(
-            id: "demo-candidate-a",
-            displayName: "二甲双胍片",
-            recognitionHint: "白色药盒，蓝色字"
-        ),
-        MedicineCandidate(
-            id: "demo-candidate-b",
-            displayName: "格列美脲片",
-            recognitionHint: "白色药盒，绿色字"
-        ),
-    ]
-
-    /// The person's frequently used medicines, offered as a recovery path when
-    /// a photo cannot be read.
-    ///
-    /// DEMO DATA — NOT FOR CLINICAL USE.
-    static let demoFrequentlyUsed: [MedicineCandidate] = [
-        MedicineCandidate(
-            id: "demo-frequent-a",
-            displayName: "二甲双胍片",
-            recognitionHint: "常用"
-        ),
-        MedicineCandidate(
-            id: "demo-frequent-b",
-            displayName: "降压药",
-            recognitionHint: "常用"
-        ),
-    ]
 }

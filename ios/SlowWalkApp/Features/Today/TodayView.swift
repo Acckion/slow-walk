@@ -15,7 +15,10 @@ struct TodayView: View {
     private var plan: TodayPlan { environment.plan }
 
     private var summary: TodayStatusSummary {
-        TodayStatusSummary(state: environment.companion.state)
+        TodayStatusSummary(
+            state: environment.companion.state,
+            medicineState: environment.companion.medicineState
+        )
     }
 
     /// The headline. Once a session has finished, the plan's opening line would
@@ -138,10 +141,12 @@ struct TodayView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         // Status is carried by wording and a shape, never by
                         // colour alone.
-                        Image(systemName: medicine.isTakenToday
-                            ? "checkmark.circle"
-                            : "circle")
-                            .accessibilityHidden(true)
+                        Image(
+                            systemName: medicine.isTakenToday
+                                ? "checkmark.circle"
+                                : "circle"
+                        )
+                        .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(medicine.displayName)
                                 .font(.body)

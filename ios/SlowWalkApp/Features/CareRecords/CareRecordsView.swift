@@ -2,9 +2,7 @@ import SwiftUI
 
 /// The timeline of what happened while accompanying someone.
 ///
-/// Records describe the process, not a medical outcome. A read that did not
-/// succeed is recorded as an event with a recovery path, never as a conclusion
-/// about a medicine.
+/// Records describe the process, not a diagnosis or prescription.
 struct CareRecordsView: View {
     @Environment(AppEnvironment.self) private var environment
 
@@ -69,32 +67,26 @@ struct CareRecordsView: View {
     /// Neutral, factual descriptions. Nothing here blames the person.
     static func description(for kind: CareRecordEventKind) -> String {
         switch kind {
-        case let .dayPlanItemStarted(title):
+        case .dayPlanItemStarted(let title):
             "开始今天的安排：\(title)"
-        case let .medicineReadStarted(attemptNumber):
-            attemptNumber == 1
-                ? "开始读取药盒"
-                : "第 \(attemptNumber) 次读取药盒"
-        case let .medicineReadDidNotSucceed(setback):
-            switch setback {
-            case .textNotLegible:
-                "这次没有看清药盒上的字，已提供重试方式"
-            case .noMedicineNameFound:
-                "这次没有找到药名，已提供重试方式"
-            }
-        case let .medicineReadFoundCandidates(candidateCount):
-            "这次读到 \(candidateCount) 个相近的药名，等待确认"
-        case let .medicineConfirmed(medicineName, origin):
-            switch origin {
-            case .readFromPhoto:
-                "已确认药名：\(medicineName)（照片读取后确认）"
-            case .chosenFromFrequentList:
-                "已确认药名：\(medicineName)（从常用药名选择）"
-            }
-        case let .careActionShown(medicineName):
-            "已显示\(medicineName)的用药提示占位（正式提示卡尚未接入）"
-        case let .companionFinished(completion):
+        case .medicineAssessmentStarted:
+            "开始使用预设文字进行设备内演示评估"
+        case .medicineAssessmentNeedsConfirmation(let candidateCount):
+            "设备内评估给出 \(candidateCount) 个候选药名，等待确认"
+        case .medicineAssessmentRequiresSourceReview:
+            "设备内评估提示信息来源仍需复核，未允许继续"
+        case .medicineConfirmed(let medicineName):
+            "已确认候选药名：\(medicineName)"
+        case .careActionShown(let medicineName):
+            "已显示\(medicineName)的设备内演示提示"
+        case .medicineAssessmentFailed(let isRecoverable):
+            isRecoverable
+                ? "设备内演示评估没有完成，可以重试"
+                : "设备内演示评估没有完成"
+        case .companionFinished(let completion):
             switch completion {
+            case .medicineReviewed:
+                "陪伴结束：已查看用药提示"
             case .arrivedSafely:
                 "陪伴结束：已安全到达"
             case .endedEarly:

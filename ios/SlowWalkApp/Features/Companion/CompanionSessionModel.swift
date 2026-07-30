@@ -1,80 +1,89 @@
 import Foundation
+import SlowWalkAPIContracts
+import SlowWalkClientCore
+import SlowWalkDomain
 
-/// Owns the live companion session: current state, side effects, and records.
-///
-/// All transition decisions come from `CompanionFlowReducer`. This type adds
-/// only what a pure function cannot do — write care records and run the
-/// simulated read — so the two concerns stay separable.
+/// Owns companion navigation and mirrors the coordinator's canonical medicine
+/// ViewState for SwiftUI. No App-specific medicine result state exists.
 @Observable
 @MainActor
 final class CompanionSessionModel {
     private(set) var state: CompanionFlowState = .notStarted
+    private(set) var medicineState: MedicineAssessmentViewState = .idle
+    private(set) var pendingAssessmentTask: Task<Void, Never>?
 
     private let records: any CareRecordStoring
-    private let simulator: any MedicineScanSimulating
-    private let readDelay: any MedicineReadDelaying
+    private let coordinator: MedicineAssessmentCoordinator
+    private let medicineInput: DemoMedicineAssessmentInput
     private let plan: TodayPlan
-
-    /// Guards against a stale simulated read landing after the person has
-    /// already moved on (retried, chosen from the list, or ended the session).
-    /// Only `invalidatePendingRead()` moves it.
-    private var readGeneration = 0
-
-    /// The in-flight simulated read, exposed read-only so tests can await the
-    /// exact task whose staleness they are probing. The setter stays private;
-    /// only `recordReadStartedAndRun()` starts a read.
-    private(set) var pendingReadTask: Task<Void, Never>?
+    private var assessmentGeneration = 0
+    private var pendingConfirmedMedicineName: String?
+    private var stateObservationTask: Task<Void, Never>?
+    private var lastCoordinatorSequenceNumber: UInt64 = 0
+    private var lastCoordinatorStateRank = 0
 
     init(
         records: any CareRecordStoring,
-        simulator: any MedicineScanSimulating = MockMedicineScanSimulator.demo,
-        plan: TodayPlan,
-        readDelay: any MedicineReadDelaying = ContinuousMedicineReadDelay()
+        coordinator: MedicineAssessmentCoordinator,
+        medicineInput: DemoMedicineAssessmentInput,
+        plan: TodayPlan
     ) {
         self.records = records
-        self.simulator = simulator
-        self.readDelay = readDelay
+        self.coordinator = coordinator
+        self.medicineInput = medicineInput
         self.plan = plan
+        stateObservationTask = Task { [weak self, coordinator] in
+            let updates = await coordinator.stateUpdates()
+            for await update in updates {
+                guard !Task.isCancelled else { return }
+                self?.receiveMedicineUpdate(update)
+            }
+        }
     }
 
-    // MARK: - Derived presentation values
+    var stepLabel: String {
+        CompanionCopy.stepLabel(for: state, medicineState: medicineState)
+    }
 
-    var stepLabel: String { CompanionCopy.stepLabel(for: state) }
-    var situation: String { CompanionCopy.situation(for: state) }
-    var nextStep: String { CompanionCopy.nextStep(for: state) }
-    var reason: String? { CompanionCopy.reason(for: state) }
+    var situation: String {
+        CompanionCopy.situation(for: state, medicineState: medicineState)
+    }
+
+    var nextStep: String {
+        CompanionCopy.nextStep(for: state, medicineState: medicineState)
+    }
+
+    var reason: String? {
+        CompanionCopy.reason(for: state, medicineState: medicineState)
+    }
 
     var canEndEarly: Bool { state.isActive }
 
-    /// True while the simulated read is running, so the view can show progress.
-    var isReadingMedicine: Bool {
-        if case let .scanningMedicine(attempt) = state {
-            return !attempt.isAwaitingRecovery
-        }
+    var assessedMedicineID: String? {
+        guard case .result(let presentation) = medicineState else { return nil }
+        return presentation.response.resolution.selectedMedicine?.id
+    }
+
+    var isMedicineAssessmentCancelled: Bool {
+        if case .cancelled = medicineState { return true }
         return false
     }
 
-    /// Recovery choices offered when a read did not succeed.
-    var recoveryOptions: [CompanionRecoveryOption] {
-        guard case let .scanningMedicine(attempt) = state,
-              attempt.isAwaitingRecovery
-        else {
-            return []
+    var canRetryMedicineAssessment: Bool {
+        guard case .medicineAssessment = state else { return false }
+        switch medicineState {
+        case .requiresMedicineConfirmation, .failed, .cancelled:
+            return true
+        case .idle, .recognizing, .assessing, .result:
+            return false
         }
-        return [.retryPhoto, .chooseFromList, .contactSomeone]
     }
 
-    // MARK: - Intents
-
-    /// Starts a session, reporting whether one actually started.
-    ///
-    /// The answer matters to the caller: Today navigates to the Companion tab
-    /// on the back of this call, and must not move the person when the
-    /// transition was refused. The record is written only once a session has
-    /// really begun, so a refused start leaves the timeline untouched.
     @discardableResult
     func startCompanion() -> Bool {
         guard send(.startCompanion) else { return false }
+        invalidateAssessment()
+        medicineState = .idle
         if let outing = plan.outing {
             records.append(.dayPlanItemStarted(title: outing.title))
         } else {
@@ -83,47 +92,52 @@ final class CompanionSessionModel {
         return true
     }
 
-    func beginMedicineRead() {
-        guard send(.beginMedicineRead) else { return }
-        recordReadStartedAndRun()
+    func beginMedicineAssessment() {
+        guard send(.beginMedicineAssessment) else { return }
+        runMedicineAssessment()
     }
 
-    func retryMedicineRead() {
-        guard send(.retryMedicineRead) else { return }
-        recordReadStartedAndRun()
+    func retryMedicineAssessment() {
+        guard canRetryMedicineAssessment else { return }
+        runMedicineAssessment()
     }
 
-    func chooseFromFrequentList() {
-        let candidates = MedicineCandidate.demoFrequentlyUsed
-        guard send(.chooseFromFrequentList(candidates)) else { return }
-        // The read is being abandoned in favour of the list, so its result
-        // must not arrive later and overwrite this choice.
-        invalidatePendingRead()
-    }
-
-    /// Goes back to reading when none of the offered candidates match.
-    func retakeMedicinePhoto() {
-        guard send(.retakeMedicinePhoto) else { return }
-        recordReadStartedAndRun()
-    }
-
-    func confirmMedicine(_ candidate: MedicineCandidate) {
-        guard case let .awaitingMedicineConfirmation(prompt) = state,
-              send(.confirmMedicine(candidate))
+    func confirmMedicine(_ candidate: SlowWalkDomain.MedicineCandidate) {
+        guard case .requiresMedicineConfirmation(let requirement) = medicineState,
+            requirement.response?.resolution.candidates.contains(candidate) == true
         else {
             return
         }
-        records.append(
-            .medicineConfirmed(
-                medicineName: candidate.displayName,
-                origin: prompt.origin
+
+        invalidateAssessment()
+        let generation = assessmentGeneration
+        pendingConfirmedMedicineName = candidate.medicine.canonicalName
+        pendingAssessmentTask = Task { [weak self, coordinator] in
+            _ = await coordinator.confirmMedicine(
+                candidateID: candidate.medicine.id
             )
-        )
-        records.append(.careActionShown(medicineName: candidate.displayName))
+            guard !Task.isCancelled,
+                let self,
+                self.assessmentGeneration == generation
+            else {
+                return
+            }
+            let update = await coordinator.currentStateUpdate
+            self.receiveMedicineUpdate(update)
+        }
     }
 
-    func acknowledgeCareAction() {
-        guard send(.acknowledgeCareAction) else { return }
+    @discardableResult
+    func acknowledgeCareAction() -> Bool {
+        guard case .result = medicineState,
+            send(.acknowledgeCareAction(hasOuting: plan.outing != nil))
+        else {
+            return false
+        }
+        if plan.outing == nil {
+            records.append(.companionFinished(.medicineReviewed))
+        }
+        return true
     }
 
     func approachStop() {
@@ -137,91 +151,141 @@ final class CompanionSessionModel {
 
     func endEarly() {
         guard send(.endEarly) else { return }
-        // The session is over; nothing from the abandoned read may land after
-        // it and reopen a step the person has already left.
-        invalidatePendingRead()
+        invalidateAssessment()
+        medicineState = .cancelled
+        Task { [coordinator] in
+            await coordinator.cancelCurrentAssessment()
+        }
         records.append(.companionFinished(.endedEarly))
     }
 
-    // MARK: - Simulated read
-
-    /// Drops whatever simulated read is still in flight.
-    ///
-    /// Every abandonment of a read goes through here, so there is one place to
-    /// look for why a stale result was ignored. Call it only after the matching
-    /// transition succeeded: moving the generation for a refused or repeated
-    /// event would silently cancel a read that is still legitimately running.
-    private func invalidatePendingRead() {
-        readGeneration += 1
-    }
-
-    private func recordReadStartedAndRun() {
-        guard case let .scanningMedicine(attempt) = state else { return }
-
-        // Starting a read supersedes any earlier one. Invalidate first, then
-        // capture the generation this read owns.
-        invalidatePendingRead()
-        let generation = readGeneration
-        let attemptNumber = attempt.attemptNumber
-
-        records.append(.medicineReadStarted(attemptNumber: attemptNumber))
-
-        pendingReadTask = Task { [weak self] in
-            do {
-                try await self?.readDelay.wait()
-            } catch {
-                return
+    /// Stops in-flight work when the app is no longer active without ending
+    /// the whole companion session or accepting a late result.
+    func cancelPendingMedicineAssessment() {
+        guard case .medicineAssessment = state else { return }
+        switch medicineState {
+        case .idle, .recognizing, .assessing:
+            guard pendingAssessmentTask != nil else { return }
+            invalidateAssessment()
+            medicineState = .cancelled
+            Task { [coordinator] in
+                await coordinator.cancelCurrentAssessment()
             }
-            guard let self, self.readGeneration == generation else { return }
-            self.finishRead(forAttemptNumber: attemptNumber)
-        }
-    }
-
-    private func finishRead(forAttemptNumber attemptNumber: Int) {
-        guard let outcome = simulator.outcome(forAttemptNumber: attemptNumber) else {
+        case .requiresMedicineConfirmation, .result, .failed, .cancelled:
             return
         }
-        switch outcome {
-        case let .doesNotSucceed(setback):
-            guard send(.medicineReadDidNotSucceed(setback)) else { return }
-            records.append(.medicineReadDidNotSucceed(setback))
-        case let .findsCandidates(candidates):
-            guard send(.medicineCandidatesReady(candidates)) else { return }
-            records.append(
-                .medicineReadFoundCandidates(candidateCount: candidates.count)
+    }
+
+    private func runMedicineAssessment() {
+        invalidateAssessment()
+        let generation = assessmentGeneration
+        pendingConfirmedMedicineName = nil
+        records.append(.medicineAssessmentStarted)
+
+        pendingAssessmentTask = Task {
+            _ = await coordinator.assess(
+                imageInput: medicineInput.imageInput,
+                userProfile: medicineInput.userProfile,
+                recentRecords: medicineInput.recentRecords,
+                requestID: UUID()
             )
+            guard !Task.isCancelled,
+                assessmentGeneration == generation
+            else {
+                return
+            }
+            let update = await coordinator.currentStateUpdate
+            receiveMedicineUpdate(update)
         }
     }
 
-    // MARK: - Transition
+    private func receiveMedicineUpdate(
+        _ update: MedicineAssessmentStateUpdate
+    ) {
+        let rank = Self.stateRank(update.state)
+        guard update.sequenceNumber >= lastCoordinatorSequenceNumber else {
+            return
+        }
+        if update.sequenceNumber == lastCoordinatorSequenceNumber,
+            rank < lastCoordinatorStateRank
+        {
+            return
+        }
+        lastCoordinatorSequenceNumber = update.sequenceNumber
+        lastCoordinatorStateRank = rank
+        receiveMedicineState(update.state)
+    }
 
-    /// Applies an event, returning whether it changed the state.
-    ///
-    /// Deliberately not `@discardableResult`: a refused event must never be
-    /// followed by the side effects of a successful one, so every caller is
-    /// made to answer whether the transition happened.
+    private func receiveMedicineState(_ newState: MedicineAssessmentViewState) {
+        guard case .medicineAssessment = state,
+            medicineState != newState
+        else {
+            return
+        }
+
+        medicineState = newState
+
+        switch newState {
+        case .requiresMedicineConfirmation(let requirement):
+            if requirement.reason == .serverRequiresConfirmation {
+                records.append(.medicineAssessmentRequiresSourceReview)
+            } else {
+                let count = requirement.response?.resolution.candidates.count ?? 0
+                records.append(
+                    .medicineAssessmentNeedsConfirmation(candidateCount: count)
+                )
+            }
+
+        case .result(let presentation):
+            let name =
+                presentation.response.resolution.selectedMedicine?
+                .canonicalName ?? presentation.response.actionCard.title
+            if let confirmedName = pendingConfirmedMedicineName {
+                records.append(.medicineConfirmed(medicineName: confirmedName))
+            }
+            pendingConfirmedMedicineName = nil
+            records.append(.careActionShown(medicineName: name))
+
+        case .failed(let failure):
+            pendingConfirmedMedicineName = nil
+            records.append(
+                .medicineAssessmentFailed(isRecoverable: failure.isRecoverable)
+            )
+
+        case .cancelled:
+            pendingConfirmedMedicineName = nil
+
+        case .idle, .recognizing, .assessing:
+            break
+        }
+    }
+
+    private func invalidateAssessment() {
+        assessmentGeneration += 1
+        pendingAssessmentTask?.cancel()
+        pendingAssessmentTask = nil
+    }
+
+    private static func stateRank(
+        _ state: MedicineAssessmentViewState
+    ) -> Int {
+        switch state {
+        case .idle:
+            0
+        case .recognizing:
+            1
+        case .assessing:
+            2
+        case .requiresMedicineConfirmation, .result, .failed, .cancelled:
+            3
+        }
+    }
+
     private func send(_ event: CompanionFlowEvent) -> Bool {
         guard let next = CompanionFlowReducer.nextState(from: state, on: event) else {
             return false
         }
         state = next
         return true
-    }
-}
-
-/// A recovery choice offered after a read that did not succeed.
-enum CompanionRecoveryOption: Identifiable, Equatable, Hashable, CaseIterable {
-    case retryPhoto
-    case chooseFromList
-    case contactSomeone
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .retryPhoto: CompanionCopy.retryPhotoTitle
-        case .chooseFromList: CompanionCopy.chooseFromListTitle
-        case .contactSomeone: CompanionCopy.contactSomeoneTitle
-        }
     }
 }

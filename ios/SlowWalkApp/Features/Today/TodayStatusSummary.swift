@@ -1,4 +1,5 @@
 import Foundation
+import SlowWalkClientCore
 
 /// A one-line summary of where the current companion session stands.
 ///
@@ -11,10 +12,22 @@ struct TodayStatusSummary: Equatable, Hashable {
     let isSessionUnderway: Bool
     let hasFinishedSession: Bool
 
-    init(state: CompanionFlowState) {
-        stepLabel = CompanionCopy.stepLabel(for: state)
-        situation = CompanionCopy.situation(for: state)
-        nextStep = CompanionCopy.nextStep(for: state)
+    init(
+        state: CompanionFlowState,
+        medicineState: MedicineAssessmentViewState
+    ) {
+        stepLabel = CompanionCopy.stepLabel(
+            for: state,
+            medicineState: medicineState
+        )
+        situation = CompanionCopy.situation(
+            for: state,
+            medicineState: medicineState
+        )
+        nextStep = CompanionCopy.nextStep(
+            for: state,
+            medicineState: medicineState
+        )
         isSessionUnderway = state.isActive
         if case .completed = state {
             hasFinishedSession = true

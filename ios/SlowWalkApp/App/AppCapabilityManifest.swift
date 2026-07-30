@@ -20,7 +20,7 @@ struct AppCapabilityManifest: Equatable, Sendable {
     let remoteServer: Mode
 
     static let currentDemo = AppCapabilityManifest(
-        medicineRules: .unavailable,
+        medicineRules: .onDevice,
         medicineInput: .simulated,
         locationProgress: .simulated,
         automaticArrivalReminder: .unavailable,
