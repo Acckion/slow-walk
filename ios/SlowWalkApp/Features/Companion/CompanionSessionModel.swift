@@ -16,9 +16,10 @@ final class CompanionSessionModel {
     private let coordinator: MedicineAssessmentCoordinator
     private let medicineInput: DemoMedicineAssessmentInput
     private let plan: TodayPlan
+    private let taskLifetime = CompanionTaskLifetime()
     private var assessmentGeneration = 0
     private var pendingConfirmedMedicineName: String?
-    private var stateObservationTask: Task<Void, Never>?
+    private var coordinatorCancellationTask: Task<Void, Never>?
     private var lastCoordinatorSequenceNumber: UInt64 = 0
     private var lastCoordinatorStateRank = 0
 
@@ -32,13 +33,15 @@ final class CompanionSessionModel {
         self.coordinator = coordinator
         self.medicineInput = medicineInput
         self.plan = plan
-        stateObservationTask = Task { [weak self, coordinator] in
+        let observationTask = Task { [weak self, coordinator] in
             let updates = await coordinator.stateUpdates()
             for await update in updates {
                 guard !Task.isCancelled else { return }
-                self?.receiveMedicineUpdate(update)
+                guard let self else { return }
+                self.receiveMedicineUpdate(update)
             }
         }
+        taskLifetime.storeObservationTask(observationTask)
     }
 
     var stepLabel: String {
@@ -111,8 +114,13 @@ final class CompanionSessionModel {
 
         invalidateAssessment()
         let generation = assessmentGeneration
+        let cancellationTask = coordinatorCancellationTask
         pendingConfirmedMedicineName = candidate.medicine.canonicalName
-        pendingAssessmentTask = Task { [weak self, coordinator] in
+        let task = Task { [weak self, coordinator] in
+            if let cancellationTask {
+                await cancellationTask.value
+            }
+            guard !Task.isCancelled else { return }
             _ = await coordinator.confirmMedicine(
                 candidateID: candidate.medicine.id
             )
@@ -125,6 +133,8 @@ final class CompanionSessionModel {
             let update = await coordinator.currentStateUpdate
             self.receiveMedicineUpdate(update)
         }
+        pendingAssessmentTask = task
+        taskLifetime.replaceAssessmentTask(with: task)
     }
 
     @discardableResult
@@ -153,9 +163,7 @@ final class CompanionSessionModel {
         guard send(.endEarly) else { return }
         invalidateAssessment()
         medicineState = .cancelled
-        Task { [coordinator] in
-            await coordinator.cancelCurrentAssessment()
-        }
+        scheduleCoordinatorCancellation()
         records.append(.companionFinished(.endedEarly))
     }
 
@@ -168,9 +176,7 @@ final class CompanionSessionModel {
             guard pendingAssessmentTask != nil else { return }
             invalidateAssessment()
             medicineState = .cancelled
-            Task { [coordinator] in
-                await coordinator.cancelCurrentAssessment()
-            }
+            scheduleCoordinatorCancellation()
         case .requiresMedicineConfirmation, .result, .failed, .cancelled:
             return
         }
@@ -179,23 +185,42 @@ final class CompanionSessionModel {
     private func runMedicineAssessment() {
         invalidateAssessment()
         let generation = assessmentGeneration
+        let cancellationTask = coordinatorCancellationTask
+        let input = medicineInput
         pendingConfirmedMedicineName = nil
         records.append(.medicineAssessmentStarted)
 
-        pendingAssessmentTask = Task {
+        let task = Task { [weak self, coordinator] in
+            if let cancellationTask {
+                await cancellationTask.value
+            }
+            guard !Task.isCancelled else { return }
             _ = await coordinator.assess(
-                imageInput: medicineInput.imageInput,
-                userProfile: medicineInput.userProfile,
-                recentRecords: medicineInput.recentRecords,
+                imageInput: input.imageInput,
+                userProfile: input.userProfile,
+                recentRecords: input.recentRecords,
                 requestID: UUID()
             )
             guard !Task.isCancelled,
-                assessmentGeneration == generation
+                let self,
+                self.assessmentGeneration == generation
             else {
                 return
             }
             let update = await coordinator.currentStateUpdate
-            receiveMedicineUpdate(update)
+            self.receiveMedicineUpdate(update)
+        }
+        pendingAssessmentTask = task
+        taskLifetime.replaceAssessmentTask(with: task)
+    }
+
+    private func scheduleCoordinatorCancellation() {
+        let previousCancellation = coordinatorCancellationTask
+        coordinatorCancellationTask = Task { [coordinator] in
+            if let previousCancellation {
+                await previousCancellation.value
+            }
+            await coordinator.cancelCurrentAssessment()
         }
     }
 
@@ -262,8 +287,8 @@ final class CompanionSessionModel {
 
     private func invalidateAssessment() {
         assessmentGeneration += 1
-        pendingAssessmentTask?.cancel()
         pendingAssessmentTask = nil
+        taskLifetime.replaceAssessmentTask(with: nil)
     }
 
     private static func stateRank(
@@ -287,5 +312,38 @@ final class CompanionSessionModel {
         }
         state = next
         return true
+    }
+}
+
+nonisolated private final class CompanionTaskLifetime: @unchecked Sendable {
+    private let lock = NSLock()
+    private var assessmentTask: Task<Void, Never>?
+    private var observationTask: Task<Void, Never>?
+
+    func storeObservationTask(_ task: Task<Void, Never>) {
+        lock.lock()
+        let previousTask = observationTask
+        observationTask = task
+        lock.unlock()
+        previousTask?.cancel()
+    }
+
+    func replaceAssessmentTask(with task: Task<Void, Never>?) {
+        lock.lock()
+        let previousTask = assessmentTask
+        assessmentTask = task
+        lock.unlock()
+        previousTask?.cancel()
+    }
+
+    deinit {
+        lock.lock()
+        let tasks = [assessmentTask, observationTask]
+        assessmentTask = nil
+        observationTask = nil
+        lock.unlock()
+        for task in tasks {
+            task?.cancel()
+        }
     }
 }

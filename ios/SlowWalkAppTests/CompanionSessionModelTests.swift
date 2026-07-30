@@ -1,4 +1,5 @@
 import Foundation
+import SlowWalkClientCore
 import Testing
 
 @testable import SlowWalkApp
@@ -157,6 +158,41 @@ struct CompanionSessionModelTests {
                 if case .careActionShown = $0.kind { return true }
                 return false
             } == false
+        )
+    }
+
+    @Test func immediateRetryWaitsForCoordinatorCancellation() async {
+        let environment = makeEnvironment()
+        let session = environment.companion
+
+        #expect(session.startCompanion())
+        session.beginMedicineAssessment()
+        session.cancelPendingMedicineAssessment()
+        #expect(session.isMedicineAssessmentCancelled)
+
+        session.retryMedicineAssessment()
+        await waitForAssessment(session)
+
+        #expect(session.assessedMedicineID == "demo-acetaminophen")
+        #expect(session.state == .medicineAssessment)
+    }
+
+    @Test func riskIconsDoNotUseSuccessSymbolForWarnings() {
+        #expect(
+            CareActionPresentationSlot.riskSystemImage(for: .routine)
+                == "checkmark.shield.fill"
+        )
+        #expect(
+            CareActionPresentationSlot.riskSystemImage(for: .reviewRequired)
+                == "exclamationmark.triangle"
+        )
+        #expect(
+            CareActionPresentationSlot.riskSystemImage(for: .urgentAttention)
+                == "exclamationmark.triangle.fill"
+        )
+        #expect(
+            CareActionPresentationSlot.riskSystemImage(for: .immediateAttention)
+                == "exclamationmark.octagon.fill"
         )
     }
 

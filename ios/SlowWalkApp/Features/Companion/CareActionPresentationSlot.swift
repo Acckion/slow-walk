@@ -19,9 +19,9 @@ struct CareActionPresentationSlot: View {
         VStack(alignment: .leading, spacing: 16) {
             Label(
                 riskLabel,
-                systemImage: presentation.risk.requiresImmediateAttention
-                    ? "exclamationmark.octagon.fill"
-                    : "checkmark.shield.fill"
+                systemImage: Self.riskSystemImage(
+                    for: presentation.risk.attention
+                )
             )
             .font(.headline)
 
@@ -90,6 +90,21 @@ struct CareActionPresentationSlot: View {
             "风险提示：尽快关注"
         case .immediateAttention:
             "风险提示：立即关注"
+        }
+    }
+
+    static func riskSystemImage(
+        for attention: RiskAttentionSemantics
+    ) -> String {
+        switch attention {
+        case .routine:
+            "checkmark.shield.fill"
+        case .reviewRequired:
+            "exclamationmark.triangle"
+        case .urgentAttention:
+            "exclamationmark.triangle.fill"
+        case .immediateAttention:
+            "exclamationmark.octagon.fill"
         }
     }
 }
