@@ -59,8 +59,8 @@ public struct MedicineResolutionResponseDTO: Codable, Sendable, Equatable, Hasha
 /// API v1 request for the complete recognition-to-action-card pipeline.
 ///
 /// The medicine itself is deliberately absent. It is resolved from the
-/// server-owned catalog so a client cannot replace trusted ingredients,
-/// warnings, or source references.
+/// use case's trusted catalog, whether the pipeline runs on-device or behind
+/// HTTP, so untrusted input cannot replace ingredients, warnings, or sources.
 public struct MedicineAssessmentRequestDTO: Codable, Sendable, Equatable, Hashable {
     public let input: MedicineRecognitionInput
     public let userProfile: UserHealthProfileDTO

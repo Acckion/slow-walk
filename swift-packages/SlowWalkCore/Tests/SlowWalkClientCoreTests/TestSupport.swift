@@ -93,7 +93,9 @@ func makeMedicineResponse(
     status: MedicineResolutionStatus = .resolved,
     riskLevel: RiskLevel = .yellow,
     requiresConfirmation: Bool = false,
-    knowledgeWarning: Bool = false
+    knowledgeWarning: Bool = false,
+    includeAssessment: Bool = true,
+    cardRequiresConfirmation: Bool? = nil
 ) -> MedicineAssessmentResponseDTO {
     let source = SourceReference(
         sourceName: "SlowWalk demo catalog",
@@ -113,7 +115,7 @@ func makeMedicineResponse(
         dosageTextFromSource: nil,
         contraindicationTags: [],
         warnings: [
-            "DEMO DATA — NOT FOR CLINICAL USE",
+            "DEMO DATA — NOT FOR CLINICAL USE"
         ],
         dataVersion: "demo-v1"
     )
@@ -155,12 +157,12 @@ func makeMedicineResponse(
             : "missing-evidence"
     )
     let assessment: RiskAssessment? =
-        status == .resolved
+        status == .resolved && includeAssessment
         ? RiskAssessment(
             level: riskLevel,
             reasons: [reason],
             recommendedActions: [
-                .consultHealthcareProfessional,
+                .consultHealthcareProfessional
             ],
             assessedAt: clientTestDate,
             requiresProfessionalAdvice:
@@ -170,7 +172,8 @@ func makeMedicineResponse(
             evidenceCompleteness: .partial
         )
         : nil
-    let warnings = knowledgeWarning
+    let warnings =
+        knowledgeWarning
         ? [
             "DEMO DATA — NOT FOR CLINICAL USE",
             "Knowledge source requires review.",
@@ -182,14 +185,14 @@ func makeMedicineResponse(
             "Review the evidence before deciding.",
         warnings: warnings,
         recommendedActions: [
-            .consultHealthcareProfessional,
+            .consultHealthcareProfessional
         ],
         riskLevel: riskLevel,
         sourceReferences:
             status == .resolved ? [source] : [],
         mustConfirmMedicine:
-            status != .resolved
-                || requiresConfirmation,
+            cardRequiresConfirmation
+            ?? (status != .resolved || requiresConfirmation),
         generatedAt: clientTestDate
     )
     return MedicineAssessmentResponseDTO(
@@ -244,7 +247,7 @@ func makeLocationResponse(
     level: RiskLevel = .green,
     reasonCode:
         LocationRiskReasonCode =
-            .arrivedAtDestination,
+        .arrivedAtDestination,
     accuracy: LocationAccuracy = .excellent,
     qualityStatus:
         LocationDataQualityStatus = .valid
@@ -264,7 +267,7 @@ func makeLocationResponse(
                 message: "Demo location result.",
                 evidence: "Demo evidence only.",
                 ruleIdentifier: "location-demo"
-            ),
+            )
         ],
         recommendedActions:
             level == .red
@@ -302,8 +305,7 @@ func makeLocationResponse(
 actor CapturingMedicineRequester:
     MedicineAssessmentRequesting
 {
-    private(set) var request:
-        MedicineAssessmentRequestDTO?
+    private(set) var request: MedicineAssessmentRequestDTO?
     let response: MedicineAssessmentResponseDTO
 
     init(response: MedicineAssessmentResponseDTO) {
@@ -321,8 +323,7 @@ actor CapturingMedicineRequester:
 actor CapturingLocationRequester:
     LocationAssessmentRequesting
 {
-    private(set) var request:
-        LocationAssessmentRequestDTO?
+    private(set) var request: LocationAssessmentRequestDTO?
     let response: LocationAssessmentResponseDTO
 
     init(response: LocationAssessmentResponseDTO) {

@@ -68,8 +68,7 @@ public struct MedicinePipelineAssessmentResult: Sendable, Equatable {
     /// Opaque evidence required to confirm one of this result's candidates.
     public var confirmationContext: MedicineConfirmationContext? {
         guard !resolution.candidates.isEmpty,
-              resolution.status != .resolved
-                || resolution.requiresUserConfirmation
+            resolution.status != .resolved
         else {
             return nil
         }
@@ -106,21 +105,20 @@ public enum MedicineConfirmationError: Error, Sendable, Equatable {
 public struct MedicinePipeline: Sendable {
     private let catalogLoader: any MedicineCatalogLoading
     private let cache: any MedicineCache
-    private let dateProvider: any DateProviding
+    private let dateProvider: any Clock
     private let uuidProvider: any UUIDProviding
     private let normalizer: any MedicineNameNormalizing
     private let resolver: any MedicineResolving
     private let riskAssessor: any RiskAssessing
     private let actionCardFactory: ActionCardFactory
     private let contextBuilder: any MedicationRiskContextBuilding
-    private let knowledgeSearcher:
-        (any MedicineKnowledgeSearching)?
+    private let knowledgeSearcher: (any MedicineKnowledgeSearching)?
 
     public init(
         catalogLoader: any MedicineCatalogLoading =
             BundledDemoMedicineCatalogLoader(),
         cache: any MedicineCache = InMemoryMedicineCache(),
-        dateProvider: any DateProviding = SystemDateProvider(),
+        dateProvider: any Clock = SystemDateProvider(),
         uuidProvider: any UUIDProviding = SystemUUIDProvider(),
         normalizer: any MedicineNameNormalizing =
             MedicineNameNormalizer(),
@@ -139,7 +137,8 @@ public struct MedicinePipeline: Sendable {
         self.resolver = resolver
         self.riskAssessor = riskAssessor
         self.actionCardFactory = actionCardFactory
-        self.contextBuilder = contextBuilder
+        self.contextBuilder =
+            contextBuilder
             ?? MedicationRiskContextBuilder(clock: dateProvider)
         self.knowledgeSearcher = knowledgeSearcher
     }
@@ -189,9 +188,11 @@ public struct MedicinePipeline: Sendable {
         guard prior.confirmationContext != nil else {
             throw MedicineConfirmationError.confirmationNotRequired
         }
-        guard let candidate = prior.resolution.candidates.first(
-            where: { $0.medicine.id == candidateID }
-        ) else {
+        guard
+            let candidate = prior.resolution.candidates.first(
+                where: { $0.medicine.id == candidateID }
+            )
+        else {
             throw MedicineConfirmationError.candidateNotOffered
         }
 
@@ -201,13 +202,22 @@ public struct MedicinePipeline: Sendable {
             medicationRecords: recentRecords
         )
         let generatedAt = dateProvider.now()
-        let resolution = MedicineResolution(
+        let confirmedResolution = MedicineResolution(
             status: .resolved,
             candidates: prior.resolution.candidates,
             selectedMedicine: candidate.medicine,
             evidence: prior.resolution.evidence,
             requiresUserConfirmation: false
         )
+        let resolution: MedicineResolution
+        if let knowledgeResult = prior.knowledgeResult {
+            resolution = applyingKnowledgeConfirmation(
+                to: confirmedResolution,
+                knowledgeResult: knowledgeResult
+            )
+        } else {
+            resolution = confirmedResolution
+        }
         let resolutionResult = MedicinePipelineResolutionResult(
             resolution: resolution,
             cacheStatus: prior.cacheStatus,
@@ -244,8 +254,9 @@ public struct MedicinePipeline: Sendable {
         let assessment: RiskAssessment?
         let healthContextValidation: HealthContextValidation
         if resolutionResult.resolution.status == .resolved,
-           let medicine =
-            resolutionResult.resolution.selectedMedicine {
+            let medicine =
+                resolutionResult.resolution.selectedMedicine
+        {
             let buildResult = try contextBuilder.build(
                 medicine: medicine,
                 resolution: resolutionResult.resolution,
@@ -278,10 +289,10 @@ public struct MedicinePipeline: Sendable {
                 healthContextValidation.issues,
             knowledgeWarnings:
                 resolutionResult.knowledgeResult?
-                    .warnings.map(\.message) ?? [],
+                .warnings.map(\.message) ?? [],
             requiresKnowledgeConfirmation:
                 resolutionResult.knowledgeResult?
-                    .requiresConservativeAction ?? false
+                .requiresConservativeAction ?? false
         )
 
         return MedicinePipelineAssessmentResult(
@@ -378,7 +389,8 @@ public struct MedicinePipeline: Sendable {
         )
         let resolution: MedicineResolution
         if lookup.status == .hit,
-           let cachedResolution = lookup.resolution {
+            let cachedResolution = lookup.resolution
+        {
             resolution = resolver.resolve(
                 input: input,
                 normalizedName: normalizedName,
@@ -552,7 +564,8 @@ public struct MedicinePipeline: Sendable {
                 candidate.medicine
         }
         if let selectedMedicine =
-            cachedResolution.selectedMedicine {
+            cachedResolution.selectedMedicine
+        {
             medicinesByID[selectedMedicine.id] = selectedMedicine
         }
         return medicinesByID.values.sorted {

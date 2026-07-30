@@ -23,6 +23,10 @@ public actor LocalMedicineAssessmentRequester:
         self.pipeline = pipeline
     }
 
+    public init(clock: any Clock) {
+        pipeline = MedicinePipeline(dateProvider: clock)
+    }
+
     public func assess(
         request: MedicineAssessmentRequestDTO
     ) async throws -> MedicineAssessmentResponseDTO {
@@ -52,14 +56,16 @@ public actor LocalMedicineAssessmentRequester:
     ) async throws -> MedicineAssessmentResponseDTO {
         try Task.checkCancellation()
         guard let pendingConfirmation,
-              pendingConfirmation.request.requestID
+            pendingConfirmation.request.requestID
                 == command.originalRequestID
         else {
             throw LocalMedicineConfirmationError.noPendingAssessment
         }
-        guard pendingConfirmation.context.candidates.contains(
-            where: { $0.medicine.id == command.candidateID }
-        ) else {
+        guard
+            pendingConfirmation.context.candidates.contains(
+                where: { $0.medicine.id == command.candidateID }
+            )
+        else {
             throw LocalMedicineConfirmationError.candidateNotOffered
         }
 
@@ -80,10 +86,12 @@ public actor LocalMedicineAssessmentRequester:
     private func validateVersion(
         _ request: MedicineAssessmentRequestDTO
     ) throws {
-        guard SlowWalkAPI.supports(
-            bodyVersion: request.apiVersion,
-            for: .medicineAssess
-        ) else {
+        guard
+            SlowWalkAPI.supports(
+                bodyVersion: request.apiVersion,
+                for: .medicineAssess
+            )
+        else {
             throw ClientAPIError(
                 error: APIErrorDTO(
                     code: .unsupportedAPIVersion,

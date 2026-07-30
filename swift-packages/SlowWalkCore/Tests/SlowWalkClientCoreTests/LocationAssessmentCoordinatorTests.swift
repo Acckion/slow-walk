@@ -26,8 +26,9 @@ final class LocationAssessmentCoordinatorTests:
             requestID: clientTestUUID(50)
         )
 
-        guard case let
-            .insufficientSamples(details) = state
+        guard
+            case
+                .insufficientSamples(let details) = state
         else {
             return XCTFail(
                 "Expected insufficient samples."
@@ -63,7 +64,7 @@ final class LocationAssessmentCoordinatorTests:
             requestID: response.requestID
         )
 
-        guard case let .result(presentation) = state
+        guard case .result(let presentation) = state
         else {
             return XCTFail("Expected location result.")
         }
@@ -85,6 +86,7 @@ final class LocationAssessmentCoordinatorTests:
         async throws
     {
         let response = makeLocationResponse(
+            requestID: clientTestUUID(50),
             level: .yellow,
             reasonCode:
                 .locationAccuracyInsufficient,
@@ -98,7 +100,7 @@ final class LocationAssessmentCoordinatorTests:
                 )
         )
 
-        guard case let .result(presentation) = state
+        guard case .result(let presentation) = state
         else {
             return XCTFail("Expected location result.")
         }
@@ -117,6 +119,7 @@ final class LocationAssessmentCoordinatorTests:
         async throws
     {
         let response = makeLocationResponse(
+            requestID: clientTestUUID(50),
             level: .green,
             reasonCode: .arrivedAtDestination
         )
@@ -127,7 +130,7 @@ final class LocationAssessmentCoordinatorTests:
                 )
         )
 
-        guard case let .result(presentation) = state
+        guard case .result(let presentation) = state
         else {
             return XCTFail("Expected location result.")
         }
@@ -146,6 +149,7 @@ final class LocationAssessmentCoordinatorTests:
         async throws
     {
         let response = makeLocationResponse(
+            requestID: clientTestUUID(50),
             level: .red,
             reasonCode: .multipleHighRiskSignals
         )
@@ -156,7 +160,7 @@ final class LocationAssessmentCoordinatorTests:
                 )
         )
 
-        guard case let .result(presentation) = state
+        guard case .result(let presentation) = state
         else {
             return XCTFail("Expected location result.")
         }
@@ -203,7 +207,7 @@ final class LocationAssessmentCoordinatorTests:
         }
 
         var reachedAssessing = false
-        for _ in 0 ..< 1_000 {
+        for _ in 0..<1_000 {
             if case .assessing =
                 await coordinator.state
             {
@@ -239,7 +243,7 @@ final class LocationAssessmentCoordinatorTests:
                 )
         )
 
-        guard case let .failed(failure) = state else {
+        guard case .failed(let failure) = state else {
             return XCTFail("Expected API failure.")
         }
         XCTAssertEqual(

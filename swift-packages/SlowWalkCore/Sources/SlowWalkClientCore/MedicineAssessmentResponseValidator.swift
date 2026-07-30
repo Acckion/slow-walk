@@ -16,8 +16,9 @@ public struct MedicineAssessmentResponseValidator: Sendable {
         guard response.apiVersion == request.apiVersion else {
             throw MedicineAssessmentResponseValidationError.apiVersionMismatch
         }
-        guard !response.sourceDataVersion
-            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard
+            !response.sourceDataVersion
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
             throw MedicineAssessmentResponseValidationError
                 .missingSourceDataVersion
@@ -38,17 +39,21 @@ public struct MedicineAssessmentResponseValidator: Sendable {
         switch response.resolution.status {
         case .resolved:
             guard let selected = response.resolution.selectedMedicine,
-                  candidateIDs.contains(selected.id)
+                candidateIDs.contains(selected.id)
             else {
                 throw MedicineAssessmentResponseValidationError
                     .invalidResolution
             }
+            guard response.assessment != nil else {
+                throw MedicineAssessmentResponseValidationError
+                    .assessmentMismatch
+            }
         case .ambiguous,
-             .insufficientEvidence,
-             .notFound,
-             .recognitionFailed:
+            .insufficientEvidence,
+            .notFound,
+            .recognitionFailed:
             guard response.resolution.selectedMedicine == nil,
-                  response.assessment == nil
+                response.assessment == nil
             else {
                 throw MedicineAssessmentResponseValidationError
                     .invalidResolution
@@ -57,18 +62,19 @@ public struct MedicineAssessmentResponseValidator: Sendable {
 
         if let assessment = response.assessment {
             guard response.resolution.status == .resolved,
-                  assessment.level == response.actionCard.riskLevel
+                assessment.level == response.actionCard.riskLevel
             else {
                 throw MedicineAssessmentResponseValidationError
                     .assessmentMismatch
             }
         }
 
-        if response.resolution.requiresUserConfirmation {
-            guard response.actionCard.mustConfirmMedicine else {
-                throw MedicineAssessmentResponseValidationError
-                    .confirmationMismatch
-            }
+        guard
+            response.resolution.requiresUserConfirmation
+                == response.actionCard.mustConfirmMedicine
+        else {
+            throw MedicineAssessmentResponseValidationError
+                .confirmationMismatch
         }
     }
 }

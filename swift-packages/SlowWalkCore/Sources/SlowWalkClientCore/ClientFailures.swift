@@ -55,7 +55,7 @@ public enum OCRRecognitionError:
 
 /// Presentation-safe failure categories.
 ///
-/// Server messages and field details are deliberately not retained because
+/// Error messages and field details are deliberately not retained because
 /// they may contain OCR, health-profile, or location values.
 public enum ClientFailureKind:
     String,
@@ -127,7 +127,7 @@ public enum ClientFailureMapper {
                     endpoint: nil,
                     isRecoverable: false
                 )
-            case let .timedOut(timeout):
+            case .timedOut(let timeout):
                 return ClientFailure(
                     kind: .timeout,
                     apiErrorCode: nil,
@@ -166,6 +166,16 @@ public enum ClientFailureMapper {
             )
         }
 
+        if error is LocationAssessmentResponseValidationError {
+            return ClientFailure(
+                kind: .malformedResponse,
+                apiErrorCode: nil,
+                requestID: nil,
+                endpoint: .locationAssess,
+                isRecoverable: false
+            )
+        }
+
         return ClientFailure(
             kind: .unknown,
             apiErrorCode: nil,
@@ -180,30 +190,30 @@ public enum ClientFailureMapper {
     ) -> Bool {
         switch code {
         case .knowledgeSourceUnavailable,
-             .knowledgeSourceTimeout,
-             .offlineCacheUnavailable,
-             .internalError:
+            .knowledgeSourceTimeout,
+            .offlineCacheUnavailable,
+            .internalError:
             return true
         case .malformedRequest,
-             .unsupportedMediaType,
-             .unsupportedAPIVersion,
-             .validationError,
-             .invalidUserProfile,
-             .unsupportedProfileSchema,
-             .invalidMedicationRecord,
-             .futureMedicationRecord,
-             .invalidBodyMetrics,
-             .invalidSourceResponse,
-             .sourceVersionUnsupported,
-             .medicineNotFound,
-             .sourceConflict,
-             .medicineAmbiguous,
-             .medicineRecognitionFailed,
-             .medicineInsufficientEvidence,
-             .invalidLocationSample,
-             .locationDataStale,
-             .locationAccuracyInsufficient,
-             .insufficientLocationHistory:
+            .unsupportedMediaType,
+            .unsupportedAPIVersion,
+            .validationError,
+            .invalidUserProfile,
+            .unsupportedProfileSchema,
+            .invalidMedicationRecord,
+            .futureMedicationRecord,
+            .invalidBodyMetrics,
+            .invalidSourceResponse,
+            .sourceVersionUnsupported,
+            .medicineNotFound,
+            .sourceConflict,
+            .medicineAmbiguous,
+            .medicineRecognitionFailed,
+            .medicineInsufficientEvidence,
+            .invalidLocationSample,
+            .locationDataStale,
+            .locationAccuracyInsufficient,
+            .insufficientLocationHistory:
             return false
         }
     }

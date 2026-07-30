@@ -1,6 +1,7 @@
 import Foundation
 import SlowWalkDomain
 import XCTest
+
 @testable import SlowWalkRiskEngine
 
 final class MedicationRiskEngineTests: XCTestCase {
@@ -37,6 +38,16 @@ final class MedicationRiskEngineTests: XCTestCase {
         )
         XCTAssertTrue(assessment.requiresProfessionalAdvice)
         XCTAssertTrue(assessment.requiresFamilyAttention)
+    }
+
+    func testSourcedMedicineAliasInAllergyProfileReturnsRed() {
+        let profile = makeProfile(allergies: [" medicine a "])
+        let assessment = MedicationRiskEngine().assess(
+            context: makeContext(profile: profile)
+        )
+
+        XCTAssertEqual(assessment.level, .red)
+        XCTAssertTrue(assessment.reasons.map(\.code).contains(.allergyMatch))
     }
 
     func testDuplicateActiveIngredientReturnsRed() {
@@ -443,7 +454,7 @@ final class MedicationRiskEngineTests: XCTestCase {
             )
         case .missing:
             bodyMetrics = nil
-        case let .value(value):
+        case .value(let value):
             bodyMetrics = value
         }
 

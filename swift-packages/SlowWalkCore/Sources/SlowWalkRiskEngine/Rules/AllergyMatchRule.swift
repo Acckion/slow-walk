@@ -1,6 +1,7 @@
 import SlowWalkDomain
 
-/// Raises a red reminder when a normalized allergy matches medicine labels.
+/// Raises a red reminder when a normalized allergy matches sourced medicine
+/// identity or canonical safety labels.
 public struct AllergyMatchRule: MedicationRiskRule {
     public let identifier = "allergy-match"
 
@@ -9,7 +10,10 @@ public struct AllergyMatchRule: MedicationRiskRule {
     public func evaluate(context: MedicationRiskContext) -> RiskFinding? {
         let allergies = RuleSupport.normalizedSet(context.userProfile.allergies)
         let medicineLabels = RuleSupport.normalizedSet(
-            context.medicine.contraindicationTags + context.medicine.activeIngredientIDs
+            [context.medicine.canonicalName]
+                + context.medicine.aliases
+                + context.medicine.contraindicationTags
+                + context.medicine.activeIngredientIDs
         )
         let matches = allergies.intersection(medicineLabels).sorted()
 

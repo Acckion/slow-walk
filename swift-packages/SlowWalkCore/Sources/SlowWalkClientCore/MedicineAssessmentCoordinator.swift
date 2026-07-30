@@ -29,12 +29,11 @@ public actor MedicineAssessmentCoordinator {
     private let apiVersion: String
 
     private var activeTask: Task<OperationOutcome, Never>?
-    private var generation = 0
-    private var activeGeneration: Int?
+    private var generation: UInt64 = 0
+    private var activeGeneration: UInt64?
     private var pendingConfirmation: PendingConfirmation?
-    private var stateContinuations: [
-        UUID: AsyncStream<MedicineAssessmentViewState>.Continuation
-    ] = [:]
+    private var stateContinuations:
+        [UUID: AsyncStream<MedicineAssessmentStateUpdate>.Continuation] = [:]
 
     public init(
         recognizer: any MedicineTextRecognizing,
@@ -45,7 +44,7 @@ public actor MedicineAssessmentCoordinator {
         confirmer: (any MedicineCandidateConfirming)? = nil,
         responseValidator: MedicineAssessmentResponseValidator = .init(),
         clock: any Clock,
-        apiVersion: String
+        apiVersion: String = SlowWalkAPI.version
     ) {
         self.recognizer = recognizer
         self.mapper = mapper
@@ -57,22 +56,48 @@ public actor MedicineAssessmentCoordinator {
         self.apiVersion = apiVersion
     }
 
+    /// Starts an assessment from domain models used by an on-device client.
+    ///
+    /// DTO conversion stays inside ClientCore so an app composition root does
+    /// not need to treat the local pipeline as an HTTP service.
+    @discardableResult
+    public func assess(
+        imageInput: OCRImageInput,
+        userProfile: UserHealthProfile,
+        recentRecords: [MedicationRecord],
+        requestID: UUID
+    ) async -> MedicineAssessmentViewState {
+        await assess(
+            imageInput: imageInput,
+            userProfile: UserHealthProfileDTO(userProfile),
+            recentRecords: recentRecords.map(MedicationRecordDTO.init),
+            requestID: requestID
+        )
+    }
+
     /// State stream for a MainActor facade or another presentation consumer.
     /// The current value is yielded immediately; later updates are buffered so
     /// short recognizing/assessing transitions are not lost.
     public func stateUpdates()
-        -> AsyncStream<MedicineAssessmentViewState>
+        -> AsyncStream<MedicineAssessmentStateUpdate>
     {
         let id = UUID()
-        let pair = AsyncStream<MedicineAssessmentViewState>.makeStream(
+        let pair = AsyncStream<MedicineAssessmentStateUpdate>.makeStream(
             bufferingPolicy: .bufferingNewest(8)
         )
         stateContinuations[id] = pair.continuation
-        pair.continuation.yield(state)
+        pair.continuation.yield(currentStateUpdate)
         pair.continuation.onTermination = { [weak self] _ in
             Task { await self?.removeStateContinuation(id) }
         }
         return pair.stream
+    }
+
+    public var currentStateUpdate: MedicineAssessmentStateUpdate {
+        MedicineAssessmentStateUpdate(
+            sequenceNumber: generation,
+            state: state
+        )
     }
 
     @discardableResult
@@ -140,9 +165,7 @@ public actor MedicineAssessmentCoordinator {
                     recognitionInput: recognitionInput
                 )
                 let pendingRequest: MedicineAssessmentRequestDTO?
-                if case .requiresMedicineConfirmation = nextState,
-                   !response.resolution.candidates.isEmpty
-                {
+                if Self.needsCandidateConfirmation(nextState) {
                     pendingRequest = request
                 } else {
                     pendingRequest = nil
@@ -173,8 +196,8 @@ public actor MedicineAssessmentCoordinator {
         candidateID: String
     ) async -> MedicineAssessmentViewState {
         guard let pendingConfirmation,
-              pendingConfirmation.candidateIDs.contains(candidateID),
-              let confirmer
+            pendingConfirmation.candidateIDs.contains(candidateID),
+            let confirmer
         else {
             return state
         }
@@ -235,6 +258,7 @@ public actor MedicineAssessmentCoordinator {
         activeTask = nil
         activeGeneration = nil
         pendingConfirmation = nil
+        generation += 1
         publish(.idle)
     }
 
@@ -247,7 +271,7 @@ public actor MedicineAssessmentCoordinator {
 
     private func finish(
         _ task: Task<OperationOutcome, Never>,
-        generation operationGeneration: Int
+        generation operationGeneration: UInt64
     ) async -> MedicineAssessmentViewState {
         let outcome = await withTaskCancellationHandler(
             operation: { await task.value },
@@ -255,9 +279,9 @@ public actor MedicineAssessmentCoordinator {
         )
         if activeGeneration == operationGeneration {
             if let request = outcome.pendingRequest,
-               case let .requiresMedicineConfirmation(requirement) =
-                outcome.state,
-               let response = requirement.response
+                case .requiresMedicineConfirmation(let requirement) =
+                    outcome.state,
+                let response = requirement.response
             {
                 pendingConfirmation = PendingConfirmation(
                     request: request,
@@ -279,7 +303,7 @@ public actor MedicineAssessmentCoordinator {
 
     private func transition(
         to newState: MedicineAssessmentViewState,
-        generation operationGeneration: Int
+        generation operationGeneration: UInt64
     ) {
         guard activeGeneration == operationGeneration else { return }
         publish(newState)
@@ -287,8 +311,9 @@ public actor MedicineAssessmentCoordinator {
 
     private func publish(_ newState: MedicineAssessmentViewState) {
         state = newState
+        let update = currentStateUpdate
         for continuation in stateContinuations.values {
-            continuation.yield(newState)
+            continuation.yield(update)
         }
     }
 
@@ -299,12 +324,17 @@ public actor MedicineAssessmentCoordinator {
     private static func needsCandidateConfirmation(
         _ state: MedicineAssessmentViewState
     ) -> Bool {
-        guard case let .requiresMedicineConfirmation(requirement) = state,
-              let response = requirement.response
+        guard case .requiresMedicineConfirmation(let requirement) = state,
+            let response = requirement.response
         else {
             return false
         }
-        return !response.resolution.candidates.isEmpty
+        switch requirement.reason {
+        case .ambiguousMedicine, .unresolvedMedicine:
+            return !response.resolution.candidates.isEmpty
+        case .noRecognizedText, .serverRequiresConfirmation:
+            return false
+        }
     }
 
     private static func viewState(

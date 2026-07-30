@@ -21,8 +21,7 @@ public struct RiskPresentation:
     Hashable
 {
     public let level: RiskLevel
-    public let attention:
-        RiskAttentionSemantics
+    public let attention: RiskAttentionSemantics
     public let requiresImmediateAttention: Bool
 
     public init(level: RiskLevel) {
@@ -49,8 +48,7 @@ public struct MedicineAssessmentPresentation:
     Equatable,
     Hashable
 {
-    public let response:
-        MedicineAssessmentResponseDTO
+    public let response: MedicineAssessmentResponseDTO
     public let risk: RiskPresentation
 
     public init(
@@ -83,10 +81,8 @@ public struct MedicineConfirmationRequirement:
     Hashable
 {
     public let reason: MedicineConfirmationReason
-    public let recognitionInput:
-        MedicineRecognitionInput
-    public let response:
-        MedicineAssessmentResponseDTO?
+    public let recognitionInput: MedicineRecognitionInput
+    public let response: MedicineAssessmentResponseDTO?
 
     public init(
         reason: MedicineConfirmationReason,
@@ -116,13 +112,26 @@ public enum MedicineAssessmentViewState:
     case cancelled
 }
 
+/// Monotonic coordinator state update used to reject late progress events.
+public struct MedicineAssessmentStateUpdate: Sendable, Equatable {
+    public let sequenceNumber: UInt64
+    public let state: MedicineAssessmentViewState
+
+    public init(
+        sequenceNumber: UInt64,
+        state: MedicineAssessmentViewState
+    ) {
+        self.sequenceNumber = sequenceNumber
+        self.state = state
+    }
+}
+
 public struct LocationAssessmentPresentation:
     Sendable,
     Equatable,
     Hashable
 {
-    public let response:
-        LocationAssessmentResponseDTO
+    public let response: LocationAssessmentResponseDTO
     public let risk: RiskPresentation
 
     public init(

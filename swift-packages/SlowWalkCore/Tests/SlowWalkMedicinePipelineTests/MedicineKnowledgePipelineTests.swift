@@ -56,7 +56,7 @@ final class MedicineKnowledgePipelineTests:
                         "authoritative",
                         "secondary",
                     ]
-                ),
+                )
             ],
             candidateRequiresConfirmation: true
         )
@@ -103,7 +103,7 @@ final class MedicineKnowledgePipelineTests:
                     code: .offlineCacheUsed,
                     message:
                         "Stale demo cache is in offline use."
-                ),
+                )
             ],
             candidateRequiresConfirmation: true,
             isOffline: true
@@ -135,6 +135,64 @@ final class MedicineKnowledgePipelineTests:
                 "Stale demo cache is in offline use."
             )
         )
+        XCTAssertTrue(result.resolution.requiresUserConfirmation)
+        XCTAssertNil(result.confirmationContext)
+    }
+
+    func testCandidateConfirmationDoesNotClearKnowledgeReview()
+        async throws
+    {
+        let catalog = try loadDemoCatalog()
+        let medicines = catalog.medicines.filter {
+            $0.aliases.contains("Cold Relief")
+        }
+        let candidates = medicines.map {
+            MedicineKnowledgeCandidate(
+                medicine: $0,
+                completeness: 0.5,
+                validationStatus: .warning,
+                sourceIdentifiers: ["authoritative"],
+                conflicts: [],
+                warnings: [],
+                requiresConfirmation: true
+            )
+        }
+        let knowledge = MedicineKnowledgeSearchResult(
+            normalizedQuery: "cold relief",
+            candidates: candidates,
+            sourceStatus: .partial,
+            cacheStatus: .miss,
+            completeness: 0.5,
+            sourceReferences: medicines.flatMap(\.sourceReferences),
+            warnings: [],
+            sourceVersions: ["authoritative": "demo-v1"],
+            generatedAt: pipelineTestDate,
+            isOffline: false
+        )
+        let pipeline = makePipeline(
+            knowledgeSearcher: StaticKnowledgeSearcher(
+                result: .success(knowledge)
+            )
+        )
+        let initial = try await pipeline.assess(
+            input: makeRecognitionInput(["Cold Relief"]),
+            userProfile: makePipelineProfile(),
+            recentRecords: []
+        )
+        let context = try XCTUnwrap(initial.confirmationContext)
+        let candidate = try XCTUnwrap(context.candidates.first)
+
+        let confirmed = try await pipeline.assessConfirmedCandidate(
+            candidateID: candidate.medicine.id,
+            context: context,
+            userProfile: makePipelineProfile(),
+            recentRecords: []
+        )
+
+        XCTAssertEqual(confirmed.resolution.status, .resolved)
+        XCTAssertTrue(confirmed.resolution.requiresUserConfirmation)
+        XCTAssertTrue(confirmed.actionCard.mustConfirmMedicine)
+        XCTAssertNil(confirmed.confirmationContext)
     }
 
     func testRedRiskOverridesOtherwiseNormalKnowledge()
@@ -203,7 +261,7 @@ final class MedicineKnowledgePipelineTests:
         do {
             _ = try await pipeline.assess(
                 input: makeRecognitionInput([
-                    "Acetaminophen",
+                    "Acetaminophen"
                 ]),
                 userProfile: makePipelineProfile(),
                 recentRecords: []
@@ -254,7 +312,7 @@ final class MedicineKnowledgePipelineTests:
                         preferredValue: "acetaminophen",
                         conflictingValue:
                             "conflicting-demo-ingredient"
-                    ),
+                    )
                 ]
                 : [],
             warnings: warnings,
@@ -271,7 +329,7 @@ final class MedicineKnowledgePipelineTests:
                 medicine.sourceReferences,
             warnings: warnings,
             sourceVersions: [
-                "authoritative": "demo-v1",
+                "authoritative": "demo-v1"
             ],
             generatedAt: pipelineTestDate,
             isOffline: isOffline

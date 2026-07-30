@@ -5,24 +5,21 @@ import SlowWalkLocationRisk
 
 /// Pure Swift orchestration for bounded location assessment requests.
 ///
-/// Location risk remains server-owned; this coordinator only collects,
-/// bounds, sends, and presents canonical DTOs.
+/// The requester may run `LocationRiskEngine` directly on the device or use an
+/// explicitly configured remote adapter. The coordinator collects, bounds,
+/// validates, and presents canonical DTOs without choosing a transport.
 public actor LocationAssessmentCoordinator {
-    public private(set) var state:
-        LocationAssessmentViewState = .idle
+    public private(set) var state: LocationAssessmentViewState = .idle
 
-    private let sampleProvider:
-        any LocationSampleProviding
-    private let requestBuilder:
-        any LocationAssessmentRequestBuilding
-    private let requester:
-        any LocationAssessmentRequesting
+    private let sampleProvider: any LocationSampleProviding
+    private let requestBuilder: any LocationAssessmentRequestBuilding
+    private let requester: any LocationAssessmentRequesting
+    private let responseValidator: LocationAssessmentResponseValidator
     private let clock: any Clock
     private let apiVersion: String
     private let minimumSampleCount: Int
 
-    private var activeTask:
-        Task<LocationAssessmentViewState, Never>?
+    private var activeTask: Task<LocationAssessmentViewState, Never>?
     private var generation = 0
     private var activeGeneration: Int?
 
@@ -33,6 +30,8 @@ public actor LocationAssessmentCoordinator {
             any LocationAssessmentRequestBuilding,
         requester:
             any LocationAssessmentRequesting,
+        responseValidator:
+            LocationAssessmentResponseValidator = .init(),
         clock: any Clock,
         apiVersion: String,
         minimumSampleCount: Int
@@ -44,6 +43,7 @@ public actor LocationAssessmentCoordinator {
         self.sampleProvider = sampleProvider
         self.requestBuilder = requestBuilder
         self.requester = requester
+        self.responseValidator = responseValidator
         self.clock = clock
         self.apiVersion = apiVersion
         self.minimumSampleCount =
@@ -64,6 +64,7 @@ public actor LocationAssessmentCoordinator {
         let sampleProvider = self.sampleProvider
         let requestBuilder = self.requestBuilder
         let requester = self.requester
+        let responseValidator = self.responseValidator
         let clock = self.clock
         let apiVersion = self.apiVersion
         let minimumSampleCount =
@@ -78,7 +79,8 @@ public actor LocationAssessmentCoordinator {
                 try await sampleProvider.startSampling()
                 try Task.checkCancellation()
                 let referenceDate = clock.now()
-                let samples = await sampleProvider
+                let samples =
+                    await sampleProvider
                     .recentSamples(
                         asOf: referenceDate
                     )
@@ -89,8 +91,9 @@ public actor LocationAssessmentCoordinator {
                     apiVersion: apiVersion,
                     referenceDate: referenceDate
                 )
-                guard request.recentSamples.count
-                    >= minimumSampleCount
+                guard
+                    request.recentSamples.count
+                        >= minimumSampleCount
                 else {
                     return .insufficientSamples(
                         InsufficientLocationSamples(
@@ -103,16 +106,21 @@ public actor LocationAssessmentCoordinator {
                 }
 
                 try Task.checkCancellation()
-                await self.transition(
+                self.transition(
                     to: .assessing(
                         startedAt: clock.now()
                     ),
                     generation:
                         operationGeneration
                 )
-                let response = try await requester
+                let response =
+                    try await requester
                     .assess(request: request)
                 try Task.checkCancellation()
+                try responseValidator.validate(
+                    response,
+                    for: request
+                )
                 return .result(
                     LocationAssessmentPresentation(
                         response: response
@@ -172,8 +180,9 @@ public actor LocationAssessmentCoordinator {
         to newState: LocationAssessmentViewState,
         generation operationGeneration: Int
     ) {
-        guard activeGeneration
-            == operationGeneration
+        guard
+            activeGeneration
+                == operationGeneration
         else {
             return
         }

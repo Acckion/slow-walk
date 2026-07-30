@@ -6,7 +6,9 @@ import XCTest
 
 final class LocalMedicineAssessmentRequesterTests: XCTestCase {
     func testAssessmentRunsPipelineLocally() async throws {
-        let requester = LocalMedicineAssessmentRequester()
+        let requester = LocalMedicineAssessmentRequester(
+            clock: FixedClientClock(date: clientTestDate)
+        )
         let request = makeRequest(
             texts: ["Acetaminophen"],
             requestID: clientTestUUID(60)
@@ -22,6 +24,7 @@ final class LocalMedicineAssessmentRequesterTests: XCTestCase {
             "demo-acetaminophen"
         )
         XCTAssertFalse(response.sourceDataVersion.isEmpty)
+        XCTAssertEqual(response.generatedAt, clientTestDate)
         XCTAssertNoThrow(
             try MedicineAssessmentResponseValidator().validate(
                 response,
@@ -147,6 +150,55 @@ final class LocalMedicineAssessmentRequesterTests: XCTestCase {
             XCTAssertEqual(
                 error as? MedicineAssessmentResponseValidationError,
                 .requestIDMismatch
+            )
+        }
+    }
+
+    func testResponseValidatorRejectsConfirmationMismatch() {
+        let requestID = clientTestUUID(67)
+        let request = makeRequest(
+            texts: ["Demo Medicine"],
+            requestID: requestID
+        )
+        let response = makeMedicineResponse(
+            requestID: requestID,
+            requiresConfirmation: true,
+            cardRequiresConfirmation: false
+        )
+
+        XCTAssertThrowsError(
+            try MedicineAssessmentResponseValidator().validate(
+                response,
+                for: request
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? MedicineAssessmentResponseValidationError,
+                .confirmationMismatch
+            )
+        }
+    }
+
+    func testResponseValidatorRejectsResolvedResponseWithoutAssessment() {
+        let requestID = clientTestUUID(68)
+        let request = makeRequest(
+            texts: ["Demo Medicine"],
+            requestID: requestID
+        )
+        let response = makeMedicineResponse(
+            requestID: requestID,
+            includeAssessment: false
+        )
+
+        XCTAssertThrowsError(
+            try MedicineAssessmentResponseValidator().validate(
+                response,
+                for: request
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? MedicineAssessmentResponseValidationError,
+                .assessmentMismatch
             )
         }
     }
