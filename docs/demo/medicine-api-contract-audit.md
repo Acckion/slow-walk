@@ -1,6 +1,6 @@
 # Medicine MVP 接口冻结核验
 
-核验日期：2026-07-29
+核验日期：2026-07-29；状态更新：2026-07-30
 核验范围：成员 C / `feature/demo-fixtures`（PR #7 修复轨道
 `fix/pr7-canonical-fixtures-k3`）
 
@@ -11,7 +11,7 @@
 | 项目 | 冻结值 | 代码来源 |
 | --- | --- | --- |
 | App 名称 | `SlowWalkApp` | `ios/SlowWalkApp`（占位 shell，已存在） |
-| 展示模块 | `SlowWalkPresentation` | **计划中，尚未创建**；仓库中不存在该模块，不得引用为已实现 |
+| 展示模块 | `SlowWalkPresentation` | 原 PR #11 已关闭；替代实现位于 Draft PR #17，尚未合入 `develop`，不得引用为当前 App 依赖 |
 | 请求协议 | `MedicineAssessmentRequesting` | `SlowWalkClientCore` |
 | 协调器 | `MedicineAssessmentCoordinator` | `SlowWalkClientCore` |
 | 状态来源 | `MedicineAssessmentViewState` | `SlowWalkClientCore` |
@@ -27,6 +27,11 @@ expectedPresentationVariant = Presentation 展示变体
 ```
 
 这只是 Fixture 元数据，不改变 Core public API。
+
+2026-07-30 补充：App Tests Target 已由 PR #18 合入 `develop`，当前包含 25 项
+iOS 测试。`SlowWalkPresentation` 是否保留为独立 Package 不改变本文件冻结的
+canonical 状态边界；若合入，App 只使用直接接收 `ActionCard` 的渲染组件，不保存
+其派生 `MedicineDisplayState`。
 
 Coordinator 的实际映射（`MedicineAssessmentCoordinator.assess`）：
 

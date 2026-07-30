@@ -4,6 +4,10 @@
 
 - canonical Medicine API DTO 与 ISO 8601 编解码。
 - `MedicineAssessmentCoordinator` 的状态编排。
+- `LocalMedicineAssessmentRequester` 直接调用设备内 Medicine Pipeline，并对响应执行
+  request ID、版本和结构校验。
+- iOS 陪伴页使用 canonical `MedicineAssessmentViewState`，真实 Pipeline 返回后才
+  显示 ActionCard；没有出行计划时不会进入出行状态。
 - 服务端 `POST /api/v1/medicine/assess` 路由。
 - 确定性药品解析、健康上下文检查和风险规则。
 - `ActionCard`、来源追溯、缓存状态和 typed API error。
@@ -29,12 +33,14 @@
 ## 当前未实现
 
 - Vision OCR、相机权限和真实药盒图像处理。
-- SwiftUI Medicine ActionCard 与确认页 UI；iOS 目录目前只有占位 app
-  shell。`SlowWalkPresentation` 计划中、尚未创建。
+- `SlowWalkPresentation` 的最终集成；App 当前使用薄层 canonical ActionCard
+  renderer。独立 Package 合入后只复用直接 ActionCard 视图，不把其派生状态保存为
+  App 的第三套 Medicine 状态。
 - 真实药品数据库、Qwen、RAG 或临床规则。
 - HealthKit、Apple Watch 或真实身体指标。
 - 生产认证、云数据库、推送、家属账户和隐私治理。
 - 生产网络 SLA、离线同步与真实服务部署。
+- 真实位置采集；当前出行按钮只修改演示进度，不声称来自 CoreLocation。
 
 ## 演示安全规则
 

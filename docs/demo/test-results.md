@@ -75,3 +75,14 @@
 两个 workflow 均使用官方 `swift:6.3.2-jammy` 容器。上述 success 是修复前
 代码的结果：原测试只验证 fixture 与自身 expectation 自洽，不能证明
 fixture 正确。本分支修复后的最终结果在推送后补充。
+
+## 2026-07-30 device-first 重构验证
+
+- `SlowWalkCore`：300 项通过，0 failures。
+- `SlowWalkServer`：80 项通过，0 failures；本次没有修改 Server 运行代码。
+- `SlowWalkApp`：App 源码 target 完成无签名编译。
+- `SlowWalkAppTests`：基线 25 项加本分支 2 项测试，共 27 项测试源码 target
+  完成 Debug 编译。
+- 当前 Mac 没有可用的 iOS Simulator runtime，因此本次无法执行 iOS 测试或完成
+  标准 asset catalog Simulator Build；上述两项 Xcode 结果是临时排除
+  `Assets.xcassets` 后的源码编译验证，不冒充模拟器或真机运行结果。

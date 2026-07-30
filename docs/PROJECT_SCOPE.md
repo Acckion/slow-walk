@@ -16,13 +16,13 @@ Swift 架构，通过确定性规则给出风险提示和下一步行动，不�
 - 五组可解码 JSON fixtures 和 API 示例。
 - Repository、缓存、Clock 与 UUID 接口，以及演示/测试内存实现。
 - Swift/Hummingbird 最小服务端：健康检查和风险评估。
-- iOS 目录、SwiftUI app shell 与平台服务协议边界。
+- SwiftUI 四 Tab app shell、设备内 Medicine 演示闭环与平台服务协议边界。
 - XCTest 与 GitHub Actions Ubuntu 核心/服务端 CI。
 - 架构、范围、API、开发计划、演示和决策文档。
 
 ## 本阶段不完成
 
-- 完整 UI 成品、正式视觉设计或完整无障碍验收。
+- 完整 UI 成品、全部六场景选择器或完整无障碍验收。
 - Vision OCR、相机权限、GPS/位置守护、ActivityKit 或真机能力。
 - 真实临床规则、真实医疗数据库或真实药品数据导入。
 - 大语言模型、RAG 或自动生成医学说明。

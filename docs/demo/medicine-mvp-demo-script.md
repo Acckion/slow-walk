@@ -15,12 +15,16 @@
 - `MedicineAssessmentCoordinator` 可把 fixture response 驱动为正确的
   View state（`result` / `requiresMedicineConfirmation` / `failed`）。
 - 服务端 `POST /api/v1/medicine/assess` 路由与全部风险规则真实可用。
+- iOS 已接通预设文字、`MedicineAssessmentCoordinator`、设备内 Pipeline、canonical
+  ViewState 和 ActionCard；默认路径不依赖 Server。
+- App Tests Target 已合入 develop；架构分支覆盖无结果禁止推进、取消竞态和无出行
+  计划不进入 travelling。
 
 未完成依赖：
 
-- SwiftUI Medicine ActionCard 页面尚未实现，iOS 目录目前只有占位 app
-  shell，没有任何已接通的卡片 UI。
-- `SlowWalkPresentation` 模块计划中、尚未创建。
+- 六场景选择器尚未接入 App；当前可见闭环只使用 normal 预设输入。
+- 独立 `SlowWalkPresentation` 替代实现在 PR #17 审阅中，尚未合入 develop。最终
+  集成只复用直接 ActionCard 视图，不保存它的派生 display state。
 - 无真实 OCR、相机、VoiceOver 录制口径或真机验证。
 
 何时才可正式录制：SwiftUI ActionCard 与确认页在 app 内真实接通、
@@ -154,8 +158,8 @@
 
 旁白：
 
-> Day 1 已经冻结了稳定 Fixture、协调器状态和真实服务端 golden test。
-> SwiftUI 风险卡片接通后将按本脚本正式录制。
+> Day 1 已经冻结了稳定 Fixture、协调器状态和 Pipeline golden test。
+> 六场景入口与独立 Presentation 组件接通后将按本脚本正式录制。
 > 当前所有药品和健康数据均为合成演示数据，不可用于临床。
 
 ## 拍摄检查

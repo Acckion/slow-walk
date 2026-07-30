@@ -2,10 +2,10 @@
 
 ## 目标
 
-SlowWalk 将可测试的业务核心、HTTP 适配和 Apple 平台能力分开。风险引擎和服务端
-在 GitHub Actions Linux 容器中独立构建和测试；Windows 只做编辑、Git 与静态
-审查；iOS 代码在 Mac/Xcode 中集成。服务端可以替换 HTTP 或持久化实现而不改变
-风险规则。
+SlowWalk 采用 device-first 架构：iOS App 直接调用跨平台 Swift 业务核心，正常
+用药评估不依赖云端或本机 HTTP 服务。HTTP 与 Apple 平台能力分别作为外层适配器；
+`SlowWalkServer` 保留用于 API contract、跨进程集成和未来受治理的数据能力，不是
+当前 App 的运行前置条件。
 
 ## 模块依赖
 
@@ -29,10 +29,12 @@ SlowWalkMedicineKnowledge
 SlowWalkClientCore
   ├──→ SlowWalkDomain
   ├──→ SlowWalkAPIContracts
+  ├──→ SlowWalkMedicinePipeline
   └──→ SlowWalkLocationRisk（仅使用 canonical location value types）
 
 iOS App
   ├──→ SlowWalkClientCore
+  ├──→ SlowWalkDomain
   └──→ Apple platform adapters (outside SlowWalkCore)
 ```
 
@@ -157,10 +159,15 @@ SwiftUI 或 UIKit。
   `[LocationSample]`，支持乱序 callback、精确去重和 privacy clear。
 - 构造 canonical medicine/location request DTO，并把 response 映射为不依赖
   SwiftUI 的 View state 与非颜色单一表达的风险注意语义。
+- 通过 `LocalMedicineAssessmentRequester` 在进程内调用
+  `SlowWalkMedicinePipeline`；DTO 只作为稳定 use-case envelope，不代表发生 HTTP。
+- 校验 response 的 request ID、版本、候选集合和风险/ActionCard 不变量，并只允许
+  确认上一轮真实返回的候选 ID。
 - 由纯 Swift coordinator 持有 operation cancellation；所有时间来自注入的
   `Clock`，不自动重试不可恢复的 validation error。
 
-依赖 `SlowWalkDomain`、`SlowWalkAPIContracts` 与 `SlowWalkLocationRisk`。
+依赖 `SlowWalkDomain`、`SlowWalkAPIContracts`、`SlowWalkMedicinePipeline` 与
+`SlowWalkLocationRisk`。
 对 `SlowWalkLocationRisk` 的直接依赖仅用于当前 canonical `Destination`、
 `LocationSample` value types；Client Core 不调用或复制 `LocationRiskEngine`。
 该 target 不导入 SwiftUI、UIKit、Vision、CoreLocation、MapKit、AVFoundation、
@@ -169,6 +176,11 @@ Hummingbird 或具体 HTTP transport，并由 Linux Core workflow 编译和测�
 ## 外层适配器
 
 ### SlowWalkServer
+
+`SlowWalkServer` 是可选的 HTTP 适配器和 contract/integration test harness。
+当前 iOS MVP 不启动、不发现也不调用它；没有 Server 时设备内用药评估仍完整工作。
+只有未来出现受治理的远程数据、账户同步或跨设备协作需求，并经过隐私与安全评审后，
+App 才能通过 `MedicineAssessmentRequesting` 的网络实现选择性接入。
 
 服务端负责：
 
@@ -191,40 +203,60 @@ Hummingbird 或具体 HTTP transport，并由 Linux Core workflow 编译和测�
 iOS 层负责：
 
 - SwiftUI 页面、无障碍和导航，消费 `SlowWalkClientCore` View state。
-- 在 Mac/Xcode 中实现 Vision OCR、相机、CoreLocation、URLSession、系统语音
-  与权限 adapter。
+- 在组合根注入 `LocalMedicineAssessmentRequester`，正常路径直接运行设备内
+  `MedicinePipeline`，不通过 localhost 或云端绕一圈。
+- `LocalLocationAssessmentRequester` 已提供同样的设备内规则 adapter；当前 App
+  尚未接入 CoreLocation，因此不会用模拟按钮生成伪造位置样本或位置结论。
+- 在 Mac/Xcode 中实现 Vision OCR、相机、CoreLocation、系统语音与权限 adapter；
+  网络 adapter 只作为未来可选实现。
 - SwiftData 或本地 JSON 缓存实现。
-- 调用 Swift 服务端并显示可解释的风险行动卡。
+- 显示 canonical `ActionCard`，不在 App 内复制风险规则或维护第三套 Medicine 状态。
 
 iOS 可以依赖核心公开模块；核心模块不能反向依赖 iOS。`VisionMedicineTextRecognizer`、
 `CoreLocationSampleProvider`、`URLSessionMedicineAssessmentClient` 与
-`URLSessionLocationAssessmentClient` 当前只是下一阶段约定的 adapter 名称，尚未
+`URLSessionLocationAssessmentClient` 当前只是可选 adapter 名称，尚未
 实现或经 Mac/Xcode 验证。Apple 平台文件只放在 `ios/`，不加入跨平台 SwiftPM
 target。
 
 ## 数据流
 
 ```text
-相机或文字输入
+设备内主路径：
+
+相机或明确标注的演示文字输入
   → OCRImageInput（图片只停留在 adapter 调用栈）
   → [RecognizedTextObservation]
   → MedicineRecognitionInput
-  → MedicineAssessmentRequestDTO
-  → 服务端药品名称/别名标准化
+  → MedicineAssessmentCoordinator
+  → LocalMedicineAssessmentRequester
+  → MedicinePipeline 药品名称/别名标准化
   → 白名单知识源 + 版本/时间验证 + 冲突/缓存状态
   → 用户档案 + 近期用药记录 + 身体指标数据质量
   → 确定性风险规则
   → 最高风险 + 全部原因 + 稳定建议动作
-  → MedicineAssessmentResponseDTO
+  → canonical MedicineAssessmentResponseDTO
   → MedicineAssessmentViewState
+
+可选 HTTP 路径（当前 App 未接入）：
+
+MedicineAssessmentRequestDTO
+  → MedicineAssessmentRequesting 网络适配器
+  → SlowWalkServer
+  → 相同 MedicinePipeline
+  → 经校验的 MedicineAssessmentResponseDTO
 
 位置样本
   → LocationSampleProviding
   → bounded LocationHistoryBuffer
   → LocationAssessmentRequestDTO
-  → 服务端数据质量 + 距离/geofence/趋势 + 行为规则
+  → LocationAssessmentCoordinator
+  → LocalLocationAssessmentRequester
+  → 设备内数据质量 + 距离/geofence/趋势 + 行为规则
   → LocationAssessmentResponseDTO
   → LocationAssessmentViewState
+
+可选 Location HTTP requester 可以实现相同 contract，但不是默认路径；完整轨迹不应
+仅为运行本地可计算规则而离开设备。
 ```
 
 识别失败或来源不足会沿数据流保留下来，不能在中间层被转换为“无风险”。

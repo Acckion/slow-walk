@@ -1,5 +1,9 @@
 # SlowWalk 演示脚本
 
+> 历史脚本：本文件描述已移除的 raw-risk 演示，不再作为当前执行依据。当前 iOS
+> Medicine MVP 以 `docs/demo/medicine-mvp-demo-script.md` 为准；不得调用
+> `/api/v1/risk/assess` 或把 `shared/api-examples/risk-assessment-*.json` 当作正式契约。
+
 ## 演示目的
 
 在 5–7 分钟内展示：SlowWalk 如何把药品识别、用户档案、近期记录和可信来源转换为
@@ -15,7 +19,8 @@
 1. 确认演示提交对应的 `Swift Core` GitHub Actions 运行已经通过，并保留运行链接。
 2. 只有在另一个已验证环境提供真实运行的 Swift 服务端时才演示 HTTP；当前 Windows
    不调用本机 Swift 或启动服务端。
-3. 准备 `shared/api-examples/risk-assessment-request.json` 和五个 fixtures。
+3. 仅准备 `demo-fixtures/` 中的 canonical Medicine fixtures；历史 raw-risk JSON
+   不再用于演示。
 4. 若没有真实运行的服务端，只展示 GitHub Actions 日志、源码和 fixtures；不要
    伪造 HTTP 结果。
 

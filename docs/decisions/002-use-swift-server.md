@@ -2,7 +2,7 @@
 
 ## 状态
 
-已接受。
+已接受；Server 的产品角色由 [ADR-004](004-device-first-medicine.md) 补充说明。
 
 ## 背景
 
@@ -18,6 +18,8 @@
 - 风险判断由 `SlowWalkRiskEngine` 完成；路由不得复制业务规则。
 - 客户端和服务端通过 `SlowWalkAPIContracts` 共用 DTO。
 - 演示阶段只使用内存 Repository 和标注为非临床用途的演示数据。
+- Server 是可选 HTTP 适配器和 contract/integration test harness，不是 iOS App
+  正常运行的必需后端，也不表示当前存在云部署。
 
 ## 依赖方向
 

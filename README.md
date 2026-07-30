@@ -15,7 +15,8 @@
 - 模拟 OCR 文字归一化、保守候选解析和结构化 `ActionCard` 管线。
 - 12 条无剂量演示药品目录，以及带版本/过期语义的 actor 解析缓存。
 - Swift 服务端健康检查、药品解析和完整风险评估接口。
-- iOS 源码边界与平台服务协议骨架。
+- 可运行的 SwiftUI 四 Tab shell，以及预设文字到设备内 ActionCard 的用药闭环。
+- 可选 Swift Server HTTP 适配器；当前 iOS 默认流程不依赖云端或 localhost。
 - GitHub Actions 中的 Ubuntu Swift 核心与服务端 CI。
 
 ## 技术栈

@@ -3,6 +3,13 @@
 Swift 6 + Hummingbird 2 的最小 API 服务，业务风险判断复用本地
 `../swift-packages/SlowWalkCore` 中的 `MedicationRiskEngine`。
 
+## 架构定位
+
+Server 是可选 HTTP 适配器和 API contract/integration test harness，不是当前 iOS
+App 的运行前置条件，也没有在本仓库中部署为云服务。iOS 默认通过
+`LocalMedicineAssessmentRequester` 在设备进程内运行相同的 Medicine Pipeline。
+未来远程数据或跨设备能力必须经过认证、隐私和数据治理评审后才能接入。
+
 ## 运行
 
 以下命令仅供具备受支持 Swift 工具链的 Linux/macOS 环境使用；当前 Windows

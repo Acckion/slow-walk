@@ -2,7 +2,7 @@
 
 ## 原则
 
-- 先稳定跨平台核心，再接入 HTTP 和 Apple 平台能力。
+- 先稳定跨平台核心，再接入 Apple 平台能力；HTTP 是可选适配器，不是 iOS 前置层。
 - 每个阶段都有可执行验收，不以目录或空文件数量衡量完成度。
 - 医疗安全、来源追溯和证据不足降级行为先于界面美化。
 - Windows 只做编辑、Git、静态审查与测试生成；SwiftPM 构建测试由 GitHub
@@ -51,7 +51,7 @@
 - 所有 fixtures 可读取并解码。
 - Repository 基本读写、缺失值和并发访问测试。
 
-## 阶段 4：Swift 服务端
+## 阶段 4：设备内用例与可选 Swift 服务端
 
 交付：
 
@@ -59,19 +59,29 @@
 - 历史 `POST /api/v1/risk/assess` 已关闭；正式药品评估统一由
   `POST /api/v1/medicine/assess` 经 `MedicinePipeline` 编排。
 - request ID、结构化错误、基础日志和演示数据组合。
+- `LocalMedicineAssessmentRequester` 直接调用 Pipeline，iOS 正常路径不依赖 Server。
+- `LocalLocationAssessmentRequester` 直接调用 LocationRiskEngine，为真实 CoreLocation
+  adapter 保留设备内默认路径。
+- candidate confirmation 复用原始识别证据，并校验 response identity 与结构不变量。
 
 验收：
 
 - 健康检查、成功风险评估、非法 JSON、错误媒体类型、字段缺失和版本错误测试。
 - Ubuntu CI 构建并运行全部服务端测试。
+- Medicine/Location 本地 requester 与 HTTP route 对相同 canonical contract 保持一致。
 
 ## 阶段 5：iOS 集成
 
 在 Mac/Xcode 上完成：
 
+- 当前基线：PR #18 已把 Tests Target 与 25 项确定性 iOS 测试合入 `develop`。
+  `SlowWalkPresentation` 原 PR #11 已关闭，替代实现位于 Draft PR #17；最终即使
+  保留独立 Package，也只承担 canonical `ActionCard` 的渲染，不成为第三套
+  Medicine 可观察状态。
+
 - 正式 Xcode 工程、签名、权限和 Swift Package 依赖。
 - MedicineScanner、RiskResult、HealthProfile、MedicationHistory、LocationGuard。
-- Vision OCR、网络、持久化、语音、定位适配。
+- Vision OCR、持久化、语音、定位适配，以及确有需求时的可选网络适配。
 - Dynamic Type、VoiceOver、色彩之外的风险表达和失败恢复。
 
 验收：
