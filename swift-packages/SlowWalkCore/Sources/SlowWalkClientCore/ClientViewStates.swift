@@ -116,6 +116,20 @@ public enum MedicineAssessmentViewState:
     case cancelled
 }
 
+/// Monotonic coordinator state update used to reject late progress events.
+public struct MedicineAssessmentStateUpdate: Sendable, Equatable {
+    public let sequenceNumber: UInt64
+    public let state: MedicineAssessmentViewState
+
+    public init(
+        sequenceNumber: UInt64,
+        state: MedicineAssessmentViewState
+    ) {
+        self.sequenceNumber = sequenceNumber
+        self.state = state
+    }
+}
+
 public struct LocationAssessmentPresentation:
     Sendable,
     Equatable,
