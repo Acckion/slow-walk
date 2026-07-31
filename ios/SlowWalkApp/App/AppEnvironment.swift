@@ -32,18 +32,24 @@ final class AppEnvironment {
         clock: any SlowWalkDomain.Clock = AppSystemClock(),
         plan: TodayPlan = .demo,
         simulator: MockMedicineScanSimulator = .demo,
-        capabilities: CapabilityCatalog = .phase0
+        capabilities: CapabilityCatalog = .phase0,
+        assessmentRunner: (any MedicineAssessmentRunning)? = nil
     ) {
         self.clock = clock
         self.plan = plan
         self.capabilities = capabilities
 
         let store = InMemoryCareRecordStore(clock: clock)
+        let assessmentRunner = assessmentRunner
+            ?? LocalMedicineAssessmentRunner.demo(clock: clock)
         careRecords = store
         companion = CompanionSessionModel(
             records: store,
             simulator: simulator,
             plan: plan,
+            readDelay: ContinuousMedicineReadDelay(),
+            assessmentRunner: assessmentRunner,
+            clock: clock,
             capabilities: capabilities
         )
     }

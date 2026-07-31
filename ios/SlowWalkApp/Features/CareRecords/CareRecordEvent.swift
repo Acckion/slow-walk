@@ -20,13 +20,9 @@ import Foundation
 ///   type, and must not gain one: the translation is the calling layer's
 ///   responsibility, so Care Records depends on nothing inside the flow.
 ///
-/// The Companion layer converts its own setbacks into this vocabulary on its own
-/// side of the boundary (`MedicineAssessmentSetback.careRecordReason`, private to
-/// `CompanionSessionModel.swift`), so the flow's states and the record's states
-/// can evolve independently — and the dependency points one way only.
 enum CareRecordIncompleteReason: Equatable, Hashable, CaseIterable {
-    /// The capability the step needed is not wired up in this build.
-    case capabilityNotAvailableYet
+    /// The canonical assessment ended without a result being displayed.
+    case assessmentNotCompleted
 }
 
 /// What happened during a companion session, in the order it happened.
@@ -41,7 +37,7 @@ enum CareRecordEventKind: Equatable, Hashable {
     /// conclusion about which medicine it is.
     case medicineReadFoundCandidates(candidateCount: Int)
     case medicineConfirmed(medicineName: String, origin: MedicineChoiceOrigin)
-    /// A formal assessment was owed and could not be carried out.
+    /// A formal assessment was owed and did not complete.
     ///
     /// Recorded so the timeline says plainly that no assessment happened.
     /// Without it, a reader seeing a confirmed medicine and nothing after it

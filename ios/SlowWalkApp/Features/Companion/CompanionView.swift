@@ -1,3 +1,7 @@
+import SlowWalkAPIContracts
+import SlowWalkClientCore
+import SlowWalkDomain
+import SlowWalkPresentation
 import SwiftUI
 
 /// Holds one continuous companion session from start to finish.
@@ -7,6 +11,7 @@ import SwiftUI
 /// follow underneath.
 struct CompanionView: View {
     @Environment(AppEnvironment.self) private var environment
+    @State private var showingAssessmentCandidates = false
 
     private var session: CompanionSessionModel { environment.companion }
     var body: some View {
@@ -118,40 +123,79 @@ struct CompanionView: View {
         .accessibilityLabel("正在按演示脚本模拟识别药名，请稍等。本阶段不读取照片。")
     }
 
-    /// The ways out of the assessment gate.
-    ///
-    /// There is deliberately no control here that continues the outing. The
-    /// person may choose a different medicine, read again, or end the session —
-    /// and `session.canDepart` is asserted so a departure control cannot be
-    /// added back without the assessment result that would justify it.
+    /// Renders the canonical Client Core state through SlowWalkPresentation.
+    /// The App adds navigation controls only; it owns no risk label, warning,
+    /// or recommended-action wording.
     private func assessmentGateControls(
         _ gate: MedicineAssessmentGate
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            MedicineAssessmentPendingPanel(
-                gate: gate,
-                // From the session's own table, so the badge in this panel and
-                // the sentence above it describe the same build.
-                assessmentStatus: session.capabilities
-                    .status(of: .medicineRiskAssessment)
-            )
+            assessmentView(for: gate)
 
-            primaryButton(CompanionCopy.reconsiderMedicineTitle) {
+            if session.canContinueAfterAssessment {
+                primaryButton(CompanionCopy.continueCompanionTitle) {
+                    _ = session.continueAfterMedicineAssessment()
+                }
+            }
+
+            secondaryButton(CompanionCopy.reconsiderMedicineTitle) {
                 session.reconsiderMedicineChoice()
             }
 
             secondaryButton(CompanionCopy.retryPhotoTitle) {
                 session.retakeMedicinePhoto()
             }
-
-            if session.canDepart {
-                // Unreachable today: `canDepart` is false for every value of
-                // `MedicineAssessmentProgress` this build can produce. Kept as
-                // the single place a departure control may ever live, so it
-                // cannot be added anywhere that skips the check.
-                primaryButton(CompanionCopy.continueCompanionTitle) {}
-                    .disabled(true)
+        }
+        .confirmationDialog(
+            "确认本次评估提供的候选药品",
+            isPresented: $showingAssessmentCandidates,
+            titleVisibility: .visible
+        ) {
+            ForEach(
+                session.assessmentCandidates,
+                id: \.medicine.id
+            ) { candidate in
+                Button(candidate.medicine.canonicalName) {
+                    session.confirmAssessmentCandidate(
+                        candidateID: candidate.medicine.id
+                    )
+                }
             }
+            Button("取消", role: .cancel) {}
+        }
+    }
+
+    @ViewBuilder
+    private func assessmentView(
+        for gate: MedicineAssessmentGate
+    ) -> some View {
+        let displayState = MedicineStateMapper.map(
+            gate.viewState,
+            demoDisclaimer: CompanionCopy.demoDataNotice
+        )
+        let confirmAction: (() -> Void)? = session.assessmentCandidates.isEmpty
+            ? nil
+            : { showingAssessmentCandidates = true }
+
+        switch gate.viewState {
+        case let .result(presentation):
+            MedicineAssessmentView(state: displayState)
+                .onAppear {
+                    session.medicineActionCardDidAppear(
+                        requestID: presentation.response.requestID
+                    )
+                }
+        case .idle,
+            .recognizing,
+            .requiresMedicineConfirmation,
+            .assessing,
+            .failed,
+            .cancelled:
+            MedicineAssessmentView(
+                state: displayState,
+                retryAction: session.retryMedicineAssessment,
+                confirmAction: confirmAction
+            )
         }
     }
 

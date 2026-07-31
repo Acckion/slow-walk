@@ -179,10 +179,9 @@ extension CapabilityCatalog {
     ///
     /// - `medicineRecognition` — `MockMedicineScanSimulator` hands out a fixed
     ///   script. No camera, no image.
-    /// - `medicineRiskAssessment` — `.unavailable`, not `.deviceLocal`.
-    ///   `MedicinePipeline` exists in `SlowWalkCore`, but no adapter in this
-    ///   target calls it, so the app cannot assess anything today. It becomes
-    ///   `.deviceLocal` when `LocalMedicineAssessmentRequester` lands.
+    /// - `medicineRiskAssessment` — the app composes the production coordinator
+    ///   with `LocalMedicineAssessmentRequester`; assessment stays on device.
+    ///   The preceding name-recognition step remains a scripted demo.
     /// - `visionOCR` — no Vision adapter exists in this target.
     /// - `coreLocation` — no CoreLocation adapter exists in this target; the
     ///   travelling step is advanced by a button, not by movement.
@@ -201,7 +200,7 @@ extension CapabilityCatalog {
     static let phase0 = CapabilityCatalog(
         availability: [
             .medicineRecognition: .simulated,
-            .medicineRiskAssessment: .unavailable,
+            .medicineRiskAssessment: .deviceLocal,
             .visionOCR: .unavailable,
             .coreLocation: .unavailable,
             .arrivalReminder: .unavailable,
@@ -211,7 +210,7 @@ extension CapabilityCatalog {
         ],
         detail: [
             .medicineRecognition: "候选药名来自固定演示脚本，不读取相机图片。",
-            .medicineRiskAssessment: "设备内评估将在下一阶段接入，本阶段不会给出风险等级。",
+            .medicineRiskAssessment: "使用内置演示药品目录在设备内完成，照片不会上传。",
             .visionOCR: "尚未接入照片文字识别。",
             .coreLocation: "本阶段使用演示位置，出行步骤由手动操作推进。",
             .arrivalReminder: "本阶段不会自动提醒到站。",

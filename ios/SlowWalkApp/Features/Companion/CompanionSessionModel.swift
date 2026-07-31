@@ -1,10 +1,9 @@
 import Foundation
+import SlowWalkAPIContracts
+import SlowWalkClientCore
+import SlowWalkDomain
 
-/// Owns the live companion session: current state, side effects, and records.
-///
-/// All transition decisions come from `CompanionFlowReducer`. This type adds
-/// only what a pure function cannot do — write care records and run the
-/// simulated read — so the two concerns stay separable.
+/// Owns the live companion session, asynchronous work, and care records.
 @Observable
 @MainActor
 final class CompanionSessionModel {
@@ -13,109 +12,109 @@ final class CompanionSessionModel {
     private let records: any CareRecordStoring
     private let simulator: any MedicineScanSimulating
     private let readDelay: any MedicineReadDelaying
+    private let assessmentRunner: any MedicineAssessmentRunning
     private let plan: TodayPlan
+    private let clock: any SlowWalkDomain.Clock
+    private let makeRequestID: () -> UUID
 
-    /// What this build can really do.
-    ///
-    /// The session's own copy of the table it was assembled with. Every screen
-    /// reading capability state for this session reads it from here — see
-    /// `CompanionView` — so behaviour and wording cannot describe different
-    /// builds. There is no fallback default: the composition root supplies it.
     let capabilities: CapabilityCatalog
 
-    /// Guards against a stale simulated read landing after the person has
-    /// already moved on (retried, chosen from the list, or ended the session).
-    /// Only `invalidatePendingRead()` moves it.
     private var readGeneration = 0
+    private var assessmentGeneration = 0
+    private var displayedActionCardRequestIDs = Set<UUID>()
 
-    /// The in-flight simulated read, exposed read-only so tests can await the
-    /// exact task whose staleness they are probing. The setter stays private;
-    /// only `recordReadStartedAndRun()` starts a read.
     private(set) var pendingReadTask: Task<Void, Never>?
+    private(set) var pendingAssessmentTask: Task<Void, Never>?
 
     init(
         records: any CareRecordStoring,
-        simulator: any MedicineScanSimulating = MockMedicineScanSimulator.demo,
+        simulator: any MedicineScanSimulating,
         plan: TodayPlan,
-        readDelay: any MedicineReadDelaying = ContinuousMedicineReadDelay(),
-        capabilities: CapabilityCatalog
+        readDelay: any MedicineReadDelaying,
+        assessmentRunner: any MedicineAssessmentRunning,
+        clock: any SlowWalkDomain.Clock,
+        capabilities: CapabilityCatalog,
+        makeRequestID: @escaping () -> UUID = UUID.init
     ) {
         self.records = records
         self.simulator = simulator
-        self.readDelay = readDelay
         self.plan = plan
+        self.readDelay = readDelay
+        self.assessmentRunner = assessmentRunner
+        self.clock = clock
         self.capabilities = capabilities
+        self.makeRequestID = makeRequestID
     }
 
-    // MARK: - Derived presentation values
+    // MARK: - Presentation values
 
     var stepLabel: String { CompanionCopy.stepLabel(for: state) }
-    /// Wording derived from this session's own capability table, so what the
-    /// person reads and what the flow does come from one source.
+
     var situation: String {
         CompanionCopy.situation(for: state, capabilities: capabilities)
     }
+
     var nextStep: String { CompanionCopy.nextStep(for: state) }
     var reason: String? { CompanionCopy.reason(for: state) }
-
     var canEndEarly: Bool { state.isActive }
 
-    /// True while the simulated read is running, so the view can show progress.
     var isReadingMedicine: Bool {
-        if case let .scanningMedicine(attempt) = state {
+        if case .scanningMedicine(let attempt) = state {
             return !attempt.isAwaitingRecovery
         }
         return false
     }
 
-    /// The assessment gate the session is currently held at, if any.
-    ///
-    /// Exposed so the view can render the "not assessed yet" step and its ways
-    /// out without inspecting the state enum itself.
     var assessmentGate: MedicineAssessmentGate? {
-        if case let .awaitingMedicineAssessment(gate) = state {
+        if case .awaitingMedicineAssessment(let gate) = state {
             return gate
         }
         return nil
     }
 
-    /// Whether the session may leave for the outing.
-    ///
-    /// Departure is only legitimate once a formal assessment has produced a
-    /// result. This switch is exhaustive over `MedicineAssessmentProgress`, and
-    /// neither of its cases is a result, so the answer today is always `false`.
-    /// Written this way on purpose: adding a success case to the progress enum
-    /// makes this switch non-exhaustive and forces the departure rule to be
-    /// stated deliberately, instead of a `true` appearing by default.
+    var canContinueAfterAssessment: Bool {
+        assessmentGate?.hasFinalResult == true
+    }
+
     var canDepart: Bool {
-        guard let gate = assessmentGate else { return false }
-        switch gate.progress {
-        case .notStarted, .couldNotAssess:
-            return false
+        canContinueAfterAssessment && plan.outing != nil
+    }
+
+    /// Candidate identities are projected only from the current canonical
+    /// response. No cached or app-authored list can reach Core confirmation.
+    var assessmentCandidates: [SlowWalkDomain.MedicineCandidate] {
+        guard
+            case .requiresMedicineConfirmation(let requirement) =
+                assessmentGate?.viewState,
+            let response = requirement.response
+        else {
+            return []
+        }
+        switch requirement.reason {
+        case .ambiguousMedicine, .unresolvedMedicine:
+            return response.resolution.candidates
+        case .noRecognizedText, .serverRequiresConfirmation:
+            return []
         }
     }
 
-    /// Recovery choices offered when a read did not succeed.
     var recoveryOptions: [CompanionRecoveryOption] {
-        guard case let .scanningMedicine(attempt) = state,
-              attempt.isAwaitingRecovery
+        guard case .scanningMedicine(let attempt) = state,
+            attempt.isAwaitingRecovery
         else {
             return []
         }
         return [.retryPhoto, .chooseFromList, .contactSomeone]
     }
 
-    // MARK: - Intents
+    // MARK: - Session intents
 
-    /// Starts a session, reporting whether one actually started.
-    ///
-    /// The answer matters to the caller: Today navigates to the Companion tab
-    /// on the back of this call, and must not move the person when the
-    /// transition was refused. The record is written only once a session has
-    /// really begun, so a refused start leaves the timeline untouched.
     @discardableResult
     func startCompanion() -> Bool {
         guard send(.startCompanion) else { return false }
+        invalidatePendingRead()
+        invalidatePendingAssessment()
+        displayedActionCardRequestIDs.removeAll()
         if let outing = plan.outing {
             records.append(.dayPlanItemStarted(title: outing.title))
         } else {
@@ -137,20 +136,18 @@ final class CompanionSessionModel {
     func chooseFromFrequentList() {
         let candidates = MedicineCandidate.demoFrequentlyUsed
         guard send(.chooseFromFrequentList(candidates)) else { return }
-        // The read is being abandoned in favour of the list, so its result
-        // must not arrive later and overwrite this choice.
         invalidatePendingRead()
     }
 
-    /// Goes back to reading when none of the offered candidates match.
     func retakeMedicinePhoto() {
         guard send(.retakeMedicinePhoto) else { return }
+        invalidatePendingAssessment()
         recordReadStartedAndRun()
     }
 
     func confirmMedicine(_ candidate: MedicineCandidate) {
-        guard case let .awaitingMedicineConfirmation(prompt) = state,
-              send(.confirmMedicine(candidate))
+        guard case .awaitingMedicineConfirmation(let prompt) = state,
+            send(.confirmMedicine(candidate))
         else {
             return
         }
@@ -160,22 +157,70 @@ final class CompanionSessionModel {
                 origin: prompt.origin
             )
         )
-        // No `careActionShown` record is written here, and none may be. That
-        // record means a care action was actually shown to the person; writing
-        // it on confirmation put a claim in the care timeline that nothing had
-        // produced. The record is written by whatever presents a real
-        // assessment result, which this build has none of.
-        //
-        // Any pending read is abandoned: a confirmation is a decision, and a
-        // result that was in flight when it was made must not land afterwards
-        // and reopen a step the person has already left.
         invalidatePendingRead()
-        beginMedicineAssessment()
+        beginMedicineAssessment(for: candidate)
     }
 
-    /// Goes back to the candidate list to choose a different medicine.
     func reconsiderMedicineChoice() {
         guard send(.reconsiderMedicineChoice) else { return }
+        invalidatePendingAssessment()
+    }
+
+    func retryMedicineAssessment() {
+        guard let gate = assessmentGate else { return }
+        switch gate.viewState {
+        case .failed(let failure):
+            guard failure.isRecoverable else { return }
+        case .cancelled:
+            break
+        case .idle,
+            .recognizing,
+            .requiresMedicineConfirmation,
+            .assessing,
+            .result:
+            return
+        }
+        beginMedicineAssessment(for: gate.confirmed.candidate)
+    }
+
+    func confirmAssessmentCandidate(candidateID: String) {
+        guard assessmentCandidates.contains(where: {
+            $0.medicine.id == candidateID
+        })
+        else {
+            return
+        }
+
+        beginAssessmentOperation()
+        guard send(.medicineAssessmentUpdated(.assessing(startedAt: clock.now())))
+        else {
+            return
+        }
+
+        let generation = assessmentGeneration
+        let runner = assessmentRunner
+        pendingAssessmentTask = Task { [weak self] in
+            let result = await runner.confirmMedicine(candidateID: candidateID)
+            guard let self,
+                self.assessmentGeneration == generation
+            else {
+                return
+            }
+            self.finishMedicineAssessment(result)
+        }
+    }
+
+    @discardableResult
+    func continueAfterMedicineAssessment() -> Bool {
+        let hasOuting = plan.outing != nil
+        guard send(.continueAfterMedicineAssessment(hasOuting: hasOuting))
+        else {
+            return false
+        }
+        if !hasOuting {
+            records.append(.companionFinished(.medicineReviewCompleted))
+        }
+        return true
     }
 
     func approachStop() {
@@ -189,68 +234,101 @@ final class CompanionSessionModel {
 
     func endEarly() {
         guard send(.endEarly) else { return }
-        // The session is over; nothing from the abandoned read may land after
-        // it and reopen a step the person has already left.
         invalidatePendingRead()
+        invalidatePendingAssessment()
         records.append(.companionFinished(.endedEarly))
     }
 
-    // MARK: - Medicine assessment
-    //
-    // This build has no assessment adapter. Rather than let the flow sit at a
-    // gate that never resolves, the missing capability is reported as a
-    // setback, so the person is offered a way out immediately and the screen
-    // states plainly that no assessment was made.
-
-    /// Reports the assessment outcome for the medicine just confirmed.
-    ///
-    /// The outcome is read from `capabilities`, not hardcoded, so the single
-    /// capability table decides what happens here. There is deliberately no
-    /// branch that produces a result: `MedicineAssessmentProgress` has no
-    /// success case to produce one with, so this method cannot fabricate an
-    /// assessment even if the capability table claimed the capability existed.
-    private func beginMedicineAssessment() {
-        guard capabilities
-            .availability(of: .medicineRiskAssessment)
-            .isImplemented == false
+    /// Called only by the view branch that actually inserted the final
+    /// canonical ActionCard into the hierarchy.
+    func medicineActionCardDidAppear(requestID: UUID) {
+        guard
+            case .awaitingMedicineAssessment(let gate) = state,
+            case .result(let presentation) = gate.viewState,
+            presentation.response.requestID == requestID,
+            displayedActionCardRequestIDs.insert(requestID).inserted
         else {
-            // A capability table claiming assessment works, with no adapter to
-            // honour it, must not silently become an assessed medicine. The
-            // gate stays at `.notStarted`: no card, no record, no departure.
             return
         }
-        guard send(.medicineAssessmentDidNotSucceed(.notWiredUpYet)) else { return }
-        // Converted on this side of the boundary: the timeline stores a Care
-        // Records reason, never the Companion setback itself, so the record
-        // vocabulary does not move when the flow's states do.
-        records.append(
-            .medicineAssessmentDidNotSucceed(
-                MedicineAssessmentSetback.notWiredUpYet.careRecordReason
+
+        let medicineName =
+            presentation.response.resolution.selectedMedicine?.canonicalName
+            ?? presentation.response.actionCard.title
+        records.append(.careActionShown(medicineName: medicineName))
+    }
+
+    // MARK: - Medicine assessment
+
+    private func beginMedicineAssessment(for candidate: MedicineCandidate) {
+        beginAssessmentOperation()
+        guard send(.medicineAssessmentUpdated(.assessing(startedAt: clock.now())))
+        else {
+            return
+        }
+
+        let generation = assessmentGeneration
+        let requestID = makeRequestID()
+        let runner = assessmentRunner
+        pendingAssessmentTask = Task { [weak self] in
+            let result = await runner.assess(
+                medicine: candidate,
+                requestID: requestID
             )
-        )
+            guard let self,
+                self.assessmentGeneration == generation
+            else {
+                return
+            }
+            self.finishMedicineAssessment(result)
+        }
+    }
+
+    private func beginAssessmentOperation() {
+        pendingAssessmentTask?.cancel()
+        pendingAssessmentTask = nil
+        assessmentGeneration &+= 1
+    }
+
+    private func finishMedicineAssessment(
+        _ result: MedicineAssessmentViewState
+    ) {
+        guard send(.medicineAssessmentUpdated(result)) else { return }
+        pendingAssessmentTask = nil
+
+        switch result {
+        case .failed, .cancelled:
+            records.append(
+                .medicineAssessmentDidNotSucceed(.assessmentNotCompleted)
+            )
+        case .idle,
+            .recognizing,
+            .requiresMedicineConfirmation,
+            .assessing,
+            .result:
+            break
+        }
+    }
+
+    private func invalidatePendingAssessment() {
+        assessmentGeneration &+= 1
+        pendingAssessmentTask?.cancel()
+        pendingAssessmentTask = nil
     }
 
     // MARK: - Simulated read
 
-    /// Drops whatever simulated read is still in flight.
-    ///
-    /// Every abandonment of a read goes through here, so there is one place to
-    /// look for why a stale result was ignored. Call it only after the matching
-    /// transition succeeded: moving the generation for a refused or repeated
-    /// event would silently cancel a read that is still legitimately running.
     private func invalidatePendingRead() {
         readGeneration += 1
+        pendingReadTask?.cancel()
+        pendingReadTask = nil
     }
 
     private func recordReadStartedAndRun() {
-        guard case let .scanningMedicine(attempt) = state else { return }
+        guard case .scanningMedicine(let attempt) = state else { return }
 
-        // Starting a read supersedes any earlier one. Invalidate first, then
-        // capture the generation this read owns.
         invalidatePendingRead()
         let generation = readGeneration
         let attemptNumber = attempt.attemptNumber
-
         records.append(.medicineReadStarted(attemptNumber: attemptNumber))
 
         pendingReadTask = Task { [weak self] in
@@ -259,36 +337,39 @@ final class CompanionSessionModel {
             } catch {
                 return
             }
-            guard let self, self.readGeneration == generation else { return }
+            guard let self,
+                !Task.isCancelled,
+                self.readGeneration == generation
+            else {
+                return
+            }
             self.finishRead(forAttemptNumber: attemptNumber)
         }
     }
 
     private func finishRead(forAttemptNumber attemptNumber: Int) {
-        guard let outcome = simulator.outcome(forAttemptNumber: attemptNumber) else {
+        guard let outcome = simulator.outcome(forAttemptNumber: attemptNumber)
+        else {
             return
         }
         switch outcome {
-        case let .doesNotSucceed(setback):
+        case .doesNotSucceed(let setback):
             guard send(.medicineReadDidNotSucceed(setback)) else { return }
             records.append(.medicineReadDidNotSucceed(setback))
-        case let .findsCandidates(candidates):
+        case .findsCandidates(let candidates):
             guard send(.medicineCandidatesReady(candidates)) else { return }
             records.append(
                 .medicineReadFoundCandidates(candidateCount: candidates.count)
             )
         }
+        pendingReadTask = nil
     }
 
     // MARK: - Transition
 
-    /// Applies an event, returning whether it changed the state.
-    ///
-    /// Deliberately not `@discardableResult`: a refused event must never be
-    /// followed by the side effects of a successful one, so every caller is
-    /// made to answer whether the transition happened.
     private func send(_ event: CompanionFlowEvent) -> Bool {
-        guard let next = CompanionFlowReducer.nextState(from: state, on: event) else {
+        guard let next = CompanionFlowReducer.nextState(from: state, on: event)
+        else {
             return false
         }
         state = next
@@ -296,7 +377,6 @@ final class CompanionSessionModel {
     }
 }
 
-/// A recovery choice offered after a read that did not succeed.
 enum CompanionRecoveryOption: Identifiable, Equatable, Hashable, CaseIterable {
     case retryPhoto
     case chooseFromList
@@ -309,29 +389,6 @@ enum CompanionRecoveryOption: Identifiable, Equatable, Hashable, CaseIterable {
         case .retryPhoto: CompanionCopy.retryPhotoTitle
         case .chooseFromList: CompanionCopy.chooseFromListTitle
         case .contactSomeone: CompanionCopy.contactSomeoneTitle
-        }
-    }
-}
-
-/// Translates a Companion setback into the Care Records vocabulary.
-///
-/// The one place the two vocabularies meet, and it sits on the Companion side on
-/// purpose: the flow knows about the timeline it writes to, while Care Records
-/// knows nothing about the flow's internal states. `CareRecordEvent.swift`
-/// therefore names reasons only and never mentions a Companion type.
-///
-/// `private` so the conversion cannot become an API other layers reach for; a
-/// second caller would be a second place the boundary is decided.
-///
-/// The `switch` is exhaustive, so a new Companion setback cannot reach the
-/// timeline until it has been given a deliberate record meaning — which is the
-/// point of keeping the types separate. Mapping a new setback onto an existing
-/// reason is a decision, not a default.
-private extension MedicineAssessmentSetback {
-    var careRecordReason: CareRecordIncompleteReason {
-        switch self {
-        case .notWiredUpYet:
-            return .capabilityNotAvailableYet
         }
     }
 }

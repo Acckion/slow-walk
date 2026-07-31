@@ -100,8 +100,8 @@ struct CareRecordsView: View {
             }
         case let .medicineAssessmentDidNotSucceed(reason):
             switch reason {
-            case .capabilityNotAvailableYet:
-                "尚未完成用药风险评估：设备内评估将在下一阶段接入"
+            case .assessmentNotCompleted:
+                "这次没有完成用药评估，未显示用药提示"
             }
         case let .careActionShown(medicineName):
             "已显示\(medicineName)的用药提示"
@@ -109,6 +109,8 @@ struct CareRecordsView: View {
             switch completion {
             case .arrivedSafely:
                 "陪伴结束：已安全到达"
+            case .medicineReviewCompleted:
+                "陪伴结束：已查看用药提示"
             case .endedEarly:
                 "陪伴结束：提前结束"
             }

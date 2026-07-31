@@ -67,24 +67,18 @@ struct CapabilityStatusTests {
         #expect(scripted.outcome(forAttemptNumber: 2) != nil)
     }
 
-    /// Risk assessment is not available, and is not described as device-local.
-    ///
-    /// `MedicinePipeline` exists in `SlowWalkCore`, but no adapter in this
-    /// target reaches it, so the app cannot assess anything. Marking this
-    /// `.deviceLocal` before `LocalMedicineAssessmentRequester` lands would be
-    /// the single most misleading entry in the table.
-    @Test func riskAssessmentIsNotYetAvailable() {
+    /// Risk assessment is device-local and does not imply real OCR.
+    @Test func riskAssessmentIsDeviceLocal() {
         let catalog = CapabilityCatalog.phase0
-        #expect(catalog.availability(of: .medicineRiskAssessment) == .unavailable)
-        #expect(catalog.availability(of: .medicineRiskAssessment) != .deviceLocal)
+        #expect(catalog.availability(of: .medicineRiskAssessment) == .deviceLocal)
+        #expect(catalog.availability(of: .medicineRecognition) == .simulated)
 
-        // And the explanation names the stage it arrives in, so the status is
-        // an entry point rather than a dead end.
         guard let detail = catalog.detail(of: .medicineRiskAssessment) else {
             Issue.record("the assessment status needs an explanation")
             return
         }
-        #expect(detail.contains("下一阶段"))
+        #expect(detail.contains("设备内"))
+        #expect(detail.contains("照片不会上传"))
     }
 
     /// The unimplemented Apple capabilities are all reported unavailable.
@@ -212,20 +206,10 @@ struct CapabilityStatusTests {
 
     // MARK: - Copy is derived from the table, not written twice
 
-    /// The flow's wording follows whatever table it is given.
-    ///
-    /// This replaces an earlier test that asserted
-    /// `CompanionCopy.capabilities == .phase0`. That assertion described the
-    /// defect rather than the guarantee: `CompanionCopy` holding its own catalog
-    /// was itself the second source of truth, so the wording stayed fixed on the
-    /// shipping table while the session ran against an injected one.
-    ///
-    /// The real guarantee is that the wording has no table of its own — it can
-    /// only describe the one passed in. Proven by passing two different catalogs
-    /// and requiring the sentence to change.
-    @Test func gateWordingFollowsTheCatalogItIsGiven() {
+    /// Canonical assessment wording is not synthesized from capability badges.
+    @Test func gateWordingDoesNotInventMedicalContentFromCatalog() {
         let gate = MedicineAssessmentGateTests.makeGate(
-            progress: .couldNotAssess(.notWiredUpYet)
+            viewState: makeMedicineResultState()
         )
         let state = CompanionFlowState.awaitingMedicineAssessment(gate)
 
@@ -235,13 +219,9 @@ struct CapabilityStatusTests {
             capabilities: TestCapabilityCatalogs.allMarked
         )
 
-        // The shipping wording carries the shipping explanation...
-        #expect(shipping.contains("下一阶段"))
+        #expect(shipping == injected)
         #expect(shipping.contains(TestCapabilityCatalogs.marker) == false)
-        // ...and the injected one carries the injected explanation. A
-        // `CompanionCopy` with its own catalog produces the same string twice.
-        #expect(injected.contains(TestCapabilityCatalogs.marker))
-        #expect(injected != shipping)
+        #expect(shipping.contains("推荐") == false)
     }
 
     /// The flow never describes a capability it does not have.

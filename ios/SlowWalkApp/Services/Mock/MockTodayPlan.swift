@@ -90,14 +90,14 @@ extension MedicineCandidate {
     /// an effect or a dosage.
     static let demoCandidates: [MedicineCandidate] = [
         MedicineCandidate(
-            id: "demo-candidate-a",
-            displayName: "二甲双胍片",
+            id: "demo-metformin",
+            displayName: "二甲双胍",
             recognitionHint: "白色药盒，蓝色字"
         ),
         MedicineCandidate(
-            id: "demo-candidate-b",
-            displayName: "格列美脲片",
-            recognitionHint: "白色药盒，绿色字"
+            id: "demo-amlodipine",
+            displayName: "氨氯地平",
+            recognitionHint: "白色药盒，红色字"
         ),
     ]
 
@@ -107,13 +107,13 @@ extension MedicineCandidate {
     /// DEMO DATA — NOT FOR CLINICAL USE.
     static let demoFrequentlyUsed: [MedicineCandidate] = [
         MedicineCandidate(
-            id: "demo-frequent-a",
-            displayName: "二甲双胍片",
+            id: "demo-metformin",
+            displayName: "二甲双胍",
             recognitionHint: "常用"
         ),
         MedicineCandidate(
-            id: "demo-frequent-b",
-            displayName: "降压药",
+            id: "demo-amlodipine",
+            displayName: "氨氯地平",
             recognitionHint: "常用"
         ),
     ]

@@ -1,3 +1,4 @@
+import SlowWalkClientCore
 import Testing
 @testable import SlowWalkApp
 
@@ -77,7 +78,12 @@ struct CompanionFlowReducerTests {
     // MARK: - isActive coverage
 
     @Test func isActiveCoversEveryCase() {
-        let inactive: [CompanionFlowState] = [.notStarted, .completed(.arrivedSafely), .completed(.endedEarly)]
+        let inactive: [CompanionFlowState] = [
+            .notStarted,
+            .completed(.arrivedSafely),
+            .completed(.medicineReviewCompleted),
+            .completed(.endedEarly),
+        ]
         for state in inactive {
             #expect(state.isActive == false, "expected inactive: \(state)")
         }
@@ -104,7 +110,7 @@ struct CompanionFlowReducerTests {
                         origin: .readFromPhoto,
                         attemptNumber: 1
                     ),
-                    progress: .notStarted
+                    viewState: .idle
                 )
             ),
             .travelling,
