@@ -85,6 +85,7 @@ final class LocationAssessmentCoordinatorTests:
         async throws
     {
         let response = makeLocationResponse(
+            requestID: clientTestUUID(50),
             level: .yellow,
             reasonCode:
                 .locationAccuracyInsufficient,
@@ -117,6 +118,7 @@ final class LocationAssessmentCoordinatorTests:
         async throws
     {
         let response = makeLocationResponse(
+            requestID: clientTestUUID(50),
             level: .green,
             reasonCode: .arrivedAtDestination
         )
@@ -146,6 +148,7 @@ final class LocationAssessmentCoordinatorTests:
         async throws
     {
         let response = makeLocationResponse(
+            requestID: clientTestUUID(50),
             level: .red,
             reasonCode: .multipleHighRiskSignals
         )
@@ -178,6 +181,24 @@ final class LocationAssessmentCoordinatorTests:
         )
 
         XCTAssertEqual(state, .cancelled)
+    }
+
+    func testMismatchedResponseNeverBecomesResult() async throws {
+        let response = makeLocationResponse(
+            requestID: clientTestUUID(99)
+        )
+
+        let state = try await runWithSamples(
+            requester: MockLocationAssessmentRequester(
+                behavior: .response(response)
+            )
+        )
+
+        guard case let .failed(failure) = state else {
+            return XCTFail("Expected malformed response failure.")
+        }
+        XCTAssertEqual(failure.kind, .malformedResponse)
+        XCTAssertFalse(failure.isRecoverable)
     }
 
     func testExplicitCancellationStopsSampling()

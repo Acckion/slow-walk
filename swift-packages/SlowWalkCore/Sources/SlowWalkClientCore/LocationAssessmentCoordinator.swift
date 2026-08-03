@@ -5,8 +5,9 @@ import SlowWalkLocationRisk
 
 /// Pure Swift orchestration for bounded location assessment requests.
 ///
-/// Location risk remains server-owned; this coordinator only collects,
-/// bounds, sends, and presents canonical DTOs.
+/// The requester may run `LocationRiskEngine` directly on the device or use an
+/// explicitly configured remote adapter. The coordinator collects, bounds,
+/// validates, and presents canonical DTOs without choosing a transport.
 public actor LocationAssessmentCoordinator {
     public private(set) var state:
         LocationAssessmentViewState = .idle
@@ -17,6 +18,8 @@ public actor LocationAssessmentCoordinator {
         any LocationAssessmentRequestBuilding
     private let requester:
         any LocationAssessmentRequesting
+    private let responseValidator:
+        LocationAssessmentResponseValidator
     private let clock: any Clock
     private let apiVersion: String
     private let minimumSampleCount: Int
@@ -33,6 +36,8 @@ public actor LocationAssessmentCoordinator {
             any LocationAssessmentRequestBuilding,
         requester:
             any LocationAssessmentRequesting,
+        responseValidator:
+            LocationAssessmentResponseValidator = .init(),
         clock: any Clock,
         apiVersion: String,
         minimumSampleCount: Int
@@ -44,6 +49,7 @@ public actor LocationAssessmentCoordinator {
         self.sampleProvider = sampleProvider
         self.requestBuilder = requestBuilder
         self.requester = requester
+        self.responseValidator = responseValidator
         self.clock = clock
         self.apiVersion = apiVersion
         self.minimumSampleCount =
@@ -64,6 +70,7 @@ public actor LocationAssessmentCoordinator {
         let sampleProvider = self.sampleProvider
         let requestBuilder = self.requestBuilder
         let requester = self.requester
+        let responseValidator = self.responseValidator
         let clock = self.clock
         let apiVersion = self.apiVersion
         let minimumSampleCount =
@@ -103,7 +110,7 @@ public actor LocationAssessmentCoordinator {
                 }
 
                 try Task.checkCancellation()
-                await self.transition(
+                self.transition(
                     to: .assessing(
                         startedAt: clock.now()
                     ),
@@ -113,6 +120,14 @@ public actor LocationAssessmentCoordinator {
                 let response = try await requester
                     .assess(request: request)
                 try Task.checkCancellation()
+                do {
+                    try responseValidator.validate(
+                        response,
+                        for: request
+                    )
+                } catch is LocationAssessmentResponseValidationError {
+                    throw ClientTransportError.malformedResponse
+                }
                 return .result(
                     LocationAssessmentPresentation(
                         response: response
