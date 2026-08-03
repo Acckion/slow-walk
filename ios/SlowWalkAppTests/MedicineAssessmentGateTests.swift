@@ -3,6 +3,8 @@ import Foundation
 import SlowWalkClientCore
 import SlowWalkAPIContracts
 import SlowWalkDomain
+import SwiftUI
+import UIKit
 @testable import SlowWalkApp
 
 /// Tests for the Medicine Assessment safety gate.
@@ -142,11 +144,11 @@ struct MedicineAssessmentGateTests {
         }
     }
 
-    /// `.travelling` has no entry at all in this build from the gate.
+    /// `.travelling` has no entry from an undisplayed gate.
     ///
-    /// Departure requires a displayed assessment result, and no display path
-    /// exists yet, so no state/event pair may reach `.travelling` from the
-    /// gate. Non-gate states that previously reached travelling
+    /// Departure requires a displayed assessment result. These fixtures carry
+    /// no display acknowledgement, so no state/event pair may reach
+    /// `.travelling` from the gate. Non-gate states that reach travelling
     /// (`.travelling` → `.approachStop` chain) are excluded.
     @Test func travellingIsUnreachableFromTheGate() {
         for update in Self.everyGateUpdate {
@@ -217,6 +219,177 @@ struct MedicineAssessmentGateTests {
         }
         #expect(hasActionShown == false)
         #expect(session.assessmentGate?.assessmentState == .result(Self.presentation))
+        #expect(session.assessmentGate?.displayedResultRequestID == nil)
+        #expect(session.canDepart == false)
+        #expect(session.canCompleteMedicineCheck == false)
+        #expect(session.continueToOuting() == false)
+        #expect(session.completeMedicineCheck() == false)
+    }
+
+    /// Reducer-level identity check: a display event cannot acknowledge a
+    /// request other than the canonical result currently held by the gate.
+    @Test func displayAcknowledgementRequiresCurrentResultRequestID() {
+        let gate = Self.makeGate(
+            latestUpdate: Self.makeResultUpdate(sequenceNumber: 1)
+        )
+        let wrongRequestID = UUID(
+            uuidString: "00000000-0000-0000-0000-000000000002"
+        )!
+
+        #expect(CompanionFlowReducer.nextState(
+            from: .awaitingMedicineAssessment(gate),
+            on: .medicineAssessmentResultDidDisplay(wrongRequestID)
+        ) == nil)
+
+        let next = CompanionFlowReducer.nextState(
+            from: .awaitingMedicineAssessment(gate),
+            on: .medicineAssessmentResultDidDisplay(
+                Self.presentation.response.requestID
+            )
+        )
+        guard case let .awaitingMedicineAssessment(displayedGate)? = next else {
+            Issue.record("expected displayed assessment gate")
+            return
+        }
+        #expect(displayedGate.hasDisplayedCurrentResult)
+        #expect(
+            displayedGate.displayedResultRequestID
+                == Self.presentation.response.requestID
+        )
+    }
+
+    /// A later canonical result must receive its own display acknowledgement;
+    /// an older displayed request cannot authorize it.
+    @Test func displayedRequestDoesNotAuthorizeDifferentCurrentResult() {
+        let oldRequestID = Self.presentation.response.requestID
+        let newRequestID = UUID(
+            uuidString: "00000000-0000-0000-0000-000000000003"
+        )!
+        let response = Self.presentation.response
+        let newPresentation = MedicineAssessmentPresentation(
+            response: MedicineAssessmentResponseDTO(
+                requestID: newRequestID,
+                resolution: response.resolution,
+                assessment: response.assessment,
+                actionCard: response.actionCard,
+                cacheHit: response.cacheHit,
+                resolutionCacheStatus: response.resolutionCacheStatus,
+                sourceDataVersion: response.sourceDataVersion,
+                generatedAt: response.generatedAt,
+                apiVersion: response.apiVersion
+            )
+        )
+        let originalGate = Self.makeGate(latestUpdate: nil)
+        let gate = MedicineAssessmentGate(
+            confirmed: originalGate.confirmed,
+            prompt: originalGate.prompt,
+            latestUpdate: MedicineAssessmentStateUpdate(
+                sequenceNumber: 2,
+                state: .result(newPresentation)
+            ),
+            displayedResultRequestID: oldRequestID
+        )
+
+        #expect(gate.hasDisplayedCurrentResult == false)
+        #expect(CompanionFlowReducer.nextState(
+            from: .awaitingMedicineAssessment(gate),
+            on: .continueToOuting
+        ) == nil)
+        #expect(CompanionFlowReducer.nextState(
+            from: .awaitingMedicineAssessment(gate),
+            on: .completeMedicineCheck
+        ) == nil)
+    }
+
+    /// A displayed result cannot authorize a later non-result state, even when
+    /// that state carries the same response/request ID as confirmation context.
+    @Test func cancelledFailedAndConfirmationOnlyStatesBlockDisplayedQualification() async {
+        let confirmationOnly = MedicineConfirmationRequirement(
+            reason: .serverRequiresConfirmation,
+            recognitionInput: MedicineRecognitionInput(
+                recognizedTexts: ["test"],
+                capturedAt: Date(timeIntervalSince1970: 0),
+                languageCode: "en",
+                rawConfidence: 0.9
+            ),
+            response: Self.presentation.response
+        )
+        let states: [MedicineAssessmentViewState] = [
+            .cancelled,
+            .failed(Self.clientFailure),
+            .requiresMedicineConfirmation(confirmationOnly),
+        ]
+
+        for state in states {
+            let (session, store) = await Self.sessionAndStoreAtGate(
+                latestUpdate: Self.makeResultUpdate(sequenceNumber: 1)
+            )
+            #expect(session.medicineAssessmentResultDidDisplay())
+
+            session.applyAssessmentStateUpdate(
+                MedicineAssessmentStateUpdate(
+                    sequenceNumber: 2,
+                    state: state
+                )
+            )
+
+            #expect(session.assessmentGate?.assessmentState == state)
+            #expect(session.assessmentGate?.hasDisplayedCurrentResult == false)
+            #expect(session.medicineAssessmentResultDidDisplay() == false)
+            #expect(session.canDepart == false)
+            #expect(session.canCompleteMedicineCheck == false)
+            #expect(session.continueToOuting() == false)
+            #expect(session.completeMedicineCheck() == false)
+
+            if let gate = session.assessmentGate {
+                #expect(CompanionFlowReducer.nextState(
+                    from: .awaitingMedicineAssessment(gate),
+                    on: .continueToOuting
+                ) == nil)
+                #expect(CompanionFlowReducer.nextState(
+                    from: .awaitingMedicineAssessment(gate),
+                    on: .completeMedicineCheck
+                ) == nil)
+            } else {
+                Issue.record("expected assessment gate for \(state)")
+            }
+
+            let shownCount = store.kinds.filter { kind in
+                if case .careActionShown = kind { return true }
+                return false
+            }.count
+            #expect(shownCount == 1)
+        }
+    }
+
+    /// A stale result cannot replace a newer failure and reuse its old display
+    /// acknowledgement to reopen either flow exit.
+    @Test func staleResultAfterFailureCannotRestoreDisplayedQualification() async {
+        let (session, store) = await Self.sessionAndStoreAtGate(
+            latestUpdate: Self.makeResultUpdate(sequenceNumber: 2)
+        )
+        #expect(session.medicineAssessmentResultDidDisplay())
+        #expect(session.canDepart)
+
+        session.applyAssessmentStateUpdate(
+            MedicineAssessmentStateUpdate(
+                sequenceNumber: 3,
+                state: .failed(Self.clientFailure)
+            )
+        )
+        session.applyAssessmentStateUpdate(
+            Self.makeResultUpdate(sequenceNumber: 2)
+        )
+
+        #expect(session.assessmentGate?.assessmentState == .failed(Self.clientFailure))
+        #expect(session.canDepart == false)
+        #expect(session.medicineAssessmentResultDidDisplay() == false)
+        #expect(session.continueToOuting() == false)
+        #expect(session.completeMedicineCheck() == false)
+        #expect(store.kinds.filter { kind in
+            if case .careActionShown = kind { return true }
+            return false
+        }.count == 1)
     }
 
     /// A generated canonical result is waiting for presentation; it is not an
@@ -544,8 +717,8 @@ struct MedicineAssessmentGateTests {
 
     // MARK: - 8. Qualification booleans
 
-    /// Only `.result` earns departure qualification, and only with an outing.
-    @Test func onlyResultWithOutingEarnsCanDepart() async {
+    /// Every non-result state rejects display acknowledgement and both exits.
+    @Test func nonResultStatesCannotQualifyOrRecordDisplay() async {
         // Non-result gate with outing — no departure.
         let nonResultStates: [MedicineAssessmentViewState] = [
             .idle,
@@ -568,7 +741,7 @@ struct MedicineAssessmentGateTests {
         ]
 
         for state in nonResultStates {
-            let session = await Self.sessionAtGate(
+            let (session, store) = await Self.sessionAndStoreAtGate(
                 latestUpdate: MedicineAssessmentStateUpdate(
                     sequenceNumber: 1,
                     state: state
@@ -577,20 +750,58 @@ struct MedicineAssessmentGateTests {
             #expect(session.canDepart == false, "\(state) must not allow departure")
             #expect(session.canCompleteMedicineCheck == false,
                     "\(state) must not allow medicine-only completion")
+            #expect(session.medicineAssessmentResultDidDisplay() == false)
+            #expect(session.continueToOuting() == false)
+            #expect(session.completeMedicineCheck() == false)
+            #expect(store.kinds.contains { kind in
+                if case .careActionShown = kind { return true }
+                return false
+            } == false)
         }
     }
 
-    /// `.result` with outing → canDepart is true, canCompleteMedicineCheck is false.
-    @Test func resultWithOutingEnablesCanDepart() async {
-        let session = await Self.sessionAtGate(
+    /// A result alone stays blocked; display records once and unlocks outing.
+    @Test func displayedResultWithOutingRecordsOnceAndEnablesExplicitDeparture() async {
+        let (session, store) = await Self.sessionAndStoreAtGate(
             latestUpdate: Self.makeResultUpdate(sequenceNumber: 1)
         )
-        #expect(session.canDepart == true)
+
+        #expect(session.canDepart == false)
         #expect(session.canCompleteMedicineCheck == false)
+        #expect(session.continueToOuting() == false)
+        #expect(store.kinds.contains { kind in
+            if case .careActionShown = kind { return true }
+            return false
+        } == false)
+
+        #expect(session.medicineAssessmentResultDidDisplay())
+        #expect(session.assessmentGate?.hasDisplayedCurrentResult == true)
+        #expect(
+            session.assessmentGate?.displayedResultRequestID
+                == Self.presentation.response.requestID
+        )
+        #expect(session.canDepart)
+        #expect(session.canCompleteMedicineCheck == false)
+
+        // Repeated render callbacks are harmless and do not duplicate history.
+        #expect(session.medicineAssessmentResultDidDisplay() == false)
+        let shown = store.kinds.filter { kind in
+            if case .careActionShown = kind { return true }
+            return false
+        }
+        #expect(shown == [
+            .careActionShown(
+                medicineName: MedicineCandidate.demoCandidates[0].displayName
+            ),
+        ])
+
+        #expect(session.continueToOuting())
+        #expect(session.state == .travelling)
+        #expect(session.assessmentGate == nil)
     }
 
-    /// `.result` without outing → canDepart is false, canCompleteMedicineCheck true.
-    @Test func resultWithoutOutingEnablesCanCompleteMedicineCheck() async {
+    /// A medicine-only plan has its own explicit, recorded completion path.
+    @Test func displayedResultCompletesMedicineOnlySession() async {
         let plan = TodayPlan(
             preferredName: "王阿姨",
             medicines: [
@@ -603,35 +814,29 @@ struct MedicineAssessmentGateTests {
             ],
             outing: nil
         )
-        let delay = ControllableReadDelay()
-        let store = RecordingCareRecordStore()
-        let session = CompanionSessionModel(
-            records: store,
-            simulator: SpyScanSimulator(
-                scriptedOutcome: .findsCandidates(MedicineCandidate.demoCandidates)
-            ),
-            plan: plan,
-            readDelay: delay,
-            capabilities: .phase0
-        )
-
-        #expect(session.startCompanion())
-        session.beginMedicineRead()
-        await delay.waitForInstall()
-        #expect(delay.release())
-        if let task = session.pendingReadTask { await task.value }
-        session.confirmMedicine(MedicineCandidate.demoCandidates[0])
-
-        // Apply result.
-        session.applyAssessmentStateUpdate(
-            Self.makeResultUpdate(sequenceNumber: 1)
+        let (session, store) = await Self.sessionAndStoreAtGate(
+            latestUpdate: Self.makeResultUpdate(sequenceNumber: 1),
+            plan: plan
         )
 
         #expect(session.canDepart == false)
-        #expect(session.canCompleteMedicineCheck == true)
-        // State stays at the gate, not travelling, not completed.
-        #expect(session.assessmentGate != nil)
-        #expect(session.state != .travelling)
+        #expect(session.canCompleteMedicineCheck == false)
+        #expect(session.completeMedicineCheck() == false)
+
+        #expect(session.medicineAssessmentResultDidDisplay())
+        #expect(session.canDepart == false)
+        #expect(session.canCompleteMedicineCheck)
+        #expect(session.continueToOuting() == false)
+        #expect(session.completeMedicineCheck())
+        #expect(session.state == .completed(.completedMedicineCheck))
+        #expect(session.completeMedicineCheck() == false)
+
+        #expect(store.kinds.suffix(2) == [
+            .careActionShown(
+                medicineName: MedicineCandidate.demoCandidates[0].displayName
+            ),
+            .companionFinished(.completedMedicineCheck),
+        ])
     }
 
     // MARK: - 9. MedicineAssessmentPresentation roundtrip
@@ -654,70 +859,111 @@ struct MedicineAssessmentGateTests {
         #expect(updatedGate.assessmentState == .result(Self.presentation))
     }
 
-    // MARK: - 10. A medicine-only session never travels
-
-    /// With no outing planned, even a `.result` must not enable departure.
-    ///
-    /// Uses a plan with `outing == nil` — a medicine-only session — and walks
-    /// the real flow to the gate. Even after receiving `.result`, the session
-    /// must stay at the gate with no departure qualification.
-    @Test func medicineOnlySessionDoesNotEnterTravelling() async {
-        let plan = TodayPlan(
-            preferredName: "王阿姨",
-            medicines: [
-                TodayMedicineItem(
-                    id: "medicine-only",
-                    displayName: "降糖药",
-                    timeOfDayDescription: "晚饭后",
-                    isTakenToday: false
-                ),
-            ],
-            outing: nil
+    /// The result-only SwiftUI branch takes its identity directly from the
+    /// canonical response, so a replacement result creates a new view identity.
+    @Test func resultPresentationIdentityUsesCanonicalRequestID() {
+        let first = CompanionView.AssessmentPresentationIdentity(
+            .result(Self.presentation)
         )
-        let delay = ControllableReadDelay()
-        let store = RecordingCareRecordStore()
-        let session = CompanionSessionModel(
-            records: store,
-            simulator: SpyScanSimulator(
-                scriptedOutcome: .findsCandidates(MedicineCandidate.demoCandidates)
-            ),
-            plan: plan,
-            readDelay: delay,
-            capabilities: .phase0
+        let replacement = Self.presentation(
+            requestID: UUID(
+                uuidString: "00000000-0000-0000-0000-000000000002"
+            )!
+        )
+        let second = CompanionView.AssessmentPresentationIdentity(
+            .result(replacement)
         )
 
-        #expect(session.startCompanion())
-        session.beginMedicineRead()
-        await delay.waitForInstall()
-        #expect(delay.release())
-        if let task = session.pendingReadTask { await task.value }
-        session.confirmMedicine(MedicineCandidate.demoCandidates[0])
-
-        // Held at the gate, not travelling and not approaching a stop.
-        #expect(session.assessmentGate != nil)
-        #expect(session.state != .travelling)
-        #expect(session.state != .approachingStop)
-        #expect(session.canDepart == false)
-
-        // Apply result — still no departure qualification (no outing).
-        session.applyAssessmentStateUpdate(
-            Self.makeResultUpdate(sequenceNumber: 1)
-        )
-        #expect(session.canDepart == false)
-        #expect(session.canCompleteMedicineCheck == true)
-        #expect(session.assessmentGate != nil)
-        #expect(session.state != .travelling)
-        #expect(session.state != .approachingStop)
-
-        // And the record for a medicine-only session names the medicine step,
-        // never an outing that does not exist.
-        #expect(store.kinds.first == .dayPlanItemStarted(title: "今日用药"))
+        #expect(first == .result(Self.presentation.response.requestID))
+        #expect(second == .result(replacement.response.requestID))
+        #expect(first != second)
     }
 
-    // MARK: - 11. Outing session only qualifies after result
+    /// Every non-result canonical state is routed away from the branch that
+    /// owns the display acknowledgement callback.
+    @Test func nonResultPresentationsHaveNoResultIdentity() {
+        for update in Self.everyGateUpdate {
+            guard let state = update?.state else {
+                #expect(
+                    CompanionView.AssessmentPresentationIdentity(.idle)
+                        == .nonResult
+                )
+                continue
+            }
+            if case .result = state { continue }
 
-    /// An outing session must only earn departure qualification after `.result`.
-    @Test func outingSessionOnlyQualifiesAfterResult() async {
+            #expect(
+                CompanionView.AssessmentPresentationIdentity(state)
+                    == .nonResult
+            )
+        }
+    }
+
+    /// Presentation cannot invent a candidate confirmation because the
+    /// canonical callback provides no candidate identity.
+    @Test func assessmentPresentationProvidesNoCandidateConfirmation() {
+        #expect(CompanionView().assessmentCandidateConfirmationAction == nil)
+    }
+
+    /// Hosting the real Companion assessment branch exercises SwiftUI's
+    /// result-only `onAppear`, including same-ID idempotency and replacement.
+    @Test func hostedResultPageAcknowledgesEachCanonicalRequestOnce() async {
+        let (session, store) = await Self.sessionAndStoreAtGate(
+            latestUpdate: Self.makeResultUpdate(sequenceNumber: 1)
+        )
+        let initialHost = Self.host(CompanionView(session: session))
+
+        #expect(session.assessmentGate?.hasDisplayedCurrentResult == true)
+        #expect(Self.careActionShownCount(in: store) == 1)
+
+        // A separate hierarchy produces another `onAppear` for the same
+        // request, while A2a remains the final idempotency boundary.
+        let repeatedHost = Self.host(CompanionView(session: session))
+        #expect(Self.careActionShownCount(in: store) == 1)
+        repeatedHost.window.isHidden = true
+
+        let replacement = Self.presentation(
+            requestID: UUID(
+                uuidString: "00000000-0000-0000-0000-000000000004"
+            )!
+        )
+        session.applyAssessmentStateUpdate(
+            MedicineAssessmentStateUpdate(
+                sequenceNumber: 2,
+                state: .result(replacement)
+            )
+        )
+        let replacementHost = Self.host(CompanionView(session: session))
+
+        #expect(
+            session.assessmentGate?.displayedResultRequestID
+                == replacement.response.requestID
+        )
+        #expect(Self.careActionShownCount(in: store) == 2)
+        replacementHost.window.isHidden = true
+        initialHost.window.isHidden = true
+    }
+
+    /// A hosted non-result page never enters the result-only acknowledgement
+    /// branch and therefore writes no display record.
+    @Test func hostedNonResultPageDoesNotAcknowledgeDisplay() async {
+        let (session, store) = await Self.sessionAndStoreAtGate(
+            latestUpdate: MedicineAssessmentStateUpdate(
+                sequenceNumber: 1,
+                state: .failed(Self.clientFailure)
+            )
+        )
+        let host = Self.host(CompanionView(session: session))
+
+        #expect(session.assessmentGate?.displayedResultRequestID == nil)
+        #expect(Self.careActionShownCount(in: store) == 0)
+        host.window.isHidden = true
+    }
+
+    // MARK: - 10. Outing session only qualifies after display
+
+    /// An outing session qualifies only after its result was displayed.
+    @Test func outingSessionOnlyQualifiesAfterResultDisplay() async {
         let session = await Self.sessionAtGate()
 
         // At .idle gate (no update yet): no departure.
@@ -743,15 +989,89 @@ struct MedicineAssessmentGateTests {
         #expect(session.canDepart == false)
         #expect(session.assessmentGate?.isAwaitingRecovery == true)
 
-        // Apply .result: now departure qualification is earned.
+        // Receiving .result still does not earn departure qualification.
         session.applyAssessmentStateUpdate(
             Self.makeResultUpdate(sequenceNumber: 3)
         )
-        #expect(session.canDepart == true)
+        #expect(session.canDepart == false)
         #expect(session.canCompleteMedicineCheck == false)
-        // But still at the gate — C1 does not transition.
         #expect(session.assessmentGate != nil)
         #expect(session.state != .travelling)
+
+        // The real-display callback unlocks the explicit transition.
+        #expect(session.medicineAssessmentResultDidDisplay())
+        #expect(session.canDepart)
+        #expect(session.continueToOuting())
+        #expect(session.state == .travelling)
+    }
+
+    /// The button route used by the assessment page calls the explicit outing
+    /// continuation and cannot also represent medicine-only completion.
+    @Test func assessmentPageOutingActionContinuesToOuting() async {
+        let session = await Self.sessionAtGate(
+            latestUpdate: Self.makeResultUpdate(sequenceNumber: 1)
+        )
+        #expect(session.medicineAssessmentResultDidDisplay())
+
+        let continuation = CompanionView.AssessmentContinuation(
+            canDepart: session.canDepart,
+            canCompleteMedicineCheck: session.canCompleteMedicineCheck
+        )
+        #expect(continuation == .outing)
+        #expect(continuation?.perform(on: session) == true)
+        #expect(session.state == .travelling)
+    }
+
+    /// The same page route calls the dedicated medicine-only completion and
+    /// never enters travelling.
+    @Test func assessmentPageMedicineOnlyActionCompletesCheck() async {
+        let plan = TodayPlan(
+            preferredName: "王阿姨",
+            medicines: [
+                TodayMedicineItem(
+                    id: "medicine-only-action",
+                    displayName: "降糖药",
+                    timeOfDayDescription: "晚饭后",
+                    isTakenToday: false
+                ),
+            ],
+            outing: nil
+        )
+        let (session, _) = await Self.sessionAndStoreAtGate(
+            latestUpdate: Self.makeResultUpdate(sequenceNumber: 1),
+            plan: plan
+        )
+        #expect(session.medicineAssessmentResultDidDisplay())
+
+        let continuation = CompanionView.AssessmentContinuation(
+            canDepart: session.canDepart,
+            canCompleteMedicineCheck: session.canCompleteMedicineCheck
+        )
+        #expect(continuation == .medicineCheck)
+        #expect(continuation?.perform(on: session) == true)
+        #expect(session.state == .completed(.completedMedicineCheck))
+        #expect(session.state != .travelling)
+    }
+
+    /// The page models continuation as one optional action, and refuses an
+    /// invalid pair instead of rendering both buttons.
+    @Test func assessmentPageNeverOffersBothContinuationActions() {
+        #expect(CompanionView.AssessmentContinuation(
+            canDepart: false,
+            canCompleteMedicineCheck: false
+        ) == nil)
+        #expect(CompanionView.AssessmentContinuation(
+            canDepart: true,
+            canCompleteMedicineCheck: true
+        ) == nil)
+        #expect(CompanionView.AssessmentContinuation(
+            canDepart: true,
+            canCompleteMedicineCheck: false
+        ) == .outing)
+        #expect(CompanionView.AssessmentContinuation(
+            canDepart: false,
+            canCompleteMedicineCheck: true
+        ) == .medicineCheck)
     }
 
     // MARK: - Fixtures
@@ -780,6 +1100,7 @@ struct MedicineAssessmentGateTests {
         .travelling,
         .approachingStop,
         .completed(.arrivedSafely),
+        .completed(.completedMedicineCheck),
         .completed(.endedEarly),
     ]
 
@@ -795,6 +1116,11 @@ struct MedicineAssessmentGateTests {
         .retakeMedicinePhoto,
         .confirmMedicine(MedicineCandidate.demoCandidates[0]),
         .medicineAssessmentStateDidUpdate(makeIdleUpdate(sequenceNumber: 1)),
+        .medicineAssessmentResultDidDisplay(
+            UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        ),
+        .continueToOuting,
+        .completeMedicineCheck,
         .reconsiderMedicineChoice,
         .approachStop,
         .arriveSafely,
@@ -884,6 +1210,58 @@ struct MedicineAssessmentGateTests {
         return MedicineAssessmentPresentation(response: response)
     }()
 
+    static func presentation(
+        requestID: UUID
+    ) -> MedicineAssessmentPresentation {
+        MedicineAssessmentPresentation(
+            response: MedicineAssessmentResponseDTO(
+                requestID: requestID,
+                resolution: presentation.response.resolution,
+                assessment: presentation.response.assessment,
+                actionCard: presentation.response.actionCard,
+                cacheHit: presentation.response.cacheHit,
+                resolutionCacheStatus:
+                    presentation.response.resolutionCacheStatus,
+                knowledgeCacheStatus:
+                    presentation.response.knowledgeCacheStatus,
+                sourceDataVersion: presentation.response.sourceDataVersion,
+                generatedAt: presentation.response.generatedAt,
+                apiVersion: presentation.response.apiVersion,
+                healthContextValidation:
+                    presentation.response.healthContextValidation,
+                medicineKnowledge: presentation.response.medicineKnowledge
+            )
+        )
+    }
+
+    static func host(
+        _ view: CompanionView
+    ) -> (
+        window: UIWindow,
+        controller: UIHostingController<AnyView>
+    ) {
+        let environment = AppEnvironment.preview()
+        let controller = UIHostingController(
+            rootView: AnyView(view.environment(environment))
+        )
+        let window = UIWindow(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 844)
+        )
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        controller.view.layoutIfNeeded()
+        return (window, controller)
+    }
+
+    static func careActionShownCount(
+        in store: RecordingCareRecordStore
+    ) -> Int {
+        store.kinds.count { kind in
+            if case .careActionShown = kind { return true }
+            return false
+        }
+    }
+
     /// The test `ClientFailure`, reused across tests.
     static let clientFailure = ClientFailure(
         kind: .unknown,
@@ -931,16 +1309,18 @@ struct MedicineAssessmentGateTests {
     /// confirms, exactly as a person would drive it. The gate is therefore
     /// reached the same way in tests as in the app.
     static func sessionAndStoreAtGate(
-        latestUpdate: MedicineAssessmentStateUpdate? = nil
+        latestUpdate: MedicineAssessmentStateUpdate? = nil,
+        plan: TodayPlan = .demo
     ) async -> (CompanionSessionModel, RecordingCareRecordStore) {
         let delay = ControllableReadDelay()
         let store = RecordingCareRecordStore()
         let session = CompanionSessionModel(
             records: store,
+            careActionShownRecorder: CareActionShownRecorder(records: store),
             simulator: SpyScanSimulator(
                 scriptedOutcome: .findsCandidates(MedicineCandidate.demoCandidates)
             ),
-            plan: .demo,
+            plan: plan,
             readDelay: delay,
             capabilities: .phase0
         )
@@ -963,5 +1343,27 @@ struct MedicineAssessmentGateTests {
         latestUpdate: MedicineAssessmentStateUpdate? = nil
     ) async -> CompanionSessionModel {
         await sessionAndStoreAtGate(latestUpdate: latestUpdate).0
+    }
+}
+
+/// Test-target assembly for call sites that do not exercise result display.
+/// Production has no such overload: its initializer requires an explicitly
+/// composed `CareActionShownRecorder`.
+extension CompanionSessionModel {
+    convenience init(
+        records: any CareRecordStoring,
+        simulator: any MedicineScanSimulating = MockMedicineScanSimulator.demo,
+        plan: TodayPlan,
+        readDelay: any MedicineReadDelaying = ContinuousMedicineReadDelay(),
+        capabilities: CapabilityCatalog
+    ) {
+        self.init(
+            records: records,
+            careActionShownRecorder: CareActionShownRecorder(records: records),
+            simulator: simulator,
+            plan: plan,
+            readDelay: readDelay,
+            capabilities: capabilities
+        )
     }
 }
