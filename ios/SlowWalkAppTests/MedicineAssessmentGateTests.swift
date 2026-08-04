@@ -415,7 +415,7 @@ struct MedicineAssessmentGateTests {
     }
 
     @Test func medicineCaptureCopyContainsNoASCIIEnglishText() {
-        #expect(MedicineCaptureCopy.allUserVisibleText.count == 16)
+        #expect(MedicineCaptureCopy.allUserVisibleText.count == 22)
         #expect(
             MedicineCaptureCopy.allUserVisibleText.allSatisfy { text in
                 text.unicodeScalars.allSatisfy { scalar in
@@ -424,37 +424,6 @@ struct MedicineAssessmentGateTests {
                 }
             }
         )
-    }
-
-    @Test func medicineCaptureControlsPreservePhotoLibraryFallback() {
-        #expect(MedicineCaptureControlState(
-            captureState: .permissionDenied,
-            submissionStatus: .none
-        ) == .photoLibraryOnly)
-        #expect(MedicineCaptureControlState(
-            captureState: .cameraUnavailable,
-            submissionStatus: .none
-        ) == .photoLibraryOnly)
-        #expect(MedicineCaptureControlState(
-            captureState: .idle,
-            submissionStatus: .none
-        ) == .captureAndPhotoLibrary)
-        #expect(MedicineCaptureControlState(
-            captureState: .ready,
-            submissionStatus: .none
-        ) == .captureAndPhotoLibrary)
-        #expect(MedicineCaptureControlState(
-            captureState: .recognizing(generation: 1),
-            submissionStatus: .none
-        ) == .cancel)
-        #expect(MedicineCaptureControlState(
-            captureState: .ready,
-            submissionStatus: .submitted
-        ) == .none)
-        #expect(MedicineCaptureControlState(
-            captureState: .ready,
-            submissionStatus: .failed(.assessmentGateUnavailable)
-        ) == .retry)
     }
 
     /// A confirmation may only ever land at the assessment gate.

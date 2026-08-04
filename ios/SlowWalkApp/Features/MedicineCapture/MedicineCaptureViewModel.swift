@@ -1,14 +1,42 @@
+@preconcurrency import AVFoundation
 import Combine
 import Foundation
 import SlowWalkClientCore
 import UIKit
 
+@MainActor
+protocol CameraPermissionProviding: AnyObject {
+    var authorizationState: AVAuthorizationStatus { get }
+    var isCameraAvailable: Bool { get }
+    func requestAccess() async -> Bool
+}
+
+@MainActor
+final class SystemCameraPermissionProvider: CameraPermissionProviding {
+    var authorizationState: AVAuthorizationStatus {
+        CameraCaptureService.authorizationStatus
+    }
+
+    var isCameraAvailable: Bool {
+        AVCaptureDevice.default(
+            .builtInWideAngleCamera, for: .video, position: .back
+        ) != nil
+    }
+
+    func requestAccess() async -> Bool {
+        await AVCaptureDevice.requestAccess(for: .video)
+    }
+}
+
 enum MedicineCaptureState: Equatable {
     case idle
     case requestingPermission
     case permissionDenied
+    case cameraRestricted
+    case startingCamera
     case ready
     case capturing
+    case loadingPhoto(generation: Int)
     case recognizing(generation: Int)
     case success([RecognizedTextObservation])
     case noTextFound
@@ -25,17 +53,28 @@ enum MedicineAssessmentSubmissionStatus: Equatable {
 
 @MainActor
 final class MedicineCaptureViewModel: ObservableObject {
+    struct BackgroundCleanup: Sendable {
+        fileprivate let captureRequestID: UUID?
+        fileprivate let sessionID: UUID?
+    }
+
     @Published var state: MedicineCaptureState = .idle
     @Published private(set) var assessmentSubmissionStatus:
         MedicineAssessmentSubmissionStatus = .none
+    @Published private(set) var isCameraSessionStarted = false
 
     let previewSource: CameraPreviewSource
     private let captureService: any CameraCaptureServicing
+    private let permissionProvider: any CameraPermissionProviding
     private let processor: any MedicineCaptureProcessing
     private let onAssessmentSubmissionAccepted: @MainActor () -> Void
 
     private var activeCaptureID: UUID?
     private var activeSessionID: UUID?
+    private var activePhotoLoadID: UUID?
+    private var isPhotosPickerPresented = false
+    private var cameraPreparationTask: Task<Void, Never>?
+    private var cameraPreparationGeneration = 0
     private var captureTask: Task<Void, Never>?
     private var processingTask: Task<Void, Never>?
     private var processorCancellationTask: Task<Void, Never>?
@@ -49,12 +88,15 @@ final class MedicineCaptureViewModel: ObservableObject {
         processor: any MedicineCaptureProcessing,
         previewSource: CameraPreviewSource = CameraPreviewSource(),
         captureService: (any CameraCaptureServicing)? = nil,
+        permissionProvider: (any CameraPermissionProviding)? = nil,
         onAssessmentSubmissionAccepted: @escaping @MainActor () -> Void = {}
     ) {
         self.processor = processor
         self.previewSource = previewSource
         self.captureService = captureService
             ?? previewSource.makeCaptureService()
+        self.permissionProvider = permissionProvider
+            ?? SystemCameraPermissionProvider()
         self.onAssessmentSubmissionAccepted =
             onAssessmentSubmissionAccepted
     }
@@ -62,7 +104,8 @@ final class MedicineCaptureViewModel: ObservableObject {
     convenience init(
         recognizer: any MedicineTextRecognizing,
         previewSource: CameraPreviewSource = CameraPreviewSource(),
-        captureService: (any CameraCaptureServicing)? = nil
+        captureService: (any CameraCaptureServicing)? = nil,
+        permissionProvider: (any CameraPermissionProviding)? = nil
     ) {
         self.init(
             processor: MedicineCaptureStandaloneOCRProcessor(
@@ -70,13 +113,15 @@ final class MedicineCaptureViewModel: ObservableObject {
             ),
             previewSource: previewSource,
             captureService: captureService,
+            permissionProvider: permissionProvider,
             onAssessmentSubmissionAccepted: {}
         )
     }
 
     // MARK: - Session
 
-    func startSession() async throws {
+    func startSession(preparationGeneration: Int? = nil) async throws {
+        guard activeSessionID == nil else { return }
         let sessionID = UUID()
         activeSessionID = sessionID
 
@@ -92,22 +137,53 @@ final class MedicineCaptureViewModel: ObservableObject {
             throw error
         }
 
-        guard activeSessionID == sessionID else {
+        guard activeSessionID == sessionID,
+              preparationGeneration.map(ownsCameraPreparation) ?? true
+        else {
             await captureService.stop(sessionID: sessionID)
             return
         }
         previewSource.createPreviewLayer(sessionID: sessionID)
+        isCameraSessionStarted = true
         state = .ready
+    }
+
+    @discardableResult
+    func beginCameraPresentation() -> Bool {
+        guard state == .idle,
+              activeSessionID == nil,
+              cameraPreparationTask == nil
+        else { return false }
+
+        guard permissionProvider.isCameraAvailable else {
+            state = .cameraUnavailable
+            return true
+        }
+
+        switch permissionProvider.authorizationState {
+        case .notDetermined:
+            beginPermissionRequest()
+        case .authorized:
+            beginAuthorizedCameraStart()
+        case .denied:
+            state = .permissionDenied
+        case .restricted:
+            state = .cameraRestricted
+        @unknown default:
+            state = .cameraUnavailable
+        }
+        return true
     }
 
     // MARK: - Camera capture
 
     func capturePhoto() {
-        let replacedRequestID = activeCaptureID
-        activeCaptureID = nil
-        captureTask?.cancel()
-        captureTask = nil
-        _ = beginProcessingCancellation()
+        guard state == .ready,
+              activeCaptureID == nil,
+              activePhotoLoadID == nil,
+              processingGeneration == nil
+        else { return }
+
         currentGeneration &+= 1
         let generation = currentGeneration
         let requestID = UUID()
@@ -116,14 +192,6 @@ final class MedicineCaptureViewModel: ObservableObject {
         let capturedAt = Date()
         state = .capturing
         assessmentSubmissionStatus = .none
-
-        if let replacedRequestID {
-            Task {
-                await captureService.cancelPendingCapture(
-                    requestID: replacedRequestID
-                )
-            }
-        }
 
         captureTask = Task { [weak self, captureService] in
             guard let self else { return }
@@ -157,6 +225,74 @@ final class MedicineCaptureViewModel: ObservableObject {
 
     // MARK: - PhotosPicker input
 
+    var canChoosePhoto: Bool {
+        switch state {
+        case .idle, .permissionDenied, .cameraRestricted,
+             .cameraUnavailable, .ready:
+            true
+        case .requestingPermission, .startingCamera, .capturing,
+             .loadingPhoto, .recognizing, .success, .noTextFound,
+             .recognitionFailed, .cancelled:
+            false
+        }
+    }
+
+    @discardableResult
+    func beginPhotosPickerPresentation() -> Bool {
+        guard canChoosePhoto,
+              !isPhotosPickerPresented,
+              activePhotoLoadID == nil
+        else { return false }
+        isPhotosPickerPresented = true
+        return true
+    }
+
+    func endPhotosPickerPresentation() { isPhotosPickerPresented = false }
+
+    func beginPhotoLoading() -> UUID? {
+        guard canChoosePhoto, activePhotoLoadID == nil else { return nil }
+        isPhotosPickerPresented = false
+        currentGeneration &+= 1
+        let generation = currentGeneration
+        let loadID = UUID()
+        activePhotoLoadID = loadID
+        state = .loadingPhoto(generation: generation)
+        assessmentSubmissionStatus = .none
+        return loadID
+    }
+
+    @discardableResult
+    func submitLoadedPhoto(
+        loadID: UUID,
+        imageData: Data,
+        orientation: OCRImageOrientation,
+        capturedAt: Date
+    ) -> Bool {
+        guard activePhotoLoadID == loadID,
+              case .loadingPhoto(let generation) = state,
+              generation == currentGeneration
+        else { return false }
+        activePhotoLoadID = nil
+        startProcessing(
+            input: OCRImageInput(
+                data: imageData,
+                orientation: orientation,
+                capturedAt: capturedAt
+            ),
+            generation: generation
+        )
+        return true
+    }
+
+    func photoLoadingFailed(loadID: UUID) {
+        guard activePhotoLoadID == loadID,
+              case .loadingPhoto(let generation) = state,
+              generation == currentGeneration
+        else { return }
+        activePhotoLoadID = nil
+        state = .recognitionFailed("photo_loading_failed")
+    }
+
     func capture(
         imageData: Data, orientation: OCRImageOrientation, capturedAt: Date
     ) {
@@ -187,6 +323,9 @@ final class MedicineCaptureViewModel: ObservableObject {
         guard acceptedHandoffGeneration == nil,
               !acceptedHandoffWasDismissed
         else { return }
+        invalidateCameraPreparation()
+        isPhotosPickerPresented = false
+        activePhotoLoadID = nil
         let requestID = activeCaptureID
         activeCaptureID = nil
         currentGeneration &+= 1
@@ -205,6 +344,9 @@ final class MedicineCaptureViewModel: ObservableObject {
     }
 
     func dismiss() async {
+        invalidateCameraPreparation()
+        isPhotosPickerPresented = false
+        activePhotoLoadID = nil
         let requestID = activeCaptureID
         let sessionID = activeSessionID
         activeCaptureID = nil
@@ -237,6 +379,7 @@ final class MedicineCaptureViewModel: ObservableObject {
             await captureService.stop(sessionID: sessionID)
             previewSource.clearPreviewLayer(sessionID: sessionID)
         }
+        isCameraSessionStarted = false
         state = .idle
         assessmentSubmissionStatus = .none
         acceptedHandoffGeneration = nil
@@ -248,24 +391,162 @@ final class MedicineCaptureViewModel: ObservableObject {
             assessmentSubmissionStatus = .none
             return
         }
+        invalidateCameraPreparation()
+        isPhotosPickerPresented = false
+        activePhotoLoadID = nil
         activeCaptureID = nil
         captureTask?.cancel()
         captureTask = nil
         _ = beginProcessingCancellation(forceInitialStop: true)
         currentGeneration &+= 1
-        state = .idle
+        state = isCameraSessionStarted ? .ready : .idle
         assessmentSubmissionStatus = .none
     }
 
     // MARK: - Permission
 
-    func requestPermission() { state = .requestingPermission }
-    func setPermissionAuthorized(_ authorized: Bool) {
-        state = authorized ? .ready : .permissionDenied
+    func appDidBecomeActive() {
+        guard cameraPreparationTask == nil,
+              activeSessionID == nil
+        else { return }
+
+        switch state {
+        case .permissionDenied, .cameraRestricted, .cameraUnavailable:
+            applyCurrentCameraAvailability()
+        default:
+            break
+        }
     }
-    func setCameraUnavailable() { state = .cameraUnavailable }
-    func setPhotoLoadingFailed() {
-        state = .recognitionFailed("photo_loading_failed")
+
+    func prepareForBackground() -> BackgroundCleanup {
+        invalidateCameraPreparation()
+        isPhotosPickerPresented = false
+
+        let abandonsInput = activeCaptureID != nil
+            || activePhotoLoadID != nil
+        let requestID = activeCaptureID
+        let sessionID = activeSessionID
+        activeCaptureID = nil
+        activePhotoLoadID = nil
+        activeSessionID = nil
+        captureTask?.cancel()
+        captureTask = nil
+        if abandonsInput {
+            currentGeneration &+= 1
+        }
+
+        isCameraSessionStarted = false
+        if let sessionID {
+            previewSource.clearPreviewLayer(sessionID: sessionID)
+        }
+
+        switch state {
+        case .requestingPermission, .startingCamera, .ready,
+             .capturing, .loadingPhoto:
+            state = .idle
+        default:
+            break
+        }
+
+        return BackgroundCleanup(
+            captureRequestID: requestID,
+            sessionID: sessionID
+        )
+    }
+
+    func finishBackgroundCleanup(_ cleanup: BackgroundCleanup) async {
+        if let requestID = cleanup.captureRequestID {
+            await captureService.cancelPendingCapture(requestID: requestID)
+        }
+        if let sessionID = cleanup.sessionID {
+            await captureService.stop(sessionID: sessionID)
+        }
+    }
+
+    private func beginPermissionRequest() {
+        let permissionProvider = permissionProvider
+        cameraPreparationGeneration &+= 1
+        let generation = cameraPreparationGeneration
+        state = .requestingPermission
+        cameraPreparationTask = Task { @MainActor [weak self] in
+            let granted = await permissionProvider.requestAccess()
+            guard let self,
+                  self.ownsCameraPreparation(generation)
+            else { return }
+
+            guard granted else {
+                self.applyCurrentCameraAvailability()
+                self.finishCameraPreparation(generation)
+                return
+            }
+            guard permissionProvider.isCameraAvailable else {
+                self.state = .cameraUnavailable
+                self.finishCameraPreparation(generation)
+                return
+            }
+            self.state = .startingCamera
+            await self.startAuthorizedCamera(generation: generation)
+        }
+    }
+
+    private func beginAuthorizedCameraStart() {
+        cameraPreparationGeneration &+= 1
+        let generation = cameraPreparationGeneration
+        state = .startingCamera
+        cameraPreparationTask = Task { @MainActor [weak self] in
+            await self?.startAuthorizedCamera(generation: generation)
+        }
+    }
+
+    private func startAuthorizedCamera(generation: Int) async {
+        guard ownsCameraPreparation(generation) else { return }
+        do {
+            try await startSession(preparationGeneration: generation)
+            guard ownsCameraPreparation(generation) else { return }
+        } catch is CancellationError {
+            return
+        } catch CameraCaptureFailure.permissionDenied {
+            guard ownsCameraPreparation(generation) else { return }
+            state = .permissionDenied
+        } catch {
+            guard ownsCameraPreparation(generation) else { return }
+            state = .cameraUnavailable
+        }
+        finishCameraPreparation(generation)
+    }
+
+    private func ownsCameraPreparation(_ generation: Int) -> Bool {
+        !Task.isCancelled
+            && cameraPreparationGeneration == generation
+            && cameraPreparationTask != nil
+    }
+
+    private func finishCameraPreparation(_ generation: Int) {
+        guard ownsCameraPreparation(generation) else { return }
+        cameraPreparationTask = nil
+    }
+
+    private func invalidateCameraPreparation() {
+        cameraPreparationGeneration &+= 1
+        cameraPreparationTask?.cancel()
+        cameraPreparationTask = nil
+    }
+
+    private func applyCurrentCameraAvailability() {
+        guard permissionProvider.isCameraAvailable else {
+            state = .cameraUnavailable
+            return
+        }
+        switch permissionProvider.authorizationState {
+        case .notDetermined, .authorized:
+            state = .idle
+        case .denied:
+            state = .permissionDenied
+        case .restricted:
+            state = .cameraRestricted
+        @unknown default:
+            state = .cameraUnavailable
+        }
     }
 
     // MARK: - Processing
