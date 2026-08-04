@@ -24,15 +24,8 @@ public struct MedicineAssessmentView: View {
     }
 
     public var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                content
-            }
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .padding(20)
+        Form {
+            content
         }
     }
 
@@ -40,21 +33,25 @@ public struct MedicineAssessmentView: View {
     private var content: some View {
         switch state.variant {
         case .idle:
-            statusText(MedicinePresentationCopy.idleText)
+            lifecycleSection(
+                MedicinePresentationCopy.idleText,
+                systemImage: "hourglass"
+            )
 
         case .recognizing:
-            progressText(
+            progressSection(
                 MedicinePresentationCopy.recognizingText
             )
 
         case .assessing:
-            progressText(
+            progressSection(
                 MedicinePresentationCopy.assessingText
             )
 
         case .cancelled:
-            statusText(
-                MedicinePresentationCopy.cancelledText
+            lifecycleSection(
+                MedicinePresentationCopy.cancelledText,
+                systemImage: "xmark.circle"
             )
 
         case .timeout, .failed:
@@ -85,31 +82,40 @@ public struct MedicineAssessmentView: View {
         } else {
             // A confirmation can be required with no response at all. The page
             // must not fabricate a card, a level, or an instruction.
-            VStack(alignment: .leading, spacing: 12) {
-                Text(
-                    MedicinePresentationCopy
-                        .confirmationRequiredHeading
-                )
-                .font(.title3)
-                .fontWeight(.semibold)
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
+            Section {
+                Label {
+                    Text(
+                        MedicinePresentationCopy
+                            .confirmationRequiredHeading
+                    )
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+                } icon: {
+                    Image(systemName: "questionmark.circle")
+                        .accessibilityHidden(true)
+                }
+                .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
 
-                statusText(
+                Text(
                     MedicinePresentationCopy
                         .noResultAvailableText
                 )
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
 
-                if let confirmAction {
-                    Button(
-                        MedicinePresentationCopy
-                            .confirmMedicineButtonTitle,
-                        action: confirmAction
-                    )
-                    .buttonStyle(.bordered)
+            if let confirmAction {
+                Section {
+                    Button(action: confirmAction) {
+                        Label(
+                            MedicinePresentationCopy
+                                .confirmMedicineButtonTitle,
+                            systemImage: "checkmark.circle"
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
                     .medicineMinimumHitTarget()
                     .accessibilityHint(
                         MedicinePresentationCopy
@@ -124,20 +130,11 @@ public struct MedicineAssessmentView: View {
 
     @ViewBuilder
     private var failureContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Section {
             // Text siblings each stay their own element; the Button below is
             // never merged into them.
             if let failure = state.failure {
-                HStack(
-                    alignment: .firstTextBaseline,
-                    spacing: 8
-                ) {
-                    Image(
-                        systemName:
-                            "exclamationmark.triangle.fill"
-                    )
-                    .accessibilityHidden(true)
-
+                Label {
                     Text(
                         MedicinePresentationCopy
                             .failureName(
@@ -148,24 +145,33 @@ public struct MedicineAssessmentView: View {
                         horizontal: false,
                         vertical: true
                     )
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .accessibilityHidden(true)
                 }
                 .accessibilityElement(children: .combine)
             }
 
-            statusText(
+            Text(
                 MedicinePresentationCopy
                     .noResultAvailableText
             )
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
 
-            if state.failure?.allowsRetry == true,
-               let retryAction
-            {
-                Button(
-                    MedicinePresentationCopy
-                        .retryButtonTitle,
-                    action: retryAction
-                )
-                .buttonStyle(.bordered)
+        if state.failure?.allowsRetry == true,
+           let retryAction
+        {
+            Section {
+                Button(action: retryAction) {
+                    Label(
+                        MedicinePresentationCopy.retryButtonTitle,
+                        systemImage: "arrow.clockwise"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
                 .medicineMinimumHitTarget()
                 .accessibilityHint(
                     MedicinePresentationCopy
@@ -177,26 +183,38 @@ public struct MedicineAssessmentView: View {
 
     // MARK: - Support
 
-    private func statusText(
-        _ text: String
+    private func lifecycleSection(
+        _ text: String,
+        systemImage: String
     ) -> some View {
-        Text(text)
-            .fixedSize(horizontal: false, vertical: true)
+        Section {
+            Label {
+                Text(text)
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: systemImage)
+                    .accessibilityHidden(true)
+            }
+            .accessibilityElement(children: .combine)
+        }
     }
 
-    private func progressText(
+    private func progressSection(
         _ text: String
     ) -> some View {
-        HStack(spacing: 10) {
-            ProgressView()
-                .accessibilityHidden(true)
+        Section {
+            HStack(spacing: 12) {
+                ProgressView()
+                    .accessibilityHidden(true)
 
-            Text(text)
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
+                Text(text)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(text)
         }
-        .accessibilityElement(children: .combine)
     }
 }
