@@ -8,13 +8,28 @@ public protocol MedicineRepository: Sendable {
     func save(_ medicine: Medicine) async throws
 }
 
-/// Read/write boundary for user health profiles.
+/// General multi-record profile boundary for non-iOS or reusable runtimes.
+///
+/// iOS onboarding, settings, and Medicine runtime must use
+/// `LocalUserProfileStore` for the current user instead of maintaining a
+/// second current-profile copy through this interface.
 public protocol UserHealthProfileRepository: Sendable {
     func fetch(id: UUID) async throws -> UserHealthProfile?
     func fetchAll() async throws -> [UserHealthProfile]
     func save(_ profile: UserHealthProfile) async throws
     func update(_ profile: UserHealthProfile) async throws
     func delete(id: UUID) async throws
+}
+
+/// Canonical persistence boundary for the iOS current-user profile bundle.
+///
+/// This is the single source of truth for the current composite profile.
+public protocol LocalUserProfileStore: Sendable {
+    func loadCurrentProfile() async throws -> LocalUserProfileBundle?
+    func saveCurrentProfile(
+        _ profile: LocalUserProfileBundle
+    ) async throws
+    func deleteCurrentProfile() async throws
 }
 
 /// Read/write boundary for medication history.
