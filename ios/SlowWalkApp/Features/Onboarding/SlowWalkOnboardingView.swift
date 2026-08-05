@@ -1,5 +1,5 @@
-import SwiftUI
 import SlowWalkDomain
+import SwiftUI
 
 struct SlowWalkOnboardingView: View {
     typealias DraftSubmission = SlowWalkOnboardingSubmissionModel.DraftSubmission
@@ -28,11 +28,7 @@ struct SlowWalkOnboardingView: View {
         onUseDemoData: @escaping DemoSelection,
         onComplete: @escaping Completion
     ) {
-        _draft = State(
-            initialValue: SlowWalkOnboardingInputRules.normalizedDraft(
-                initialDraft
-            )
-        )
+        _draft = State(initialValue: SlowWalkOnboardingInputRules.normalizedDraft(initialDraft))
         _flow = State(initialValue: SlowWalkOnboardingFlowState(step: initialStep))
         _submission = StateObject(
             wrappedValue: SlowWalkOnboardingSubmissionModel(
@@ -53,12 +49,8 @@ struct SlowWalkOnboardingView: View {
                     submissionFailureContent
                 }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                actionBar
-            }
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
+            .safeAreaInset(edge: .bottom, spacing: 0) { actionBar }.navigationTitle(navigationTitle)
+            .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
             .toolbar {
                 if showsBackButton {
                     ToolbarItem(placement: .topBarLeading) {
@@ -67,64 +59,40 @@ struct SlowWalkOnboardingView: View {
                         } label: {
                             Label("返回", systemImage: "chevron.backward")
                         }
-                        .labelStyle(.iconOnly)
-                        .accessibilityLabel("返回上一步")
+                        .labelStyle(.iconOnly).accessibilityLabel("返回上一步")
                         .disabled(submission.state.isSubmitting)
                     }
                 }
             }
             .interactiveDismissDisabled(submission.state.isSubmitting)
-            .onAppear {
-                focusedStep = flow.step
-            }
-            .onChange(of: flow.step) { _, newStep in
-                focusedStep = newStep
-            }
-            .onChange(of: draft.preferredName) {
-                clearValidationMessage(for: .preferredName)
-            }
-            .onChange(of: draft.ageText) {
-                clearValidationMessage(for: .age)
-            }
-            .onChange(of: submission.state) { _, state in
-                handleSubmissionState(state)
-            }
-            .onDisappear {
-                submission.invalidate()
-            }
+            .onAppear { focusedStep = flow.step }
+            .onChange(of: flow.step) { _, newStep in focusedStep = newStep }
+            .onChange(of: draft.preferredName) { clearValidationMessage(for: .preferredName) }
+            .onChange(of: draft.ageText) { clearValidationMessage(for: .age) }
+            .onChange(of: submission.state) { _, state in handleSubmissionState(state) }
+            .onDisappear { submission.invalidate() }
         }
     }
 
-    @ViewBuilder
-    private var progressHeader: some View {
+    @ViewBuilder private var progressHeader: some View {
         if let position = flow.step.formPosition {
             VStack(alignment: .leading, spacing: 6) {
-                ProgressView(
-                    value: Double(position),
-                    total: Double(flow.step.formStepCount)
-                )
-                Text("第 \(position) 步，共 \(flow.step.formStepCount) 步")
-                    .font(.caption)
+                ProgressView(value: Double(position), total: Double(flow.step.formStepCount))
+                Text("第 \(position) 步，共 \(flow.step.formStepCount) 步").font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            .padding(.horizontal).padding(.vertical, 8)
             .background(Color(uiColor: .systemGroupedBackground))
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("资料设置进度")
+            .accessibilityElement(children: .ignore).accessibilityLabel("资料设置进度")
             .accessibilityValue("第 \(position) 步，共 \(flow.step.formStepCount) 步")
         }
     }
 
-    @ViewBuilder
-    private var stepContent: some View {
+    @ViewBuilder private var stepContent: some View {
         switch flow.step {
-        case .welcome:
-            welcomeContent
-        case .preferredName:
-            preferredNameContent
-        case .age:
-            ageContent
+        case .welcome: welcomeContent
+        case .preferredName: preferredNameContent
+        case .age: ageContent
         case .conditions:
             itemsContent(
                 step: .conditions,
@@ -152,14 +120,11 @@ struct SlowWalkOnboardingView: View {
                 items: $draft.currentMedicineNames,
                 placeholder: "输入药盒上的名称",
                 sectionTitle: "正在使用的药品名称",
-                emptyText: "药名会先作为待确认信息保存，"
-                    + "不会自动转换为药品成分。",
+                emptyText: "药名会先作为待确认信息保存，" + "不会自动转换为药品成分。",
                 field: .medicines
             )
-        case .review:
-            reviewContent
-        case .complete:
-            completionContent
+        case .review: reviewContent
+        case .complete: completionContent
         }
     }
 
@@ -167,29 +132,19 @@ struct SlowWalkOnboardingView: View {
         List {
             Section {
                 VStack(spacing: 16) {
-                    Image(systemName: SlowWalkOnboardingStep.welcome.systemImage)
-                        .font(.largeTitle)
-                        .foregroundStyle(.tint)
-                        .accessibilityHidden(true)
+                    Image(systemName: SlowWalkOnboardingStep.welcome.systemImage).font(.largeTitle)
+                        .foregroundStyle(.tint).accessibilityHidden(true)
 
-                    Text(SlowWalkOnboardingStep.welcome.title)
-                        .font(.largeTitle.bold())
+                    Text(SlowWalkOnboardingStep.welcome.title).font(.largeTitle.bold())
                         .multilineTextAlignment(.center)
 
-                    Text(
-                        "用大约一分钟补充基本资料，"
-                            + "让陪伴信息更符合您的情况。"
-                    )
-                        .foregroundStyle(.secondary)
+                    Text("用大约一分钟补充基本资料，" + "让陪伴信息更符合您的情况。").foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-                .accessibilityElement(children: .combine)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityFocused($focusedStep, equals: .welcome)
-                .slowWalkReadableContent()
+                .frame(maxWidth: .infinity).padding(.vertical, 24)
+                .accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
+                .accessibilityFocused($focusedStep, equals: .welcome).slowWalkReadableContent()
             }
 
             Section("接下来") {
@@ -203,11 +158,7 @@ struct SlowWalkOnboardingView: View {
                     detail: "不清楚的项目可以留空，之后再完善。",
                     systemImage: "heart.text.square"
                 )
-                onboardingSummaryRow(
-                    "确认后再保存",
-                    detail: "进入主页前会提供一页完整摘要。",
-                    systemImage: "checklist"
-                )
+                onboardingSummaryRow("确认后再保存", detail: "进入主页前会提供一页完整摘要。", systemImage: "checklist")
             }
         }
         .listStyle(.insetGrouped)
@@ -215,8 +166,7 @@ struct SlowWalkOnboardingView: View {
 
     private var preferredNameContent: some View {
         List {
-            introduction(for: .preferredName,
-                detail: "这个称呼会用于页面问候。")
+            introduction(for: .preferredName, detail: "这个称呼会用于页面问候。")
 
             Section {
                 TextField(
@@ -224,32 +174,22 @@ struct SlowWalkOnboardingView: View {
                     text: $draft.preferredName,
                     prompt: Text("例如：王阿姨")
                 )
-                    .textContentType(.nickname)
-                    .submitLabel(.next)
-                    .onSubmit(goForward)
-                    .accessibilityLabel(
-                        SlowWalkOnboardingTextField.preferredName
-                            .accessibilityLabel
-                    )
-                    .accessibilityHint(
-                        SlowWalkOnboardingTextField.preferredName
-                            .accessibilityHint
-                    )
-                    .slowWalkReadableContent()
+                .textContentType(.nickname).submitLabel(.next).onSubmit(goForward)
+                .accessibilityLabel(SlowWalkOnboardingTextField.preferredName.accessibilityLabel)
+                .accessibilityHint(SlowWalkOnboardingTextField.preferredName.accessibilityHint)
+                .slowWalkReadableContent()
             } header: {
                 Text("称呼")
             } footer: {
                 validationFooter("最多 30 个字符。")
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollDismissesKeyboard(.interactively)
+        .listStyle(.insetGrouped).scrollDismissesKeyboard(.interactively)
     }
 
     private var ageContent: some View {
         List {
-            introduction(for: .age,
-                detail: "年龄用于后续资料校验和个性化展示。")
+            introduction(for: .age, detail: "年龄用于后续资料校验和个性化展示。")
 
             Section {
                 TextField(
@@ -257,23 +197,17 @@ struct SlowWalkOnboardingView: View {
                     text: $draft.ageText,
                     prompt: Text("例如：68")
                 )
-                    .keyboardType(.numberPad)
-                    .textContentType(.none)
-                    .accessibilityLabel(
-                        SlowWalkOnboardingTextField.age.accessibilityLabel
-                    )
-                    .accessibilityHint(
-                        SlowWalkOnboardingTextField.age.accessibilityHint
-                    )
-                    .slowWalkReadableContent()
+                .keyboardType(.numberPad).textContentType(.none)
+                .accessibilityLabel(SlowWalkOnboardingTextField.age.accessibilityLabel)
+                .accessibilityHint(SlowWalkOnboardingTextField.age.accessibilityHint)
+                .slowWalkReadableContent()
             } header: {
                 Text("年龄")
             } footer: {
                 validationFooter("请填写 1 到 120 之间的数字。")
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollDismissesKeyboard(.interactively)
+        .listStyle(.insetGrouped).scrollDismissesKeyboard(.interactively)
     }
 
     private func itemsContent(
@@ -290,34 +224,23 @@ struct SlowWalkOnboardingView: View {
 
             Section {
                 HStack(alignment: .firstTextBaseline) {
-                    TextField(
-                        field.accessibilityName,
-                        text: text,
-                        prompt: Text(placeholder)
-                    )
-                        .submitLabel(.done)
-                        .onSubmit {
-                            addItem(text.wrappedValue, to: field)
-                        }
+                    TextField(field.accessibilityName, text: text, prompt: Text(placeholder))
+                        .submitLabel(.done).onSubmit { addItem(text.wrappedValue, to: field) }
                         .accessibilityLabel(field.accessibilityName)
-                        .accessibilityHint(
-                            textField(for: field).accessibilityHint
-                        )
+                        .accessibilityHint(textField(for: field).accessibilityHint)
 
-                    Button("添加") {
-                        addItem(text.wrappedValue, to: field)
-                    }
-                    .disabled(text.wrappedValue.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ).isEmpty)
+                    Button("添加") { addItem(text.wrappedValue, to: field) }
+                        .disabled(
+                            text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                                .isEmpty
+                        )
                 }
                 .slowWalkReadableContent()
             } header: {
                 Text(sectionTitle)
             } footer: {
                 if let listInputMessage {
-                    Text(listInputMessage)
-                        .foregroundStyle(.red)
+                    Text(listInputMessage).foregroundStyle(.red)
                         .accessibilityFocused($validationMessageIsFocused)
                 } else {
                     Text(emptyText)
@@ -343,38 +266,26 @@ struct SlowWalkOnboardingView: View {
                             }
                             .buttonStyle(.borderless)
                             .accessibilityLabel(
-                                field.deleteAccessibilityLabel(
-                                    for: items.wrappedValue[index]
-                                )
+                                field.deleteAccessibilityLabel(for: items.wrappedValue[index])
                             )
                         }
                         .slowWalkReadableContent()
                     }
-                    .onDelete { offsets in
-                        items.wrappedValue.remove(atOffsets: offsets)
-                    }
+                    .onDelete { offsets in items.wrappedValue.remove(atOffsets: offsets) }
                 }
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollDismissesKeyboard(.interactively)
+        .listStyle(.insetGrouped).scrollDismissesKeyboard(.interactively)
     }
 
     private var reviewContent: some View {
         List {
-            introduction(for: .review,
-                detail: "请核对以下内容。保存前可以返回修改。")
+            introduction(for: .review, detail: "请核对以下内容。保存前可以返回修改。")
 
             Section("基本资料") {
-                LabeledContent("称呼", value: draft.preferredName)
-                    .slowWalkReadableContent()
-                LabeledContent("年龄", value: "\(draft.ageText) 岁")
-                    .slowWalkReadableContent()
-                reviewEditButton(
-                    "修改基本资料",
-                    step: .preferredName,
-                    returnAfter: .age
-                )
+                LabeledContent("称呼", value: draft.preferredName).slowWalkReadableContent()
+                LabeledContent("年龄", value: "\(draft.ageText) 岁").slowWalkReadableContent()
+                reviewEditButton("修改基本资料", step: .preferredName, returnAfter: .age)
             }
 
             Section("健康资料") {
@@ -388,18 +299,13 @@ struct SlowWalkOnboardingView: View {
 
             Section {
                 Label {
-                    Text(
-                        "药品名称会作为待确认信息保存，"
-                            + "不会自动转换为成分、剂量或用药建议。"
-                    )
+                    Text("药品名称会作为待确认信息保存，" + "不会自动转换为成分、剂量或用药建议。")
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.tint)
+                    Image(systemName: "info.circle").foregroundStyle(.tint)
                         .accessibilityHidden(true)
                 }
-                .accessibilityElement(children: .combine)
-                .slowWalkReadableContent()
+                .accessibilityElement(children: .combine).slowWalkReadableContent()
             } header: {
                 Text("信息边界")
             }
@@ -416,27 +322,14 @@ struct SlowWalkOnboardingView: View {
                         systemImage: "checkmark.circle"
                     )
                 } description: {
-                    Text(
-                        completedWithDemoData
-                            ? "现在可以进入慢行，体验完整的演示流程。"
-                            : "现在可以进入慢行。"
-                    )
+                    Text(completedWithDemoData ? "现在可以进入慢行，体验完整的演示流程。" : "现在可以进入慢行。")
                 }
-                .accessibilityFocused($focusedStep, equals: .complete)
-                .slowWalkReadableContent()
+                .accessibilityFocused($focusedStep, equals: .complete).slowWalkReadableContent()
             }
 
             Section("您可以继续") {
-                onboardingSummaryRow(
-                    "查看今天的安排",
-                    detail: "首页会汇总当前状态和待办事项。",
-                    systemImage: "sun.max"
-                )
-                onboardingSummaryRow(
-                    "使用陪伴功能",
-                    detail: "按需进入用药守护或出行陪伴。",
-                    systemImage: "figure.walk"
-                )
+                onboardingSummaryRow("查看今天的安排", detail: "首页会汇总当前状态和待办事项。", systemImage: "sun.max")
+                onboardingSummaryRow("使用陪伴功能", detail: "按需进入用药守护或出行陪伴。", systemImage: "figure.walk")
             }
         }
         .listStyle(.insetGrouped)
@@ -447,15 +340,9 @@ struct SlowWalkOnboardingView: View {
         return List {
             Section {
                 ContentUnavailableView {
-                    Label(
-                        kind.failureTitle,
-                        systemImage: "exclamationmark.triangle"
-                    )
+                    Label(kind.failureTitle, systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text(
-                        submission.state.failureMessage
-                            ?? kind.failureMessage
-                    )
+                    Text(submission.state.failureMessage ?? kind.failureMessage)
                 }
                 .slowWalkReadableContent()
             }
@@ -463,71 +350,47 @@ struct SlowWalkOnboardingView: View {
         .listStyle(.insetGrouped)
     }
 
-    @ViewBuilder
-    private var actionBar: some View {
+    @ViewBuilder private var actionBar: some View {
         VStack(spacing: 12) {
             if let failedKind = submission.state.failedKind {
                 primaryButton(
                     failedKind.retryTitle,
                     systemImage: "arrow.clockwise",
                     submissionKind: failedKind
-                ) {
-                    retrySubmission()
-                }
+                ) { retrySubmission() }
 
                 Button("返回检查资料") {
                     let returnStep: SlowWalkOnboardingStep
                     switch failedKind {
-                    case .demo:
-                        returnStep = .welcome
-                    case .profile:
-                        returnStep = .review
+                    case .demo: returnStep = .welcome
+                    case .profile: returnStep = .review
                     }
                     submission.clearFailure()
                     flow.step = returnStep
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(.bordered).controlSize(.large)
                 .frame(maxWidth: .infinity, minHeight: SlowWalkLayout.minimumTapTarget)
             } else {
                 switch flow.step {
                 case .welcome:
-                    primaryButton("开始设置", systemImage: "arrow.forward") {
-                        goForward()
-                    }
+                    primaryButton("开始设置", systemImage: "arrow.forward") { goForward() }
 
-                    secondarySubmissionButton(
-                        "使用演示资料",
-                        systemImage: "play.rectangle",
-                        kind: .demo
-                    ) {
-                        beginSubmission(.demo)
-                    }
+                    secondarySubmissionButton("使用演示资料", systemImage: "play.rectangle", kind: .demo)
+                    { beginSubmission(.demo) }
                 case .review:
-                    primaryButton(
-                        "保存并继续",
-                        systemImage: "checkmark",
-                        submissionKind: .profile
-                    ) {
+                    primaryButton("保存并继续", systemImage: "checkmark", submissionKind: .profile) {
                         beginSubmission(.profile)
                     }
-                case .complete:
-                    primaryButton("进入慢行", systemImage: "arrow.forward") {
-                        onComplete()
-                    }
+                case .complete: primaryButton("进入慢行", systemImage: "arrow.forward") { onComplete() }
                 case .preferredName, .age, .conditions, .allergies, .medicines:
                     primaryButton(
                         reviewEditStep == flow.step ? "返回确认资料" : "继续",
                         systemImage: "arrow.forward"
-                    ) {
-                        goForward()
-                    }
+                    ) { goForward() }
                 }
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(.bar)
+        .padding(.horizontal).padding(.vertical, 12).background(.bar)
     }
 
     private func primaryButton(
@@ -536,8 +399,8 @@ struct SlowWalkOnboardingView: View {
         submissionKind: SlowWalkOnboardingSubmissionKind? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        let isCurrentSubmission = submission.state.activeKind == submissionKind
-            && submissionKind != nil
+        let isCurrentSubmission =
+            submission.state.activeKind == submissionKind && submissionKind != nil
         return Button(action: action) {
             if isCurrentSubmission, let submissionKind {
                 HStack {
@@ -546,19 +409,12 @@ struct SlowWalkOnboardingView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                Label(title, systemImage: systemImage)
-                    .frame(maxWidth: .infinity)
+                Label(title, systemImage: systemImage).frame(maxWidth: .infinity)
             }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
-        .disabled(submission.state.isSubmitting)
-        .accessibilityLabel(
-            isCurrentSubmission
-                ? submissionKind?.loadingText ?? title
-                : title
-        )
+        .buttonStyle(.borderedProminent).controlSize(.large)
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget).disabled(submission.state.isSubmitting)
+        .accessibilityLabel(isCurrentSubmission ? submissionKind?.loadingText ?? title : title)
     }
 
     private func secondarySubmissionButton(
@@ -576,40 +432,28 @@ struct SlowWalkOnboardingView: View {
                 }
                 .frame(maxWidth: .infinity)
             } else {
-                Label(title, systemImage: systemImage)
-                    .frame(maxWidth: .infinity)
+                Label(title, systemImage: systemImage).frame(maxWidth: .infinity)
             }
         }
-        .buttonStyle(.bordered)
-        .controlSize(.large)
-        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
-        .disabled(submission.state.isSubmitting)
+        .buttonStyle(.bordered).controlSize(.large)
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget).disabled(submission.state.isSubmitting)
         .accessibilityLabel(isCurrentSubmission ? kind.loadingText : title)
     }
 
-    private func introduction(
-        for step: SlowWalkOnboardingStep,
-        detail: String
-    ) -> some View {
+    private func introduction(for step: SlowWalkOnboardingStep, detail: String) -> some View {
         Section {
             Label {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(step.title)
-                        .font(.title2.bold())
-                    Text(detail)
-                        .foregroundStyle(.secondary)
+                    Text(step.title).font(.title2.bold())
+                    Text(detail).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } icon: {
-                Image(systemName: step.systemImage)
-                    .font(.title2)
-                    .foregroundStyle(.tint)
+                Image(systemName: step.systemImage).font(.title2).foregroundStyle(.tint)
                     .accessibilityHidden(true)
             }
-            .padding(.vertical, 8)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityFocused($focusedStep, equals: step)
+            .padding(.vertical, 8).accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader).accessibilityFocused($focusedStep, equals: step)
             .slowWalkReadableContent()
         }
     }
@@ -617,8 +461,7 @@ struct SlowWalkOnboardingView: View {
     private func validationFooter(_ fallback: String) -> some View {
         Group {
             if let validationMessage {
-                Text(validationMessage)
-                    .foregroundStyle(.red)
+                Text(validationMessage).foregroundStyle(.red)
                     .accessibilityFocused($validationMessageIsFocused)
             } else {
                 Text(fallback)
@@ -630,13 +473,11 @@ struct SlowWalkOnboardingView: View {
         LabeledContent {
             Text(values.isEmpty ? "未填写" : values.joined(separator: "、"))
                 .foregroundStyle(values.isEmpty ? .secondary : .primary)
-                .multilineTextAlignment(.trailing)
-                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.trailing).fixedSize(horizontal: false, vertical: true)
         } label: {
             Text(title)
         }
-        .accessibilityElement(children: .combine)
-        .slowWalkReadableContent()
+        .accessibilityElement(children: .combine).slowWalkReadableContent()
     }
 
     private func reviewEditButton(
@@ -650,56 +491,39 @@ struct SlowWalkOnboardingView: View {
         } label: {
             Label(title, systemImage: "pencil")
         }
-        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
-        .accessibilityHint("修改后返回确认资料。")
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget).accessibilityHint("修改后返回确认资料。")
         .slowWalkReadableContent()
     }
 
-    private func onboardingSummaryRow(
-        _ title: String,
-        detail: String,
-        systemImage: String
-    ) -> some View {
+    private func onboardingSummaryRow(_ title: String, detail: String, systemImage: String)
+        -> some View
+    {
         Label {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(detail).font(.subheadline).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(.tint)
-                .accessibilityHidden(true)
+            Image(systemName: systemImage).foregroundStyle(.tint).accessibilityHidden(true)
         }
-        .accessibilityElement(children: .combine)
-        .slowWalkReadableContent()
+        .accessibilityElement(children: .combine).slowWalkReadableContent()
     }
 
     private var navigationTitle: String {
-        guard let failedKind = submission.state.failedKind else {
-            return flow.step.title
-        }
+        guard let failedKind = submission.state.failedKind else { return flow.step.title }
         return failedKind == .profile ? "保存资料" : "演示资料"
     }
 
     private var showsBackButton: Bool {
-        submission.state.failureMessage == nil
-            && flow.step != .welcome
-            && flow.step != .complete
+        submission.state.failureMessage == nil && flow.step != .welcome && flow.step != .complete
     }
 
-    private func introductionDetail(
-        for field: SlowWalkOnboardingListField
-    ) -> String {
+    private func introductionDetail(for field: SlowWalkOnboardingListField) -> String {
         switch field {
-        case .conditions:
-            "只填写医生已经告知的情况，不确定时可以留空。"
-        case .allergies:
-            "可填写已知的药物或食物过敏，不确定时可以留空。"
-        case .medicines:
-            "请照着药盒填写名称，不需要填写剂量或自行判断成分。"
+        case .conditions: "只填写医生已经告知的情况，不确定时可以留空。"
+        case .allergies: "可填写已知的药物或食物过敏，不确定时可以留空。"
+        case .medicines: "请照着药盒填写名称，不需要填写剂量或自行判断成分。"
         }
     }
 
@@ -739,22 +563,16 @@ struct SlowWalkOnboardingView: View {
         validationMessage = nil
     }
 
-    private func addItem(
-        _ rawValue: String,
-        to field: SlowWalkOnboardingListField
-    ) {
+    private func addItem(_ rawValue: String, to field: SlowWalkOnboardingListField) {
         let currentItems: [String]
         switch field {
-        case .conditions:
-            currentItems = draft.diagnosedConditions
-        case .allergies:
-            currentItems = draft.allergies
-        case .medicines:
-            currentItems = draft.currentMedicineNames
+        case .conditions: currentItems = draft.diagnosedConditions
+        case .allergies: currentItems = draft.allergies
+        case .medicines: currentItems = draft.currentMedicineNames
         }
 
         switch SlowWalkOnboardingInputRules.appending(rawValue, to: currentItems) {
-        case let .success(items):
+        case .success(let items):
             listInputMessage = nil
             switch field {
             case .conditions:
@@ -767,16 +585,13 @@ struct SlowWalkOnboardingView: View {
                 draft.currentMedicineNames = items
                 medicineText = ""
             }
-        case let .failure(issue):
+        case .failure(let issue):
             listInputMessage = issue.message
             validationMessageIsFocused = true
         }
     }
 
-    private func removeItem(
-        at index: Int,
-        from field: SlowWalkOnboardingListField
-    ) {
+    private func removeItem(at index: Int, from field: SlowWalkOnboardingListField) {
         switch field {
         case .conditions:
             draft.diagnosedConditions = SlowWalkOnboardingListMutation.removing(
@@ -797,9 +612,7 @@ struct SlowWalkOnboardingView: View {
         listInputMessage = nil
     }
 
-    private func textField(
-        for field: SlowWalkOnboardingListField
-    ) -> SlowWalkOnboardingTextField {
+    private func textField(for field: SlowWalkOnboardingListField) -> SlowWalkOnboardingTextField {
         switch field {
         case .conditions: .conditions
         case .allergies: .allergies
@@ -811,41 +624,28 @@ struct SlowWalkOnboardingView: View {
         _ = submission.start(kind, draft: draft)
     }
 
-    private func retrySubmission() {
-        _ = submission.retry(draft: draft)
-    }
+    private func retrySubmission() { _ = submission.retry(draft: draft) }
 
-    private func handleSubmissionState(
-        _ state: SlowWalkOnboardingSubmissionState
-    ) {
+    private func handleSubmissionState(_ state: SlowWalkOnboardingSubmissionState) {
         switch state {
-        case let .succeeded(kind, _):
+        case .succeeded(let kind, _):
             completedWithDemoData = kind == .demo
             validationMessage = nil
             listInputMessage = nil
             reviewEditStep = nil
             flow.step = .complete
-        case let .profileValidation(issue, _):
-            let presentation = SlowWalkOnboardingInputRules.presentation(
-                for: issue
-            )
+        case .profileValidation(let issue, _):
+            let presentation = SlowWalkOnboardingInputRules.presentation(for: issue)
             reviewEditStep = nil
             flow.step = presentation.step
             validationMessage = presentation.message
             validationMessageIsFocused = true
-        case .idle, .submitting, .failed:
-            break
+        case .idle, .submitting, .failed: break
         }
     }
 }
 
-#Preview("欢迎") {
-    SlowWalkOnboardingView(
-        onSubmit: { _ in },
-        onUseDemoData: {},
-        onComplete: {}
-    )
-}
+#Preview("欢迎") { SlowWalkOnboardingView(onSubmit: { _ in }, onUseDemoData: {}, onComplete: {}) }
 
 #Preview("确认资料 - 深色 AX5") {
     SlowWalkOnboardingView(
@@ -861,6 +661,5 @@ struct SlowWalkOnboardingView: View {
         onUseDemoData: {},
         onComplete: {}
     )
-    .preferredColorScheme(.dark)
-    .dynamicTypeSize(.accessibility5)
+    .preferredColorScheme(.dark).dynamicTypeSize(.accessibility5)
 }

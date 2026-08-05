@@ -4,8 +4,7 @@ import Testing
 
 @testable import SlowWalkApp
 
-@MainActor
-private final class ControlledOnboardingCallback {
+@MainActor private final class ControlledOnboardingCallback {
     private var nextID = 0
     private var pending: [Int: CheckedContinuation<Void, Error>] = [:]
     private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
@@ -28,22 +27,17 @@ private final class ControlledOnboardingCallback {
 
     func waitForCallCount(_ count: Int) async {
         guard callCount < count else { return }
-        await withCheckedContinuation { continuation in
-            waiters.append((count, continuation))
-        }
+        await withCheckedContinuation { continuation in waiters.append((count, continuation)) }
     }
 
-    func succeed(_ callID: Int) {
-        pending.removeValue(forKey: callID)?.resume()
-    }
+    func succeed(_ callID: Int) { pending.removeValue(forKey: callID)?.resume() }
 
     func fail(_ callID: Int, with error: any Error) {
         pending.removeValue(forKey: callID)?.resume(throwing: error)
     }
 }
 
-@MainActor
-struct SlowWalkOnboardingSubmissionModelTests {
+@MainActor struct SlowWalkOnboardingSubmissionModelTests {
     private enum TestFailure: Error { case unavailable }
 
     @Test func profileRapidDoubleTapCallsExternalCallbackOnce() async {
@@ -136,16 +130,13 @@ struct SlowWalkOnboardingSubmissionModelTests {
 
         #expect(model.start(.profile, draft: Self.draft))
         await profile.waitForCallCount(1)
-        profile.fail(
-            profile.callIDs[0],
-            with: UserProfileValidationIssue.ageOutOfRange
-        )
+        profile.fail(profile.callIDs[0], with: UserProfileValidationIssue.ageOutOfRange)
         await waitUntil {
             if case .profileValidation = model.state { return true }
             return false
         }
 
-        guard case let .profileValidation(issue, _) = model.state else {
+        guard case .profileValidation(let issue, _) = model.state else {
             Issue.record("Expected profile validation state")
             return
         }
@@ -188,10 +179,7 @@ struct SlowWalkOnboardingSubmissionModelTests {
         #expect(model.state == currentState)
     }
 
-    private static let draft = UserProfileDraft(
-        preferredName: "王阿姨",
-        ageText: "68"
-    )
+    private static let draft = UserProfileDraft(preferredName: "王阿姨", ageText: "68")
 
     private func makeModel(
         profile: ControlledOnboardingCallback = ControlledOnboardingCallback(),
@@ -203,9 +191,7 @@ struct SlowWalkOnboardingSubmissionModelTests {
         )
     }
 
-    private func waitUntil(
-        _ condition: @escaping @MainActor () -> Bool
-    ) async {
+    private func waitUntil(_ condition: @escaping @MainActor () -> Bool) async {
         for _ in 0..<200 {
             if condition() { return }
             await Task.yield()
@@ -214,11 +200,9 @@ struct SlowWalkOnboardingSubmissionModelTests {
     }
 }
 
-private extension SlowWalkOnboardingSubmissionState {
-    func isSucceeded(as kind: SlowWalkOnboardingSubmissionKind) -> Bool {
-        if case let .succeeded(currentKind, _) = self {
-            return currentKind == kind
-        }
+extension SlowWalkOnboardingSubmissionState {
+    fileprivate func isSucceeded(as kind: SlowWalkOnboardingSubmissionKind) -> Bool {
+        if case .succeeded(let currentKind, _) = self { return currentKind == kind }
         return false
     }
 }

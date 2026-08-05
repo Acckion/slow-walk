@@ -13,23 +13,11 @@ enum SlowWalkOnboardingStep: CaseIterable, Hashable {
     case complete
 
     private static let formSteps: [Self] = [
-        .preferredName,
-        .age,
-        .conditions,
-        .allergies,
-        .medicines,
-        .review,
+        .preferredName, .age, .conditions, .allergies, .medicines, .review,
     ]
 
     static let flowOrder: [Self] = [
-        .welcome,
-        .preferredName,
-        .age,
-        .conditions,
-        .allergies,
-        .medicines,
-        .review,
-        .complete,
+        .welcome, .preferredName, .age, .conditions, .allergies, .medicines, .review, .complete,
     ]
 
     var next: Self? {
@@ -58,13 +46,9 @@ enum SlowWalkOnboardingStep: CaseIterable, Hashable {
         }
     }
 
-    var formPosition: Int? {
-        Self.formSteps.firstIndex(of: self).map { $0 + 1 }
-    }
+    var formPosition: Int? { Self.formSteps.firstIndex(of: self).map { $0 + 1 } }
 
-    var formStepCount: Int {
-        Self.formSteps.count
-    }
+    var formStepCount: Int { Self.formSteps.count }
 
     var title: String {
         switch self {
@@ -96,9 +80,7 @@ enum SlowWalkOnboardingStep: CaseIterable, Hashable {
 struct SlowWalkOnboardingFlowState: Equatable {
     var step: SlowWalkOnboardingStep
 
-    init(step: SlowWalkOnboardingStep = .welcome) {
-        self.step = step
-    }
+    init(step: SlowWalkOnboardingStep = .welcome) { self.step = step }
 
     mutating func advance() {
         guard let next = step.next else { return }
@@ -124,9 +106,7 @@ enum SlowWalkOnboardingListField: CaseIterable, Equatable {
         }
     }
 
-    func deleteAccessibilityLabel(for value: String) -> String {
-        "删除\(accessibilityName)：\(value)"
-    }
+    func deleteAccessibilityLabel(for value: String) -> String { "删除\(accessibilityName)：\(value)" }
 }
 
 enum SlowWalkOnboardingTextField: CaseIterable, Equatable {
@@ -174,14 +154,10 @@ enum SlowWalkOnboardingItemIssue: Error, Equatable {
 
     var message: String {
         switch self {
-        case .empty:
-            "请先输入内容。"
-        case .duplicate:
-            "这项内容已经添加。"
-        case .tooLong:
-            "每项最多可填写 80 个字符。"
-        case .tooMany:
-            "每组最多可添加 30 项。"
+        case .empty: "请先输入内容。"
+        case .duplicate: "这项内容已经添加。"
+        case .tooLong: "每项最多可填写 80 个字符。"
+        case .tooMany: "每组最多可添加 30 项。"
         }
     }
 }
@@ -189,105 +165,71 @@ enum SlowWalkOnboardingItemIssue: Error, Equatable {
 enum SlowWalkOnboardingInputRules {
     static func normalizedDraft(_ draft: UserProfileDraft) -> UserProfileDraft {
         var normalized = draft
-        normalized.diagnosedConditions = cleanedUniqueItems(
-            draft.diagnosedConditions
-        )
+        normalized.diagnosedConditions = cleanedUniqueItems(draft.diagnosedConditions)
         normalized.allergies = cleanedUniqueItems(draft.allergies)
-        normalized.currentMedicineNames = cleanedUniqueItems(
-            draft.currentMedicineNames
-        )
+        normalized.currentMedicineNames = cleanedUniqueItems(draft.currentMedicineNames)
         return normalized
     }
 
-    static func validationMessage(
-        for step: SlowWalkOnboardingStep,
-        draft: UserProfileDraft
-    ) -> String? {
+    static func validationMessage(for step: SlowWalkOnboardingStep, draft: UserProfileDraft)
+        -> String?
+    {
         switch step {
         case .preferredName:
             let name = clean(draft.preferredName)
-            if name.isEmpty {
-                return "请填写希望我们使用的称呼。"
-            }
+            if name.isEmpty { return "请填写希望我们使用的称呼。" }
             if name.count > UserProfileDraftValidator.maximumPreferredNameLength {
                 return "称呼最多可填写 30 个字符。"
             }
         case .age:
             let ageText = clean(draft.ageText)
-            guard let age = Int(ageText) else {
-                return "请填写数字年龄。"
-            }
-            if !UserProfileDraftValidator.validAgeRange.contains(age) {
-                return "年龄需在 1 到 120 岁之间。"
-            }
-        case .welcome, .conditions, .allergies, .medicines, .review, .complete:
-            break
+            guard let age = Int(ageText) else { return "请填写数字年龄。" }
+            if !UserProfileDraftValidator.validAgeRange.contains(age) { return "年龄需在 1 到 120 岁之间。" }
+        case .welcome, .conditions, .allergies, .medicines, .review, .complete: break
         }
         return nil
     }
 
-    static func appending(
-        _ rawValue: String,
-        to items: [String]
-    ) -> Result<[String], SlowWalkOnboardingItemIssue> {
+    static func appending(_ rawValue: String, to items: [String]) -> Result<
+        [String], SlowWalkOnboardingItemIssue
+    > {
         let value = clean(rawValue)
-        guard !value.isEmpty else {
-            return .failure(.empty)
-        }
+        guard !value.isEmpty else { return .failure(.empty) }
         guard value.count <= UserProfileDraftValidator.maximumItemLength else {
             return .failure(.tooLong)
         }
 
         let normalizedItems: [String]
         switch validatedNormalizedItems(items) {
-        case let .success(items):
-            normalizedItems = items
-        case let .failure(issue):
-            return .failure(issue)
+        case .success(let items): normalizedItems = items
+        case .failure(let issue): return .failure(issue)
         }
 
         let comparisonKey = value.lowercased()
-        let containsValue = normalizedItems.contains {
-            $0.lowercased() == comparisonKey
-        }
-        guard !containsValue else {
-            return .failure(.duplicate)
-        }
-        guard normalizedItems.count
-                < UserProfileDraftValidator.maximumItemsPerGroup
-        else {
+        let containsValue = normalizedItems.contains { $0.lowercased() == comparisonKey }
+        guard !containsValue else { return .failure(.duplicate) }
+        guard normalizedItems.count < UserProfileDraftValidator.maximumItemsPerGroup else {
             return .failure(.tooMany)
         }
 
         return .success(normalizedItems + [value])
     }
 
-    static func presentation(
-        for issue: UserProfileValidationIssue
-    ) -> (step: SlowWalkOnboardingStep, message: String) {
+    static func presentation(for issue: UserProfileValidationIssue) -> (
+        step: SlowWalkOnboardingStep, message: String
+    ) {
         switch issue {
-        case .emptyPreferredName:
-            (.preferredName, "请填写希望我们使用的称呼。")
-        case .preferredNameTooLong:
-            (.preferredName, "称呼最多可填写 30 个字符。")
-        case .ageNotANumber:
-            (.age, "请填写数字年龄。")
-        case .ageOutOfRange:
-            (.age, "年龄需在 1 到 120 岁之间。")
-        case .tooManyAllergies:
-            (.allergies, "过敏情况最多可添加 30 项。")
-        case .allergyTooLong:
-            (.allergies, "每项过敏情况最多可填写 80 个字符。")
-        case .tooManyDiagnosedConditions:
-            (.conditions, "健康情况最多可添加 30 项。")
-        case .diagnosedConditionTooLong:
-            (.conditions, "每项健康情况最多可填写 80 个字符。")
-        case .tooManyCurrentMedicineNames:
-            (.medicines, "当前用药最多可添加 30 项。")
-        case .currentMedicineNameTooLong:
-            (.medicines, "每个药名最多可填写 80 个字符。")
-        @unknown default:
-            (.review, "请检查填写的资料后再试。")
+        case .emptyPreferredName: (.preferredName, "请填写希望我们使用的称呼。")
+        case .preferredNameTooLong: (.preferredName, "称呼最多可填写 30 个字符。")
+        case .ageNotANumber: (.age, "请填写数字年龄。")
+        case .ageOutOfRange: (.age, "年龄需在 1 到 120 岁之间。")
+        case .tooManyAllergies: (.allergies, "过敏情况最多可添加 30 项。")
+        case .allergyTooLong: (.allergies, "每项过敏情况最多可填写 80 个字符。")
+        case .tooManyDiagnosedConditions: (.conditions, "健康情况最多可添加 30 项。")
+        case .diagnosedConditionTooLong: (.conditions, "每项健康情况最多可填写 80 个字符。")
+        case .tooManyCurrentMedicineNames: (.medicines, "当前用药最多可添加 30 项。")
+        case .currentMedicineNameTooLong: (.medicines, "每个药名最多可填写 80 个字符。")
+        @unknown default: (.review, "请检查填写的资料后再试。")
         }
     }
 
@@ -301,24 +243,18 @@ enum SlowWalkOnboardingInputRules {
         for item in items {
             let value = clean(item)
             guard !value.isEmpty else { continue }
-            if seen.insert(value.lowercased()).inserted {
-                result.append(value)
-            }
+            if seen.insert(value.lowercased()).inserted { result.append(value) }
         }
         return result
     }
 
-    private static func validatedNormalizedItems(
-        _ items: [String]
-    ) -> Result<[String], SlowWalkOnboardingItemIssue> {
+    private static func validatedNormalizedItems(_ items: [String]) -> Result<
+        [String], SlowWalkOnboardingItemIssue
+    > {
         let normalized = cleanedUniqueItems(items)
-        guard normalized.allSatisfy({
-            $0.count <= UserProfileDraftValidator.maximumItemLength
-        }) else {
-            return .failure(.tooLong)
-        }
-        guard normalized.count <= UserProfileDraftValidator.maximumItemsPerGroup
-        else {
+        guard normalized.allSatisfy({ $0.count <= UserProfileDraftValidator.maximumItemLength })
+        else { return .failure(.tooLong) }
+        guard normalized.count <= UserProfileDraftValidator.maximumItemsPerGroup else {
             return .failure(.tooMany)
         }
         return .success(normalized)
@@ -352,12 +288,8 @@ enum SlowWalkOnboardingSubmissionKind: Equatable, Sendable {
 
     var failureMessage: String {
         switch self {
-        case .profile:
-            "资料没有保存成功。请检查当前设备状态后重试，"
-                + "已经填写的内容会保留在此页面。"
-        case .demo:
-            "演示资料暂时无法载入。请检查当前设备状态后重试，"
-                + "演示资料不会替代真实用户资料。"
+        case .profile: "资料没有保存成功。请检查当前设备状态后重试，" + "已经填写的内容会保留在此页面。"
+        case .demo: "演示资料暂时无法载入。请检查当前设备状态后重试，" + "演示资料不会替代真实用户资料。"
         }
     }
 }
@@ -375,23 +307,22 @@ enum SlowWalkOnboardingSubmissionState: Equatable {
     }
 
     var activeKind: SlowWalkOnboardingSubmissionKind? {
-        if case let .submitting(kind, _) = self { return kind }
+        if case .submitting(let kind, _) = self { return kind }
         return nil
     }
 
     var failedKind: SlowWalkOnboardingSubmissionKind? {
-        if case let .failed(kind, _) = self { return kind }
+        if case .failed(let kind, _) = self { return kind }
         return nil
     }
 
     var failureMessage: String? {
-        if case let .failed(_, message) = self { return message }
+        if case .failed(_, let message) = self { return message }
         return nil
     }
 }
 
-@MainActor
-final class SlowWalkOnboardingSubmissionModel: ObservableObject {
+@MainActor final class SlowWalkOnboardingSubmissionModel: ObservableObject {
     typealias DraftSubmission = @MainActor (UserProfileDraft) async throws -> Void
     typealias DemoSelection = @MainActor () async throws -> Void
 
@@ -401,19 +332,14 @@ final class SlowWalkOnboardingSubmissionModel: ObservableObject {
     private let onUseDemoData: DemoSelection
     private var activeTask: Task<Void, Never>?
 
-    init(
-        onSubmit: @escaping DraftSubmission,
-        onUseDemoData: @escaping DemoSelection
-    ) {
+    init(onSubmit: @escaping DraftSubmission, onUseDemoData: @escaping DemoSelection) {
         self.onSubmit = onSubmit
         self.onUseDemoData = onUseDemoData
     }
 
-    @discardableResult
-    func start(
-        _ kind: SlowWalkOnboardingSubmissionKind,
-        draft: UserProfileDraft
-    ) -> Bool {
+    @discardableResult func start(_ kind: SlowWalkOnboardingSubmissionKind, draft: UserProfileDraft)
+        -> Bool
+    {
         guard activeTask == nil, !state.isSubmitting else { return false }
 
         let operationID = UUID()
@@ -422,10 +348,8 @@ final class SlowWalkOnboardingSubmissionModel: ObservableObject {
             guard let self else { return }
             do {
                 switch kind {
-                case .profile:
-                    try await self.onSubmit(draft)
-                case .demo:
-                    try await self.onUseDemoData()
+                case .profile: try await self.onSubmit(draft)
+                case .demo: try await self.onUseDemoData()
                 }
                 try Task.checkCancellation()
                 self.finishSuccess(kind: kind, operationID: operationID)
@@ -433,23 +357,17 @@ final class SlowWalkOnboardingSubmissionModel: ObservableObject {
                 self.finishCancellation(kind: kind, operationID: operationID)
             } catch let issue as UserProfileValidationIssue {
                 if kind == .profile {
-                    self.finishProfileValidation(
-                        issue,
-                        operationID: operationID
-                    )
+                    self.finishProfileValidation(issue, operationID: operationID)
                 } else {
                     self.finishFailure(kind: kind, operationID: operationID)
                 }
-            } catch {
-                self.finishFailure(kind: kind, operationID: operationID)
-            }
+            } catch { self.finishFailure(kind: kind, operationID: operationID) }
         }
         return true
     }
 
-    @discardableResult
-    func retry(draft: UserProfileDraft) -> Bool {
-        guard case let .failed(kind, _) = state else { return false }
+    @discardableResult func retry(draft: UserProfileDraft) -> Bool {
+        guard case .failed(let kind, _) = state else { return false }
         return start(kind, draft: draft)
     }
 
@@ -464,49 +382,32 @@ final class SlowWalkOnboardingSubmissionModel: ObservableObject {
         state = .idle
     }
 
-    private func finishSuccess(
-        kind: SlowWalkOnboardingSubmissionKind,
-        operationID: UUID
-    ) {
+    private func finishSuccess(kind: SlowWalkOnboardingSubmissionKind, operationID: UUID) {
         guard owns(kind: kind, operationID: operationID) else { return }
         activeTask = nil
         state = .succeeded(kind: kind, operationID: operationID)
     }
 
-    private func finishProfileValidation(
-        _ issue: UserProfileValidationIssue,
-        operationID: UUID
-    ) {
+    private func finishProfileValidation(_ issue: UserProfileValidationIssue, operationID: UUID) {
         guard owns(kind: .profile, operationID: operationID) else { return }
         activeTask = nil
         state = .profileValidation(issue: issue, operationID: operationID)
     }
 
-    private func finishFailure(
-        kind: SlowWalkOnboardingSubmissionKind,
-        operationID: UUID
-    ) {
+    private func finishFailure(kind: SlowWalkOnboardingSubmissionKind, operationID: UUID) {
         guard owns(kind: kind, operationID: operationID) else { return }
         activeTask = nil
         state = .failed(kind: kind, message: kind.failureMessage)
     }
 
-    private func finishCancellation(
-        kind: SlowWalkOnboardingSubmissionKind,
-        operationID: UUID
-    ) {
+    private func finishCancellation(kind: SlowWalkOnboardingSubmissionKind, operationID: UUID) {
         guard owns(kind: kind, operationID: operationID) else { return }
         activeTask = nil
         state = .idle
     }
 
-    private func owns(
-        kind: SlowWalkOnboardingSubmissionKind,
-        operationID: UUID
-    ) -> Bool {
-        guard case let .submitting(currentKind, currentID) = state else {
-            return false
-        }
+    private func owns(kind: SlowWalkOnboardingSubmissionKind, operationID: UUID) -> Bool {
+        guard case .submitting(let currentKind, let currentID) = state else { return false }
         return currentKind == kind && currentID == operationID
     }
 }
