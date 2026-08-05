@@ -42,6 +42,18 @@ struct TodayView: View {
                                 .foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
 
+                            if summary.isSessionUnderway {
+                                Text(summary.stepLabel)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(mostImportantTint)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                Text(summary.situation)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
                             Text(summary.nextStep)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
@@ -60,8 +72,7 @@ struct TodayView: View {
                 .buttonStyle(.plain)
                 .frame(minHeight: SlowWalkLayout.minimumTapTarget)
                 .accessibilityLabel(
-                    "现在最重要的事。\(mostImportantText)。"
-                        + "\(summary.nextStep)。\(summary.primaryActionTitle)"
+                    mostImportantAccessibilityLabel
                 )
                 .accessibilityHint("进入陪伴页面。")
                 .slowWalkReadableContent()
@@ -88,6 +99,17 @@ struct TodayView: View {
         } else {
             .accentColor
         }
+    }
+
+    private var mostImportantAccessibilityLabel: String {
+        var parts = ["现在最重要的事", mostImportantText]
+        if summary.isSessionUnderway {
+            parts.append(summary.stepLabel)
+            parts.append(summary.situation)
+        }
+        parts.append(summary.nextStep)
+        parts.append(summary.primaryActionTitle)
+        return parts.joined(separator: "。")
     }
 
     private func startOrContinueCompanion() {
@@ -122,11 +144,11 @@ private struct TodayTaskOverviewCard: View {
     }
 
     private var pendingTaskCount: Int {
-        plan.pendingMedicines.count + (plan.outing == nil ? 0 : 1)
+        plan.pendingMedicines.count
     }
 
     private var totalTaskCount: Int {
-        plan.medicines.count + (plan.outing == nil ? 0 : 1)
+        plan.medicines.count
     }
 
     private var completedTaskCount: Int {
@@ -154,9 +176,9 @@ private struct TodayTaskOverviewCard: View {
                 id: "outing",
                 title: "出行",
                 systemImage: "calendar",
-                tint: plan.outing == nil ? .green : .blue,
-                progress: plan.outing == nil ? 1 : 0,
-                statusText: plan.outing == nil ? "无" : "1项"
+                tint: plan.outing == nil ? .secondary : .blue,
+                progress: plan.outing == nil ? 0 : 1,
+                statusText: plan.outing == nil ? "无安排" : "已安排"
             ),
             TodayOverviewGoal(
                 id: "tasks",
@@ -236,6 +258,7 @@ private struct TodayTaskOverviewCard: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("今日待办")
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
             Text("您好，\(plan.preferredName)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
