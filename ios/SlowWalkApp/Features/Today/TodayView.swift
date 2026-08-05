@@ -27,7 +27,7 @@ struct TodayView: View {
                     .slowWalkReadableContent()
             }
 
-            Section("现在最重要的事") {
+            Section {
                 Button(action: startOrContinueCompanion) {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: mostImportantSystemImage)
@@ -76,6 +76,10 @@ struct TodayView: View {
                 )
                 .accessibilityHint("进入陪伴页面。")
                 .slowWalkReadableContent()
+            } header: {
+                Text("现在最重要的事")
+            } footer: {
+                DemoDataFooter()
             }
         }
         .listStyle(.insetGrouped)
@@ -127,7 +131,6 @@ private struct TodayOverviewGoal: Identifiable {
     let title: String
     let systemImage: String
     let tint: Color
-    let progress: Double
     let statusText: String
 }
 
@@ -136,38 +139,43 @@ private struct TodayTaskOverviewCard: View {
 
     let plan: TodayPlan
 
-    private let ringRadii: [CGFloat] = [102, 76, 50]
-    private let ringWidths: [CGFloat] = [20, 20, 20]
+    private let ringRadius: CGFloat = 102
+    private let ringWidth: CGFloat = 20
 
     private var completedMedicineCount: Int {
         plan.medicines.filter(\.isTakenToday).count
     }
 
-    private var pendingTaskCount: Int {
+    private var pendingMedicineCount: Int {
         plan.pendingMedicines.count
     }
 
-    private var totalTaskCount: Int {
-        plan.medicines.count
+    private var medicineProgress: Double {
+        let total = plan.medicines.count
+        return total == 0
+            ? 0
+            : Double(completedMedicineCount) / Double(total)
     }
 
-    private var completedTaskCount: Int {
-        totalTaskCount - pendingTaskCount
+    private var medicineTint: Color {
+        if plan.medicines.isEmpty {
+            .secondary
+        } else if completedMedicineCount == plan.medicines.count {
+            .green
+        } else {
+            .orange
+        }
     }
 
     private var goals: [TodayOverviewGoal] {
         let medicineTotal = plan.medicines.count
-        let medicineProgress = medicineTotal == 0
-            ? 1
-            : Double(completedMedicineCount) / Double(medicineTotal)
 
         return [
             TodayOverviewGoal(
                 id: "medicine",
                 title: "用药",
                 systemImage: "pills.fill",
-                tint: completedMedicineCount == medicineTotal ? .green : .orange,
-                progress: medicineProgress,
+                tint: medicineTint,
                 statusText: medicineTotal == 0
                     ? "无"
                     : "\(completedMedicineCount)/\(medicineTotal)"
@@ -177,20 +185,7 @@ private struct TodayTaskOverviewCard: View {
                 title: "出行",
                 systemImage: "calendar",
                 tint: plan.outing == nil ? .secondary : .blue,
-                progress: plan.outing == nil ? 0 : 1,
                 statusText: plan.outing == nil ? "无安排" : "已安排"
-            ),
-            TodayOverviewGoal(
-                id: "tasks",
-                title: "待办",
-                systemImage: "checklist.checked",
-                tint: pendingTaskCount == 0 ? .green : .accentColor,
-                progress: totalTaskCount == 0
-                    ? 1
-                    : Double(completedTaskCount) / Double(totalTaskCount),
-                statusText: totalTaskCount == 0
-                    ? "无"
-                    : "\(completedTaskCount)/\(totalTaskCount)"
             ),
         ]
     }
@@ -211,27 +206,15 @@ private struct TodayTaskOverviewCard: View {
                 }
             }
 
-            let maxRadius = ringRadii[0]
-            let maxWidth = ringWidths[0]
-            ZStack(alignment: .top) {
-                ForEach(Array(goals.enumerated()), id: \.element.id) {
-                    index, goal in
-                    let radius = ringRadii[min(index, ringRadii.count - 1)]
-                    let width = ringWidths[min(index, ringWidths.count - 1)]
-                    TodaySemiRingSegment(
-                        progress: goal.progress,
-                        tint: goal.tint,
-                        lineWidth: width,
-                        radius: radius
-                    )
-                    .alignmentGuide(.top) { dimensions in
-                        dimensions[.bottom]
-                    }
-                }
-            }
+            TodaySemiRingSegment(
+                progress: medicineProgress,
+                tint: medicineTint,
+                lineWidth: ringWidth,
+                radius: ringRadius
+            )
             .frame(
-                width: maxRadius * 2 + maxWidth,
-                height: maxRadius + maxWidth
+                width: ringRadius * 2 + ringWidth,
+                height: ringRadius + ringWidth
             )
             .clipShape(Rectangle())
             .accessibilityHidden(true)
@@ -256,7 +239,7 @@ private struct TodayTaskOverviewCard: View {
 
     private var taskHeading: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("今日待办")
+            Text("今日安排")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
             Text("您好，\(plan.preferredName)")
@@ -266,9 +249,23 @@ private struct TodayTaskOverviewCard: View {
     }
 
     private var pendingStatus: some View {
-        Text(pendingTaskCount == 0 ? "已完成" : "\(pendingTaskCount)项待完成")
+        Text(pendingMedicineStatusText)
             .font(.subheadline.weight(.medium))
-            .foregroundStyle(pendingTaskCount == 0 ? .green : .secondary)
+            .foregroundStyle(
+                pendingMedicineCount == 0 && !plan.medicines.isEmpty
+                    ? .green
+                    : .secondary
+            )
+    }
+
+    private var pendingMedicineStatusText: String {
+        if plan.medicines.isEmpty {
+            "暂无用药安排"
+        } else if pendingMedicineCount == 0 {
+            "今日用药已完成"
+        } else {
+            "\(pendingMedicineCount)项用药待完成"
+        }
     }
 
     private func compactGoalCell(_ goal: TodayOverviewGoal) -> some View {

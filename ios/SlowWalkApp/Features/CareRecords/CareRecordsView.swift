@@ -55,9 +55,12 @@ struct CareRecordsView: View {
             } header: {
                 Text("记录保存")
             } footer: {
-                if let detail = persistenceStatus.detail {
-                    Text(detail)
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    if let detail = persistenceStatus.detail {
+                        Text(detail)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    DemoDataFooter()
                 }
             }
         }
