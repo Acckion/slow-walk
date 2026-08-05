@@ -175,20 +175,18 @@ private struct TodayTaskOverviewCard: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("今日待办")
-                        .font(.headline)
-                    Text("您好，\(plan.preferredName)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    taskHeading
+                    pendingStatus
                 }
-
-                Spacer()
-
-                Text(pendingTaskCount == 0 ? "已完成" : "\(pendingTaskCount)项待完成")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(pendingTaskCount == 0 ? .green : .secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    taskHeading
+                    Spacer()
+                    pendingStatus
+                }
             }
 
             let maxRadius = ringRadii[0]
@@ -232,6 +230,22 @@ private struct TodayTaskOverviewCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
+    }
+
+    private var taskHeading: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("今日待办")
+                .font(.headline)
+            Text("您好，\(plan.preferredName)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var pendingStatus: some View {
+        Text(pendingTaskCount == 0 ? "已完成" : "\(pendingTaskCount)项待完成")
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(pendingTaskCount == 0 ? .green : .secondary)
     }
 
     private func compactGoalCell(_ goal: TodayOverviewGoal) -> some View {

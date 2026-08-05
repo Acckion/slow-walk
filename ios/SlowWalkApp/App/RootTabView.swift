@@ -29,7 +29,6 @@ enum RootDestination: Hashable, CaseIterable, Identifiable {
 }
 
 struct RootTabView: View {
-    @Environment(AppEnvironment.self) private var environment
     @State private var selection: RootDestination = .today
     @State private var isCareSettingsPresented = false
 
