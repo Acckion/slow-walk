@@ -25,8 +25,75 @@ public struct MedicineAssessmentView: View {
 
     public var body: some View {
         Form {
+            recognitionSection
             content
         }
+    }
+
+    // MARK: - Recognition
+
+    @ViewBuilder
+    private var recognitionSection: some View {
+        if let recognition = state.recognition,
+           hasRecognitionContent(recognition)
+        {
+            Section {
+                if let medicineName = recognition.resolvedMedicineName {
+                    Label {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(
+                                MedicinePresentationCopy
+                                    .resolvedMedicineLabel
+                            )
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                            Text(medicineName)
+                                .fontWeight(.semibold)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } icon: {
+                        Image(systemName: "pills")
+                            .accessibilityHidden(true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+
+                ForEach(
+                    Array(recognition.recognizedTexts.enumerated()),
+                    id: \.offset
+                ) { index, text in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(recognizedTextLabel(at: index))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Text(text)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            } header: {
+                Text(MedicinePresentationCopy.recognitionHeading)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
+    }
+
+    private func recognizedTextLabel(at index: Int) -> String {
+        guard state.recognition?.recognizedTexts.count != 1 else {
+            return MedicinePresentationCopy.recognizedTextLabel
+        }
+        return "\(MedicinePresentationCopy.recognizedTextLabel) \(index + 1)"
+    }
+
+    private func hasRecognitionContent(
+        _ recognition: MedicineRecognitionDisplay
+    ) -> Bool {
+        recognition.resolvedMedicineName != nil
+            || !recognition.recognizedTexts.isEmpty
     }
 
     @ViewBuilder

@@ -29,6 +29,9 @@ public enum MedicinePresentationCopy {
 
     // MARK: - Section headings
 
+    public static let recognitionHeading = "图片识别"
+    public static let resolvedMedicineLabel = "识别药品"
+    public static let recognizedTextLabel = "识别文字"
     public static let riskLevelHeading = "Risk level"
     public static let primaryInstructionHeading =
         "What to do next"

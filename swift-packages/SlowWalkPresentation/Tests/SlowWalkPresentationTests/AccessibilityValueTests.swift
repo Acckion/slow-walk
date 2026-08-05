@@ -192,6 +192,7 @@ final class AccessibilityValueTests: XCTestCase {
 
     func test_sectionHeadings_areDistinct() {
         let headings: Set<String> = [
+            MedicinePresentationCopy.recognitionHeading,
             MedicinePresentationCopy.riskLevelHeading,
             MedicinePresentationCopy
                 .primaryInstructionHeading,
@@ -203,8 +204,8 @@ final class AccessibilityValueTests: XCTestCase {
             MedicinePresentationCopy
                 .confirmationRequiredHeading,
         ]
-        // All six section headings exist and carry distinct text.
-        XCTAssertEqual(headings.count, 6)
+        // All seven section headings exist and carry distinct text.
+        XCTAssertEqual(headings.count, 7)
         for heading in headings {
             XCTAssertFalse(heading.isEmpty)
         }
