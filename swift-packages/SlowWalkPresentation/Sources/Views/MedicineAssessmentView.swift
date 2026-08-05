@@ -55,7 +55,10 @@ public struct MedicineAssessmentView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(
                                 MedicinePresentationCopy
-                                    .resolvedMedicineLabel
+                                    .medicineNameLabel(
+                                        requiresMedicineConfirmation:
+                                            state.requiresMedicineConfirmation
+                                    )
                             )
                             .font(.caption)
                             .foregroundStyle(.secondary)

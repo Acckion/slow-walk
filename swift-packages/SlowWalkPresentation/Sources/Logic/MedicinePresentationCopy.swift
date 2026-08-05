@@ -31,6 +31,7 @@ public enum MedicinePresentationCopy {
 
     public static let recognitionHeading = "图片识别"
     public static let resolvedMedicineLabel = "识别药品"
+    public static let pendingMedicineLabel = "候选药品（待确认）"
     public static let recognizedTextLabel = "识别文字"
     public static let riskLevelHeading = "Risk level"
     public static let primaryInstructionHeading =
@@ -52,6 +53,15 @@ public enum MedicinePresentationCopy {
     /// absence is visible instead of silently rendering an empty section.
     public static let noSourceReferencesText =
         "No information source was recorded for this result."
+
+    /// Describes identity certainty without changing the canonical medicine.
+    public static func medicineNameLabel(
+        requiresMedicineConfirmation: Bool
+    ) -> String {
+        requiresMedicineConfirmation
+            ? pendingMedicineLabel
+            : resolvedMedicineLabel
+    }
 
     // MARK: - Progress and lifecycle
 

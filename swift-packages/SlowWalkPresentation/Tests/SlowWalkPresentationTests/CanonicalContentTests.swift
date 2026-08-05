@@ -50,6 +50,48 @@ final class CanonicalContentTests: XCTestCase {
             display.recognition?.resolvedMedicineName,
             payload.response.resolution.selectedMedicine?.canonicalName
         )
+        XCTAssertFalse(display.requiresMedicineConfirmation)
+        XCTAssertEqual(
+            MedicinePresentationCopy.medicineNameLabel(
+                requiresMedicineConfirmation:
+                    display.requiresMedicineConfirmation
+            ),
+            MedicinePresentationCopy.resolvedMedicineLabel
+        )
+    }
+
+    func test_serverConfirmationUsesPendingLabelWithoutChangingMedicineName()
+        async throws
+    {
+        let payload = try PresentationFixtureLoader.load(
+            "medicine-source-warning.json"
+        )
+        let viewState = try await CoordinatorHarness.viewState(
+            for: payload
+        )
+        guard case let .requiresMedicineConfirmation(requirement) = viewState
+        else {
+            return XCTFail("Expected server confirmation state")
+        }
+        XCTAssertEqual(requirement.reason, .serverRequiresConfirmation)
+
+        let selectedName = try XCTUnwrap(
+            requirement.response?.resolution.selectedMedicine?.canonicalName
+        )
+        let display = MedicineStateMapper.map(viewState)
+
+        XCTAssertTrue(display.requiresMedicineConfirmation)
+        XCTAssertEqual(
+            display.recognition?.resolvedMedicineName,
+            selectedName
+        )
+        XCTAssertEqual(
+            MedicinePresentationCopy.medicineNameLabel(
+                requiresMedicineConfirmation:
+                    display.requiresMedicineConfirmation
+            ),
+            MedicinePresentationCopy.pendingMedicineLabel
+        )
     }
 
     func test_ambiguousRecognitionEvidence_isPreservedWithoutInventingMedicine()

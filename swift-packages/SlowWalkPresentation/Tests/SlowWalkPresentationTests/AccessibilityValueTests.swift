@@ -318,6 +318,14 @@ final class AccessibilityValueTests: XCTestCase {
         XCTAssertLessThan(canonicalContent.lowerBound, recognition.lowerBound)
     }
 
+    func test_assessmentView_hasOneTopLevelDisclaimerRow() throws {
+        let source = try assessmentViewSource()
+        let row = "MedicineDemoDisclaimerRow(text: disclaimer)"
+        let occurrenceCount = source.components(separatedBy: row).count - 1
+
+        XCTAssertEqual(occurrenceCount, 1)
+    }
+
     func test_recognitionEvidence_usesNativeDisclosure() throws {
         let source = try assessmentViewSource()
         let recognitionStart = try XCTUnwrap(
