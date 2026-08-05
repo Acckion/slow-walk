@@ -1318,6 +1318,70 @@ struct MedicineAssessmentGateTests {
         )
     }
 
+    /// The App passes one disclaimer into Presentation and never owns a second
+    /// assessment banner, regardless of whether an ActionCard exists.
+    @Test func assessmentPageUsesOnePresentationOwnedDemoDisclaimer() {
+        let timeout = ClientFailure(
+            kind: .timeout,
+            apiErrorCode: nil,
+            requestID: nil,
+            endpoint: nil,
+            isRecoverable: true
+        )
+        let confirmationWithoutCard = MedicineConfirmationRequirement(
+            reason: .noRecognizedText,
+            recognitionInput: MedicineRecognitionInput(
+                recognizedTexts: [],
+                capturedAt: Date(timeIntervalSince1970: 0),
+                languageCode: nil,
+                rawConfidence: nil
+            ),
+            response: nil
+        )
+        let states: [MedicineAssessmentViewState] = [
+            .idle,
+            .result(Self.presentation),
+            .recognizing(startedAt: Date(timeIntervalSince1970: 0)),
+            .assessing(startedAt: Date(timeIntervalSince1970: 0)),
+            .failed(Self.clientFailure),
+            .failed(timeout),
+            .requiresMedicineConfirmation(confirmationWithoutCard),
+            .cancelled,
+        ]
+
+        for state in states {
+            let page = CompanionView.AssessmentPagePresentation(state)
+            #expect(
+                page.displayState.demoDisclaimer
+                    == CompanionCopy.demoDataNotice
+            )
+        }
+    }
+
+    @Test func assessmentPageDoesNotRenderAnAppLevelDemoBanner() throws {
+        let source = try Self.companionViewSource()
+        let pageStart = try #require(
+            source.range(of: "private func assessmentPage(")
+        )
+        let pageEnd = try #require(
+            source.range(of: "private func assessmentPresentation(")
+        )
+        let pageSource = source[
+            pageStart.lowerBound ..< pageEnd.lowerBound
+        ]
+
+        #expect(pageSource.contains("DemoDataBanner") == false)
+    }
+
+    @Test func assessmentPageDoesNotInventProductionDisclaimer() {
+        let page = CompanionView.AssessmentPagePresentation(
+            .result(Self.presentation),
+            demoDisclaimer: nil
+        )
+
+        #expect(page.displayState.demoDisclaimer == nil)
+    }
+
     /// Hosting the real Companion assessment branch exercises SwiftUI's
     /// result-only `onAppear`, including same-ID idempotency and replacement.
     @Test func hostedResultPageAcknowledgesEachCanonicalRequestOnce() async {
@@ -1745,6 +1809,18 @@ struct MedicineAssessmentGateTests {
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         return (window, controller)
+    }
+
+    static func companionViewSource() throws -> String {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("SlowWalkApp")
+            .appendingPathComponent("Features")
+            .appendingPathComponent("Companion")
+            .appendingPathComponent("CompanionView.swift")
+
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
     static func careActionShownCount(
