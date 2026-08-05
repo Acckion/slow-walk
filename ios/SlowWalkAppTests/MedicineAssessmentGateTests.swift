@@ -344,7 +344,7 @@ struct MedicineAssessmentGateTests {
         }
     }
 
-    @Test func staleCaptureAcceptedCallbackCannotCloseReopenedCapture()
+    @Test func staleCaptureInputCannotRevealReopenedAssessmentSurface()
         throws
     {
         let (session, _) = Self.captureFirstSessionAndStore()
@@ -357,30 +357,44 @@ struct MedicineAssessmentGateTests {
         lifecycle.requestCurrentDismissal()
         lifecycle.present(current)
 
-        let staleAccepted = lifecycle.assessmentSubmissionAccepted(
-            for: old,
-            currentGateLease: lease,
-            currentViewModelToken: old.viewModelToken
-        )
-        #expect(staleAccepted == false)
         let oldDismissal = lifecycle.completeNextDismissal()
         #expect(oldDismissal == old)
         #expect(lifecycle.current == current)
         #expect(lifecycle.isPresented)
 
-        let wrongViewModelAccepted = lifecycle.assessmentSubmissionAccepted(
+        let staleInput = lifecycle.inputSubmissionStarted(
+            for: old,
+            currentGateLease: lease,
+            currentViewModelToken: old.viewModelToken
+        )
+        #expect(staleInput == false)
+
+        let wrongViewModelInput = lifecycle.inputSubmissionStarted(
             for: current,
             currentGateLease: lease,
             currentViewModelToken: old.viewModelToken
         )
-        #expect(wrongViewModelAccepted == false)
-        let currentAccepted = lifecycle.assessmentSubmissionAccepted(
+        #expect(wrongViewModelInput == false)
+
+        let inputStarted = lifecycle.inputSubmissionStarted(
             for: current,
             currentGateLease: lease,
             currentViewModelToken: current.viewModelToken
         )
-        #expect(currentAccepted)
-        #expect(lifecycle.isPresented == false)
+        #expect(inputStarted)
+        #expect(lifecycle.isPresented)
+        #expect(lifecycle.isAssessmentPresented)
+        let prematureDismissal = lifecycle.completeNextDismissal()
+        #expect(prematureDismissal == nil)
+
+        let staleReturn = lifecycle.returnToCapture(for: old)
+        #expect(staleReturn == false)
+        let currentReturn = lifecycle.returnToCapture(for: current)
+        #expect(currentReturn)
+        #expect(lifecycle.isPresented)
+        #expect(lifecycle.isAssessmentPresented == false)
+
+        lifecycle.requestCurrentDismissal()
         let currentDismissal = lifecycle.completeNextDismissal()
         #expect(currentDismissal == current)
         #expect(lifecycle.current == nil)
@@ -402,12 +416,12 @@ struct MedicineAssessmentGateTests {
         let current = Self.captureIdentity(lease: newLease)
         lifecycle.present(current)
 
-        let staleAccepted = lifecycle.assessmentSubmissionAccepted(
+        let staleInput = lifecycle.inputSubmissionStarted(
             for: old,
             currentGateLease: newLease,
             currentViewModelToken: old.viewModelToken
         )
-        #expect(staleAccepted == false)
+        #expect(staleInput == false)
         let oldDismissal = lifecycle.completeNextDismissal()
         #expect(oldDismissal == old)
         #expect(lifecycle.current == current)
