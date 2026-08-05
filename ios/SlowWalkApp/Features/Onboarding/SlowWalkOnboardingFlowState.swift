@@ -1,7 +1,8 @@
+import Combine
 import Foundation
 import SlowWalkDomain
 
-enum SlowWalkOnboardingStep: Int, CaseIterable, Hashable {
+enum SlowWalkOnboardingStep: CaseIterable, Hashable {
     case welcome
     case preferredName
     case age
@@ -19,6 +20,43 @@ enum SlowWalkOnboardingStep: Int, CaseIterable, Hashable {
         .medicines,
         .review,
     ]
+
+    static let flowOrder: [Self] = [
+        .welcome,
+        .preferredName,
+        .age,
+        .conditions,
+        .allergies,
+        .medicines,
+        .review,
+        .complete,
+    ]
+
+    var next: Self? {
+        switch self {
+        case .welcome: .preferredName
+        case .preferredName: .age
+        case .age: .conditions
+        case .conditions: .allergies
+        case .allergies: .medicines
+        case .medicines: .review
+        case .review: .complete
+        case .complete: nil
+        }
+    }
+
+    var previous: Self? {
+        switch self {
+        case .welcome: nil
+        case .preferredName: .welcome
+        case .age: .preferredName
+        case .conditions: .age
+        case .allergies: .conditions
+        case .medicines: .allergies
+        case .review: .medicines
+        case .complete: .review
+        }
+    }
 
     var formPosition: Int? {
         Self.formSteps.firstIndex(of: self).map { $0 + 1 }
@@ -63,17 +101,68 @@ struct SlowWalkOnboardingFlowState: Equatable {
     }
 
     mutating func advance() {
-        guard let next = SlowWalkOnboardingStep(rawValue: step.rawValue + 1) else {
-            return
-        }
+        guard let next = step.next else { return }
         step = next
     }
 
     mutating func goBack() {
-        guard let previous = SlowWalkOnboardingStep(rawValue: step.rawValue - 1) else {
-            return
-        }
+        guard let previous = step.previous else { return }
         step = previous
+    }
+}
+
+enum SlowWalkOnboardingListField: CaseIterable, Equatable {
+    case conditions
+    case allergies
+    case medicines
+
+    var accessibilityName: String {
+        switch self {
+        case .conditions: "健康情况"
+        case .allergies: "过敏情况"
+        case .medicines: "当前用药"
+        }
+    }
+
+    func deleteAccessibilityLabel(for value: String) -> String {
+        "删除\(accessibilityName)：\(value)"
+    }
+}
+
+enum SlowWalkOnboardingTextField: CaseIterable, Equatable {
+    case preferredName
+    case age
+    case conditions
+    case allergies
+    case medicines
+
+    var accessibilityLabel: String {
+        switch self {
+        case .preferredName: "称呼"
+        case .age: "年龄"
+        case .conditions: "健康情况"
+        case .allergies: "过敏情况"
+        case .medicines: "当前用药"
+        }
+    }
+
+    var accessibilityHint: String {
+        switch self {
+        case .preferredName: "例如王阿姨"
+        case .age: "例如六十八"
+        case .conditions: "例如高血压"
+        case .allergies: "例如青霉素或花生"
+        case .medicines: "请填写药盒上的名称"
+        }
+    }
+}
+
+enum SlowWalkOnboardingListMutation {
+    static func removing(at index: Int, from items: [String]) -> [String] {
+        guard items.indices.contains(index) else { return items }
+        var updated = items
+        updated.remove(at: index)
+        return updated
     }
 }
 
@@ -98,6 +187,18 @@ enum SlowWalkOnboardingItemIssue: Error, Equatable {
 }
 
 enum SlowWalkOnboardingInputRules {
+    static func normalizedDraft(_ draft: UserProfileDraft) -> UserProfileDraft {
+        var normalized = draft
+        normalized.diagnosedConditions = cleanedUniqueItems(
+            draft.diagnosedConditions
+        )
+        normalized.allergies = cleanedUniqueItems(draft.allergies)
+        normalized.currentMedicineNames = cleanedUniqueItems(
+            draft.currentMedicineNames
+        )
+        return normalized
+    }
+
     static func validationMessage(
         for step: SlowWalkOnboardingStep,
         draft: UserProfileDraft
@@ -136,19 +237,29 @@ enum SlowWalkOnboardingInputRules {
         guard value.count <= UserProfileDraftValidator.maximumItemLength else {
             return .failure(.tooLong)
         }
-        guard items.count < UserProfileDraftValidator.maximumItemsPerGroup else {
-            return .failure(.tooMany)
+
+        let normalizedItems: [String]
+        switch validatedNormalizedItems(items) {
+        case let .success(items):
+            normalizedItems = items
+        case let .failure(issue):
+            return .failure(issue)
         }
 
         let comparisonKey = value.lowercased()
-        let containsValue = items.contains {
-            clean($0).lowercased() == comparisonKey
+        let containsValue = normalizedItems.contains {
+            $0.lowercased() == comparisonKey
         }
         guard !containsValue else {
             return .failure(.duplicate)
         }
+        guard normalizedItems.count
+                < UserProfileDraftValidator.maximumItemsPerGroup
+        else {
+            return .failure(.tooMany)
+        }
 
-        return .success(items + [value])
+        return .success(normalizedItems + [value])
     }
 
     static func presentation(
@@ -182,5 +293,220 @@ enum SlowWalkOnboardingInputRules {
 
     private static func clean(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func cleanedUniqueItems(_ items: [String]) -> [String] {
+        var result = [String]()
+        var seen = Set<String>()
+        for item in items {
+            let value = clean(item)
+            guard !value.isEmpty else { continue }
+            if seen.insert(value.lowercased()).inserted {
+                result.append(value)
+            }
+        }
+        return result
+    }
+
+    private static func validatedNormalizedItems(
+        _ items: [String]
+    ) -> Result<[String], SlowWalkOnboardingItemIssue> {
+        let normalized = cleanedUniqueItems(items)
+        guard normalized.allSatisfy({
+            $0.count <= UserProfileDraftValidator.maximumItemLength
+        }) else {
+            return .failure(.tooLong)
+        }
+        guard normalized.count <= UserProfileDraftValidator.maximumItemsPerGroup
+        else {
+            return .failure(.tooMany)
+        }
+        return .success(normalized)
+    }
+}
+
+enum SlowWalkOnboardingSubmissionKind: Equatable, Sendable {
+    case profile
+    case demo
+
+    var loadingText: String {
+        switch self {
+        case .profile: "正在保存资料"
+        case .demo: "正在载入演示资料"
+        }
+    }
+
+    var failureTitle: String {
+        switch self {
+        case .profile: "暂时无法保存"
+        case .demo: "暂时无法载入演示资料"
+        }
+    }
+
+    var retryTitle: String {
+        switch self {
+        case .profile: "重试保存"
+        case .demo: "重试演示资料"
+        }
+    }
+
+    var failureMessage: String {
+        switch self {
+        case .profile:
+            "资料没有保存成功。请检查当前设备状态后重试，"
+                + "已经填写的内容会保留在此页面。"
+        case .demo:
+            "演示资料暂时无法载入。请检查当前设备状态后重试，"
+                + "演示资料不会替代真实用户资料。"
+        }
+    }
+}
+
+enum SlowWalkOnboardingSubmissionState: Equatable {
+    case idle
+    case submitting(kind: SlowWalkOnboardingSubmissionKind, operationID: UUID)
+    case failed(kind: SlowWalkOnboardingSubmissionKind, message: String)
+    case succeeded(kind: SlowWalkOnboardingSubmissionKind, operationID: UUID)
+    case profileValidation(issue: UserProfileValidationIssue, operationID: UUID)
+
+    var isSubmitting: Bool {
+        if case .submitting = self { return true }
+        return false
+    }
+
+    var activeKind: SlowWalkOnboardingSubmissionKind? {
+        if case let .submitting(kind, _) = self { return kind }
+        return nil
+    }
+
+    var failedKind: SlowWalkOnboardingSubmissionKind? {
+        if case let .failed(kind, _) = self { return kind }
+        return nil
+    }
+
+    var failureMessage: String? {
+        if case let .failed(_, message) = self { return message }
+        return nil
+    }
+}
+
+@MainActor
+final class SlowWalkOnboardingSubmissionModel: ObservableObject {
+    typealias DraftSubmission = @MainActor (UserProfileDraft) async throws -> Void
+    typealias DemoSelection = @MainActor () async throws -> Void
+
+    @Published private(set) var state: SlowWalkOnboardingSubmissionState = .idle
+
+    private let onSubmit: DraftSubmission
+    private let onUseDemoData: DemoSelection
+    private var activeTask: Task<Void, Never>?
+
+    init(
+        onSubmit: @escaping DraftSubmission,
+        onUseDemoData: @escaping DemoSelection
+    ) {
+        self.onSubmit = onSubmit
+        self.onUseDemoData = onUseDemoData
+    }
+
+    @discardableResult
+    func start(
+        _ kind: SlowWalkOnboardingSubmissionKind,
+        draft: UserProfileDraft
+    ) -> Bool {
+        guard activeTask == nil, !state.isSubmitting else { return false }
+
+        let operationID = UUID()
+        state = .submitting(kind: kind, operationID: operationID)
+        activeTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                switch kind {
+                case .profile:
+                    try await self.onSubmit(draft)
+                case .demo:
+                    try await self.onUseDemoData()
+                }
+                try Task.checkCancellation()
+                self.finishSuccess(kind: kind, operationID: operationID)
+            } catch is CancellationError {
+                self.finishCancellation(kind: kind, operationID: operationID)
+            } catch let issue as UserProfileValidationIssue {
+                if kind == .profile {
+                    self.finishProfileValidation(
+                        issue,
+                        operationID: operationID
+                    )
+                } else {
+                    self.finishFailure(kind: kind, operationID: operationID)
+                }
+            } catch {
+                self.finishFailure(kind: kind, operationID: operationID)
+            }
+        }
+        return true
+    }
+
+    @discardableResult
+    func retry(draft: UserProfileDraft) -> Bool {
+        guard case let .failed(kind, _) = state else { return false }
+        return start(kind, draft: draft)
+    }
+
+    func clearFailure() {
+        guard case .failed = state else { return }
+        state = .idle
+    }
+
+    func invalidate() {
+        activeTask?.cancel()
+        activeTask = nil
+        state = .idle
+    }
+
+    private func finishSuccess(
+        kind: SlowWalkOnboardingSubmissionKind,
+        operationID: UUID
+    ) {
+        guard owns(kind: kind, operationID: operationID) else { return }
+        activeTask = nil
+        state = .succeeded(kind: kind, operationID: operationID)
+    }
+
+    private func finishProfileValidation(
+        _ issue: UserProfileValidationIssue,
+        operationID: UUID
+    ) {
+        guard owns(kind: .profile, operationID: operationID) else { return }
+        activeTask = nil
+        state = .profileValidation(issue: issue, operationID: operationID)
+    }
+
+    private func finishFailure(
+        kind: SlowWalkOnboardingSubmissionKind,
+        operationID: UUID
+    ) {
+        guard owns(kind: kind, operationID: operationID) else { return }
+        activeTask = nil
+        state = .failed(kind: kind, message: kind.failureMessage)
+    }
+
+    private func finishCancellation(
+        kind: SlowWalkOnboardingSubmissionKind,
+        operationID: UUID
+    ) {
+        guard owns(kind: kind, operationID: operationID) else { return }
+        activeTask = nil
+        state = .idle
+    }
+
+    private func owns(
+        kind: SlowWalkOnboardingSubmissionKind,
+        operationID: UUID
+    ) -> Bool {
+        guard case let .submitting(currentKind, currentID) = state else {
+            return false
+        }
+        return currentKind == kind && currentID == operationID
     }
 }

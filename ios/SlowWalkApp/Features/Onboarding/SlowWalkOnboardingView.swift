@@ -2,25 +2,13 @@ import SwiftUI
 import SlowWalkDomain
 
 struct SlowWalkOnboardingView: View {
-    typealias DraftSubmission = @MainActor (UserProfileDraft) async throws -> Void
-    typealias DemoSelection = @MainActor () async throws -> Void
+    typealias DraftSubmission = SlowWalkOnboardingSubmissionModel.DraftSubmission
+    typealias DemoSelection = SlowWalkOnboardingSubmissionModel.DemoSelection
     typealias Completion = @MainActor () -> Void
 
-    private enum SubmissionKind {
-        case profile
-        case demo
-    }
-
-    private enum ListField {
-        case conditions
-        case allergies
-        case medicines
-    }
-
-    private let onSubmit: DraftSubmission
-    private let onUseDemoData: DemoSelection
     private let onComplete: Completion
 
+    @StateObject private var submission: SlowWalkOnboardingSubmissionModel
     @State private var draft: UserProfileDraft
     @State private var flow: SlowWalkOnboardingFlowState
     @State private var conditionText = ""
@@ -28,10 +16,8 @@ struct SlowWalkOnboardingView: View {
     @State private var medicineText = ""
     @State private var validationMessage: String?
     @State private var listInputMessage: String?
-    @State private var failedSubmission: SubmissionKind?
-    @State private var failureMessage: String?
-    @State private var isSubmitting = false
     @State private var completedWithDemoData = false
+    @State private var reviewEditStep: SlowWalkOnboardingStep?
     @AccessibilityFocusState private var focusedStep: SlowWalkOnboardingStep?
     @AccessibilityFocusState private var validationMessageIsFocused: Bool
 
@@ -42,17 +28,25 @@ struct SlowWalkOnboardingView: View {
         onUseDemoData: @escaping DemoSelection,
         onComplete: @escaping Completion
     ) {
-        _draft = State(initialValue: initialDraft)
+        _draft = State(
+            initialValue: SlowWalkOnboardingInputRules.normalizedDraft(
+                initialDraft
+            )
+        )
         _flow = State(initialValue: SlowWalkOnboardingFlowState(step: initialStep))
-        self.onSubmit = onSubmit
-        self.onUseDemoData = onUseDemoData
+        _submission = StateObject(
+            wrappedValue: SlowWalkOnboardingSubmissionModel(
+                onSubmit: onSubmit,
+                onUseDemoData: onUseDemoData
+            )
+        )
         self.onComplete = onComplete
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if failureMessage == nil {
+                if submission.state.failureMessage == nil {
                     progressHeader
                     stepContent
                 } else {
@@ -75,11 +69,11 @@ struct SlowWalkOnboardingView: View {
                         }
                         .labelStyle(.iconOnly)
                         .accessibilityLabel("返回上一步")
-                        .disabled(isSubmitting)
+                        .disabled(submission.state.isSubmitting)
                     }
                 }
             }
-            .interactiveDismissDisabled(isSubmitting)
+            .interactiveDismissDisabled(submission.state.isSubmitting)
             .onAppear {
                 focusedStep = flow.step
             }
@@ -91,6 +85,12 @@ struct SlowWalkOnboardingView: View {
             }
             .onChange(of: draft.ageText) {
                 clearValidationMessage(for: .age)
+            }
+            .onChange(of: submission.state) { _, state in
+                handleSubmissionState(state)
+            }
+            .onDisappear {
+                submission.invalidate()
             }
         }
     }
@@ -219,10 +219,22 @@ struct SlowWalkOnboardingView: View {
                 detail: "这个称呼会用于页面问候。")
 
             Section {
-                TextField("例如：王阿姨", text: $draft.preferredName)
+                TextField(
+                    SlowWalkOnboardingTextField.preferredName.accessibilityLabel,
+                    text: $draft.preferredName,
+                    prompt: Text("例如：王阿姨")
+                )
                     .textContentType(.nickname)
                     .submitLabel(.next)
                     .onSubmit(goForward)
+                    .accessibilityLabel(
+                        SlowWalkOnboardingTextField.preferredName
+                            .accessibilityLabel
+                    )
+                    .accessibilityHint(
+                        SlowWalkOnboardingTextField.preferredName
+                            .accessibilityHint
+                    )
                     .slowWalkReadableContent()
             } header: {
                 Text("称呼")
@@ -240,9 +252,19 @@ struct SlowWalkOnboardingView: View {
                 detail: "年龄用于后续资料校验和个性化展示。")
 
             Section {
-                TextField("例如：68", text: $draft.ageText)
+                TextField(
+                    SlowWalkOnboardingTextField.age.accessibilityLabel,
+                    text: $draft.ageText,
+                    prompt: Text("例如：68")
+                )
                     .keyboardType(.numberPad)
                     .textContentType(.none)
+                    .accessibilityLabel(
+                        SlowWalkOnboardingTextField.age.accessibilityLabel
+                    )
+                    .accessibilityHint(
+                        SlowWalkOnboardingTextField.age.accessibilityHint
+                    )
                     .slowWalkReadableContent()
             } header: {
                 Text("年龄")
@@ -261,18 +283,26 @@ struct SlowWalkOnboardingView: View {
         placeholder: String,
         sectionTitle: String,
         emptyText: String,
-        field: ListField
+        field: SlowWalkOnboardingListField
     ) -> some View {
         List {
             introduction(for: step, detail: introductionDetail(for: field))
 
             Section {
                 HStack(alignment: .firstTextBaseline) {
-                    TextField(placeholder, text: text)
+                    TextField(
+                        field.accessibilityName,
+                        text: text,
+                        prompt: Text(placeholder)
+                    )
                         .submitLabel(.done)
                         .onSubmit {
                             addItem(text.wrappedValue, to: field)
                         }
+                        .accessibilityLabel(field.accessibilityName)
+                        .accessibilityHint(
+                            textField(for: field).accessibilityHint
+                        )
 
                     Button("添加") {
                         addItem(text.wrappedValue, to: field)
@@ -297,9 +327,28 @@ struct SlowWalkOnboardingView: View {
             if !items.wrappedValue.isEmpty {
                 Section("已添加") {
                     ForEach(items.wrappedValue.indices, id: \.self) { index in
-                        Text(items.wrappedValue[index])
-                            .fixedSize(horizontal: false, vertical: true)
-                            .slowWalkReadableContent()
+                        HStack(alignment: .center, spacing: 12) {
+                            Text(items.wrappedValue[index])
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Button(role: .destructive) {
+                                removeItem(at: index, from: field)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .frame(
+                                        minWidth: SlowWalkLayout.minimumTapTarget,
+                                        minHeight: SlowWalkLayout.minimumTapTarget
+                                    )
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel(
+                                field.deleteAccessibilityLabel(
+                                    for: items.wrappedValue[index]
+                                )
+                            )
+                        }
+                        .slowWalkReadableContent()
                     }
                     .onDelete { offsets in
                         items.wrappedValue.remove(atOffsets: offsets)
@@ -321,12 +370,20 @@ struct SlowWalkOnboardingView: View {
                     .slowWalkReadableContent()
                 LabeledContent("年龄", value: "\(draft.ageText) 岁")
                     .slowWalkReadableContent()
+                reviewEditButton(
+                    "修改基本资料",
+                    step: .preferredName,
+                    returnAfter: .age
+                )
             }
 
             Section("健康资料") {
                 reviewRow("健康情况", values: draft.diagnosedConditions)
+                reviewEditButton("修改健康情况", step: .conditions)
                 reviewRow("过敏情况", values: draft.allergies)
+                reviewEditButton("修改过敏情况", step: .allergies)
                 reviewRow("当前用药", values: draft.currentMedicineNames)
+                reviewEditButton("修改当前用药", step: .medicines)
             }
 
             Section {
@@ -386,12 +443,19 @@ struct SlowWalkOnboardingView: View {
     }
 
     private var submissionFailureContent: some View {
-        List {
+        let kind = submission.state.failedKind ?? .profile
+        return List {
             Section {
                 ContentUnavailableView {
-                    Label("暂时无法保存", systemImage: "exclamationmark.triangle")
+                    Label(
+                        kind.failureTitle,
+                        systemImage: "exclamationmark.triangle"
+                    )
                 } description: {
-                    Text(failureMessage ?? "请稍后重试。")
+                    Text(
+                        submission.state.failureMessage
+                            ?? kind.failureMessage
+                    )
                 }
                 .slowWalkReadableContent()
             }
@@ -402,21 +466,24 @@ struct SlowWalkOnboardingView: View {
     @ViewBuilder
     private var actionBar: some View {
         VStack(spacing: 12) {
-            if failureMessage != nil {
-                primaryButton("重试保存", systemImage: "arrow.clockwise") {
+            if let failedKind = submission.state.failedKind {
+                primaryButton(
+                    failedKind.retryTitle,
+                    systemImage: "arrow.clockwise",
+                    submissionKind: failedKind
+                ) {
                     retrySubmission()
                 }
 
                 Button("返回检查资料") {
                     let returnStep: SlowWalkOnboardingStep
-                    switch failedSubmission {
+                    switch failedKind {
                     case .demo:
                         returnStep = .welcome
-                    case .profile, .none:
+                    case .profile:
                         returnStep = .review
                     }
-                    failureMessage = nil
-                    failedSubmission = nil
+                    submission.clearFailure()
                     flow.step = returnStep
                 }
                 .buttonStyle(.bordered)
@@ -429,18 +496,19 @@ struct SlowWalkOnboardingView: View {
                         goForward()
                     }
 
-                    Button {
+                    secondarySubmissionButton(
+                        "使用演示资料",
+                        systemImage: "play.rectangle",
+                        kind: .demo
+                    ) {
                         beginSubmission(.demo)
-                    } label: {
-                        Label("使用演示资料", systemImage: "play.rectangle")
-                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    .frame(minHeight: SlowWalkLayout.minimumTapTarget)
-                    .disabled(isSubmitting)
                 case .review:
-                    primaryButton("保存并继续", systemImage: "checkmark") {
+                    primaryButton(
+                        "保存并继续",
+                        systemImage: "checkmark",
+                        submissionKind: .profile
+                    ) {
                         beginSubmission(.profile)
                     }
                 case .complete:
@@ -448,7 +516,10 @@ struct SlowWalkOnboardingView: View {
                         onComplete()
                     }
                 case .preferredName, .age, .conditions, .allergies, .medicines:
-                    primaryButton("继续", systemImage: "arrow.forward") {
+                    primaryButton(
+                        reviewEditStep == flow.step ? "返回确认资料" : "继续",
+                        systemImage: "arrow.forward"
+                    ) {
                         goForward()
                     }
                 }
@@ -462,13 +533,16 @@ struct SlowWalkOnboardingView: View {
     private func primaryButton(
         _ title: String,
         systemImage: String,
+        submissionKind: SlowWalkOnboardingSubmissionKind? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            if isSubmitting {
+        let isCurrentSubmission = submission.state.activeKind == submissionKind
+            && submissionKind != nil
+        return Button(action: action) {
+            if isCurrentSubmission, let submissionKind {
                 HStack {
                     ProgressView()
-                    Text("正在保存")
+                    Text(submissionKind.loadingText)
                 }
                 .frame(maxWidth: .infinity)
             } else {
@@ -479,8 +553,38 @@ struct SlowWalkOnboardingView: View {
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
         .frame(minHeight: SlowWalkLayout.minimumTapTarget)
-        .disabled(isSubmitting)
-        .accessibilityLabel(isSubmitting ? "正在保存资料" : title)
+        .disabled(submission.state.isSubmitting)
+        .accessibilityLabel(
+            isCurrentSubmission
+                ? submissionKind?.loadingText ?? title
+                : title
+        )
+    }
+
+    private func secondarySubmissionButton(
+        _ title: String,
+        systemImage: String,
+        kind: SlowWalkOnboardingSubmissionKind,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isCurrentSubmission = submission.state.activeKind == kind
+        return Button(action: action) {
+            if isCurrentSubmission {
+                HStack {
+                    ProgressView()
+                    Text(kind.loadingText)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                Label(title, systemImage: systemImage)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+        .disabled(submission.state.isSubmitting)
+        .accessibilityLabel(isCurrentSubmission ? kind.loadingText : title)
     }
 
     private func introduction(
@@ -535,6 +639,22 @@ struct SlowWalkOnboardingView: View {
         .slowWalkReadableContent()
     }
 
+    private func reviewEditButton(
+        _ title: String,
+        step: SlowWalkOnboardingStep,
+        returnAfter: SlowWalkOnboardingStep? = nil
+    ) -> some View {
+        Button {
+            reviewEditStep = returnAfter ?? step
+            flow.step = step
+        } label: {
+            Label(title, systemImage: "pencil")
+        }
+        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+        .accessibilityHint("修改后返回确认资料。")
+        .slowWalkReadableContent()
+    }
+
     private func onboardingSummaryRow(
         _ title: String,
         detail: String,
@@ -558,16 +678,21 @@ struct SlowWalkOnboardingView: View {
     }
 
     private var navigationTitle: String {
-        failureMessage == nil ? flow.step.title : "保存资料"
+        guard let failedKind = submission.state.failedKind else {
+            return flow.step.title
+        }
+        return failedKind == .profile ? "保存资料" : "演示资料"
     }
 
     private var showsBackButton: Bool {
-        failureMessage == nil
+        submission.state.failureMessage == nil
             && flow.step != .welcome
             && flow.step != .complete
     }
 
-    private func introductionDetail(for field: ListField) -> String {
+    private func introductionDetail(
+        for field: SlowWalkOnboardingListField
+    ) -> String {
         switch field {
         case .conditions:
             "只填写医生已经告知的情况，不确定时可以留空。"
@@ -590,13 +715,23 @@ struct SlowWalkOnboardingView: View {
 
         validationMessage = nil
         listInputMessage = nil
-        flow.advance()
+        if reviewEditStep == flow.step {
+            reviewEditStep = nil
+            flow.step = .review
+        } else {
+            flow.advance()
+        }
     }
 
     private func goBack() {
         validationMessage = nil
         listInputMessage = nil
-        flow.goBack()
+        if reviewEditStep != nil {
+            reviewEditStep = nil
+            flow.step = .review
+        } else {
+            flow.goBack()
+        }
     }
 
     private func clearValidationMessage(for step: SlowWalkOnboardingStep) {
@@ -604,7 +739,10 @@ struct SlowWalkOnboardingView: View {
         validationMessage = nil
     }
 
-    private func addItem(_ rawValue: String, to field: ListField) {
+    private func addItem(
+        _ rawValue: String,
+        to field: SlowWalkOnboardingListField
+    ) {
         let currentItems: [String]
         switch field {
         case .conditions:
@@ -635,42 +773,69 @@ struct SlowWalkOnboardingView: View {
         }
     }
 
-    private func beginSubmission(_ kind: SubmissionKind) {
-        isSubmitting = true
-        failedSubmission = kind
-        failureMessage = nil
+    private func removeItem(
+        at index: Int,
+        from field: SlowWalkOnboardingListField
+    ) {
+        switch field {
+        case .conditions:
+            draft.diagnosedConditions = SlowWalkOnboardingListMutation.removing(
+                at: index,
+                from: draft.diagnosedConditions
+            )
+        case .allergies:
+            draft.allergies = SlowWalkOnboardingListMutation.removing(
+                at: index,
+                from: draft.allergies
+            )
+        case .medicines:
+            draft.currentMedicineNames = SlowWalkOnboardingListMutation.removing(
+                at: index,
+                from: draft.currentMedicineNames
+            )
+        }
+        listInputMessage = nil
+    }
 
-        Task { @MainActor in
-            do {
-                switch kind {
-                case .profile:
-                    try await onSubmit(draft)
-                    completedWithDemoData = false
-                case .demo:
-                    try await onUseDemoData()
-                    completedWithDemoData = true
-                }
-                isSubmitting = false
-                failedSubmission = nil
-                flow.step = .complete
-            } catch let issue as UserProfileValidationIssue {
-                isSubmitting = false
-                failedSubmission = nil
-                let presentation = SlowWalkOnboardingInputRules.presentation(for: issue)
-                flow.step = presentation.step
-                validationMessage = presentation.message
-                validationMessageIsFocused = true
-            } catch {
-                isSubmitting = false
-                failureMessage = "资料没有保存成功。请检查当前设备状态后重试，"
-                    + "已经填写的内容会保留在此页面。"
-            }
+    private func textField(
+        for field: SlowWalkOnboardingListField
+    ) -> SlowWalkOnboardingTextField {
+        switch field {
+        case .conditions: .conditions
+        case .allergies: .allergies
+        case .medicines: .medicines
         }
     }
 
+    private func beginSubmission(_ kind: SlowWalkOnboardingSubmissionKind) {
+        _ = submission.start(kind, draft: draft)
+    }
+
     private func retrySubmission() {
-        guard let failedSubmission else { return }
-        beginSubmission(failedSubmission)
+        _ = submission.retry(draft: draft)
+    }
+
+    private func handleSubmissionState(
+        _ state: SlowWalkOnboardingSubmissionState
+    ) {
+        switch state {
+        case let .succeeded(kind, _):
+            completedWithDemoData = kind == .demo
+            validationMessage = nil
+            listInputMessage = nil
+            reviewEditStep = nil
+            flow.step = .complete
+        case let .profileValidation(issue, _):
+            let presentation = SlowWalkOnboardingInputRules.presentation(
+                for: issue
+            )
+            reviewEditStep = nil
+            flow.step = presentation.step
+            validationMessage = presentation.message
+            validationMessageIsFocused = true
+        case .idle, .submitting, .failed:
+            break
+        }
     }
 }
 
