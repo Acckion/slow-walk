@@ -415,7 +415,41 @@ struct MedicineAssessmentGateTests {
     }
 
     @Test func medicineCaptureCopyContainsNoASCIIEnglishText() {
-        #expect(MedicineCaptureCopy.allUserVisibleText.count == 25)
+        let expected = [
+            MedicineCaptureCopy.assessmentStartFailed,
+            MedicineCaptureCopy.medicineCompanionTitle,
+            MedicineCaptureCopy.capturePrompt,
+            MedicineCaptureCopy.requestingCameraPermission,
+            MedicineCaptureCopy.startingCamera,
+            MedicineCaptureCopy.cameraPermissionDenied,
+            MedicineCaptureCopy.cameraRestricted,
+            MedicineCaptureCopy.capturing,
+            MedicineCaptureCopy.loadingPhoto,
+            MedicineCaptureCopy.processingImage,
+            MedicineCaptureCopy.noTextFound,
+            MedicineCaptureCopy.recognitionFailed,
+            MedicineCaptureCopy.cancelled,
+            MedicineCaptureCopy.cameraUnavailable,
+            MedicineCaptureCopy.useCamera,
+            MedicineCaptureCopy.choosePhoto,
+            MedicineCaptureCopy.openSettings,
+            MedicineCaptureCopy.retry,
+            MedicineCaptureCopy.cancel,
+            MedicineCaptureCopy.retake,
+            MedicineCaptureCopy.close,
+            MedicineCaptureCopy.recognizedText,
+            MedicineCaptureCopy.photoLoadFailed,
+            MedicineCaptureCopy.scannerFailed,
+            MedicineCaptureCopy.scannerReturnedNoPage,
+            MedicineCaptureCopy.singlePageRequired,
+            MedicineCaptureCopy.imageEncodingFailed,
+            MedicineCaptureCopy.captureInstructions,
+            MedicineCaptureCopy.cameraAccessibilityHint,
+            MedicineCaptureCopy.photoAccessibilityHint,
+        ]
+
+        #expect(MedicineCaptureCopy.allUserVisibleText == expected)
+        #expect(Set(expected).count == expected.count)
         #expect(
             MedicineCaptureCopy.allUserVisibleText.allSatisfy { text in
                 text.unicodeScalars.allSatisfy { scalar in

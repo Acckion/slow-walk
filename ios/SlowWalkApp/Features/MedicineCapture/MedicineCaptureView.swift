@@ -1,10 +1,11 @@
+@preconcurrency import AVFoundation
 import PhotosUI
 import SlowWalkClientCore
 import SwiftUI
 import UIKit
 import VisionKit
 
-enum MedicineCaptureCopy {
+nonisolated enum MedicineCaptureCopy {
     static let assessmentStartFailed = "无法开始用药检查，请重试。"
     static let medicineCompanionTitle = "用药陪伴"
     static let capturePrompt = "选择药品图片"
@@ -23,7 +24,6 @@ enum MedicineCaptureCopy {
     static let cameraUnavailable =
         "此设备不支持系统扫描器。可以改从相册选择药品照片。"
     static let useCamera = "拍照识别"
-    static let capture = "拍摄"
     static let choosePhoto = "相册导入"
     static let openSettings = "前往设置"
     static let retry = "重新尝试"
@@ -31,26 +31,169 @@ enum MedicineCaptureCopy {
     static let retake = "重拍"
     static let close = "关闭用药检查"
     static let recognizedText = "识别到的文字"
-    static let assessmentResult = "识别结果"
     static let photoLoadFailed = "无法读取这张照片，请重新选择。"
+    static let scannerFailed =
+        "系统扫描器暂时无法完成拍摄，请重新尝试或从相册导入。"
+    static let scannerReturnedNoPage =
+        "没有收到扫描图片，请重新拍摄或从相册导入。"
+    static let singlePageRequired =
+        "一次只拍摄一个药品包装面，请保留一页后重新提交。"
+    static let imageEncodingFailed =
+        "无法处理这张扫描图片，请重新拍摄或从相册导入。"
+    static let captureInstructions =
+        "对准药品名称所在的一面，使用系统扫描器拍摄。"
+    static let cameraAccessibilityHint = "打开系统扫描器拍摄药品包装。"
+    static let photoAccessibilityHint = "打开系统相册选择药品照片。"
 
     static let allUserVisibleText = [
         assessmentStartFailed, medicineCompanionTitle, capturePrompt,
         requestingCameraPermission,
         startingCamera, cameraPermissionDenied, cameraRestricted, capturing,
         loadingPhoto, processingImage, noTextFound, recognitionFailed,
-        cancelled, cameraUnavailable, useCamera, capture, choosePhoto,
+        cancelled, cameraUnavailable, useCamera, choosePhoto,
         openSettings, retry, cancel, retake, close, recognizedText,
-        assessmentResult, photoLoadFailed,
+        photoLoadFailed, scannerFailed,
+        scannerReturnedNoPage, singlePageRequired, imageEncodingFailed,
+        captureInstructions, cameraAccessibilityHint, photoAccessibilityHint,
     ]
+}
+
+nonisolated enum MedicineCaptureInputFailure: Error, Equatable, Sendable {
+    case scannerFailed
+    case permissionDenied
+    case permissionRestricted
+    case cameraUnavailable
+    case scannerReturnedNoPage
+    case multiplePages
+    case imageEncodingFailed
+    case photoLoadFailed
+
+    var message: String {
+        switch self {
+        case .scannerFailed:
+            MedicineCaptureCopy.scannerFailed
+        case .permissionDenied:
+            MedicineCaptureCopy.cameraPermissionDenied
+        case .permissionRestricted:
+            MedicineCaptureCopy.cameraRestricted
+        case .cameraUnavailable:
+            MedicineCaptureCopy.cameraUnavailable
+        case .scannerReturnedNoPage:
+            MedicineCaptureCopy.scannerReturnedNoPage
+        case .multiplePages:
+            MedicineCaptureCopy.singlePageRequired
+        case .imageEncodingFailed:
+            MedicineCaptureCopy.imageEncodingFailed
+        case .photoLoadFailed:
+            MedicineCaptureCopy.photoLoadFailed
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .permissionDenied, .permissionRestricted, .cameraUnavailable:
+            "camera.slash"
+        case .multiplePages:
+            "doc.on.doc"
+        case .scannerReturnedNoPage:
+            "doc.badge.ellipsis"
+        case .scannerFailed, .imageEncodingFailed, .photoLoadFailed:
+            "exclamationmark.triangle"
+        }
+    }
+
+    var offersSettings: Bool { self == .permissionDenied }
+}
+
+nonisolated enum MedicineDocumentScanContract {
+    static func failure(forPageCount pageCount: Int) -> MedicineCaptureInputFailure? {
+        switch pageCount {
+        case 1:
+            nil
+        case ...0:
+            .scannerReturnedNoPage
+        default:
+            .multiplePages
+        }
+    }
+
+    static func failure(
+        for authorizationStatus: AVAuthorizationStatus,
+        isScannerSupported: Bool
+    ) -> MedicineCaptureInputFailure? {
+        guard isScannerSupported else { return .cameraUnavailable }
+        switch authorizationStatus {
+        case .denied:
+            return .permissionDenied
+        case .restricted:
+            return .permissionRestricted
+        case .notDetermined, .authorized:
+            return nil
+        @unknown default:
+            return .scannerFailed
+        }
+    }
+}
+
+nonisolated struct MedicineCaptureInputState: Equatable, Sendable {
+    private(set) var failure: MedicineCaptureInputFailure?
+
+    mutating func accept(
+        _ data: Data?,
+        failure failureIfInvalid: MedicineCaptureInputFailure
+    ) -> Data? {
+        guard let data, !data.isEmpty else {
+            failure = failureIfInvalid
+            return nil
+        }
+        failure = nil
+        return data
+    }
+
+    mutating func reject(_ newFailure: MedicineCaptureInputFailure) {
+        failure = newFailure
+    }
+
+    mutating func clear() { failure = nil }
+}
+
+nonisolated struct MedicineCaptureCloseGate: Equatable, Sendable {
+    private(set) var hasRequestedDismissal = false
+
+    mutating func requestDismissal() -> Bool {
+        guard !hasRequestedDismissal else { return false }
+        hasRequestedDismissal = true
+        return true
+    }
+}
+
+enum MedicineCaptureAccessibilityFocusTarget: Hashable {
+    case status
+    case recognizedResult
+}
+
+enum MedicineCaptureAccessibilityFocusResolver {
+    static func target(
+        for state: MedicineCaptureState,
+        submissionStatus: MedicineAssessmentSubmissionStatus
+    ) -> MedicineCaptureAccessibilityFocusTarget {
+        guard submissionStatus == .none else { return .status }
+        if case .success = state { return .recognizedResult }
+        return .status
+    }
 }
 
 private struct MedicineDocumentScanner: UIViewControllerRepresentable {
     let onComplete: @MainActor (UIImage) -> Void
     let onCancel: @MainActor () -> Void
+    let onFailure: @MainActor (MedicineCaptureInputFailure) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onComplete: onComplete, onCancel: onCancel)
+        Coordinator(
+            onComplete: onComplete,
+            onCancel: onCancel,
+            onFailure: onFailure
+        )
     }
 
     func makeUIViewController(
@@ -70,27 +213,32 @@ private struct MedicineDocumentScanner: UIViewControllerRepresentable {
     final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
         private let onComplete: @MainActor (UIImage) -> Void
         private let onCancel: @MainActor () -> Void
+        private let onFailure: @MainActor (MedicineCaptureInputFailure) -> Void
 
         init(
             onComplete: @escaping @MainActor (UIImage) -> Void,
-            onCancel: @escaping @MainActor () -> Void
+            onCancel: @escaping @MainActor () -> Void,
+            onFailure: @escaping @MainActor (MedicineCaptureInputFailure) -> Void
         ) {
             self.onComplete = onComplete
             self.onCancel = onCancel
+            self.onFailure = onFailure
         }
 
         func documentCameraViewController(
             _ controller: VNDocumentCameraViewController,
             didFinishWith scan: VNDocumentCameraScan
         ) {
-            guard scan.pageCount > 0 else {
+            guard let failure = MedicineDocumentScanContract.failure(
+                forPageCount: scan.pageCount
+            ) else {
+                let image = scan.imageOfPage(at: 0)
                 controller.dismiss(animated: true)
-                onCancel()
+                onComplete(image)
                 return
             }
-            let image = scan.imageOfPage(at: 0)
             controller.dismiss(animated: true)
-            onComplete(image)
+            onFailure(failure)
         }
 
         func documentCameraViewControllerDidCancel(
@@ -105,7 +253,11 @@ private struct MedicineDocumentScanner: UIViewControllerRepresentable {
             didFailWithError error: Error
         ) {
             controller.dismiss(animated: true)
-            onCancel()
+            let failure = MedicineDocumentScanContract.failure(
+                for: AVCaptureDevice.authorizationStatus(for: .video),
+                isScannerSupported: VNDocumentCameraViewController.isSupported
+            ) ?? .scannerFailed
+            onFailure(failure)
         }
     }
 }
@@ -113,12 +265,13 @@ private struct MedicineDocumentScanner: UIViewControllerRepresentable {
 /// Native image-source controls embedded in the existing companion detail page.
 /// It acquires image bytes only; assessment ownership stays with CompanionView.
 struct MedicineCaptureSourceActions: View {
+    @Environment(\.scenePhase) private var scenePhase
     private let onImageSelected: @MainActor (Data) -> Void
     @State private var photosPickerItem: PhotosPickerItem?
     @State private var isPhotosPickerPresented = false
     @State private var isDocumentScannerPresented = false
     @State private var isLoadingPhoto = false
-    @State private var didFailToLoadPhoto = false
+    @State private var inputState = MedicineCaptureInputState()
     @State private var photoLoadGeneration = 0
     @State private var photoLoadTask: Task<Void, Never>?
 
@@ -139,7 +292,7 @@ struct MedicineCaptureSourceActions: View {
             .controlSize(.large)
             .frame(minHeight: SlowWalkLayout.minimumTapTarget)
             .disabled(!canScanDocuments || isLoadingPhoto)
-            .accessibilityHint("打开 Apple 系统扫描器拍摄药品包装。")
+            .accessibilityHint(MedicineCaptureCopy.cameraAccessibilityHint)
 
             Button(action: presentPhotosPicker) {
                 Label(
@@ -152,7 +305,7 @@ struct MedicineCaptureSourceActions: View {
             .controlSize(.large)
             .frame(minHeight: SlowWalkLayout.minimumTapTarget)
             .disabled(isLoadingPhoto)
-            .accessibilityHint("打开系统相册选择药品照片。")
+            .accessibilityHint(MedicineCaptureCopy.photoAccessibilityHint)
 
             if isLoadingPhoto {
                 ProgressView(MedicineCaptureCopy.loadingPhoto)
@@ -160,14 +313,21 @@ struct MedicineCaptureSourceActions: View {
                     .accessibilityElement(children: .combine)
             }
 
-            if didFailToLoadPhoto {
+            if let failure = inputState.failure {
                 Label(
-                    MedicineCaptureCopy.photoLoadFailed,
-                    systemImage: "exclamationmark.triangle"
+                    failure.message,
+                    systemImage: failure.systemImage
                 )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+                if failure.offersSettings, canOpenSettings {
+                    Button(MedicineCaptureCopy.openSettings, action: openSettings)
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .frame(minHeight: SlowWalkLayout.minimumTapTarget)
+                }
             }
 
             if !canScanDocuments {
@@ -188,7 +348,8 @@ struct MedicineCaptureSourceActions: View {
         .fullScreenCover(isPresented: $isDocumentScannerPresented) {
             MedicineDocumentScanner(
                 onComplete: submitScannedImage,
-                onCancel: { isDocumentScannerPresented = false }
+                onCancel: { isDocumentScannerPresented = false },
+                onFailure: handleScannerFailure
             )
             .ignoresSafeArea()
         }
@@ -196,10 +357,16 @@ struct MedicineCaptureSourceActions: View {
             guard let item else { return }
             loadPhoto(item)
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { refreshScannerAvailability() }
+        }
         .onDisappear {
             photoLoadTask?.cancel()
             photoLoadTask = nil
             photoLoadGeneration &+= 1
+            photosPickerItem = nil
+            isPhotosPickerPresented = false
+            isLoadingPhoto = false
         }
     }
 
@@ -209,24 +376,36 @@ struct MedicineCaptureSourceActions: View {
 
     private func presentDocumentScanner() {
         guard canScanDocuments else { return }
-        didFailToLoadPhoto = false
+        if let failure = MedicineDocumentScanContract.failure(
+            for: AVCaptureDevice.authorizationStatus(for: .video),
+            isScannerSupported: canScanDocuments
+        ) {
+            inputState.reject(failure)
+            return
+        }
+        inputState.clear()
         isDocumentScannerPresented = true
     }
 
     private func presentPhotosPicker() {
-        didFailToLoadPhoto = false
+        inputState.clear()
         isPhotosPickerPresented = true
     }
 
     private func submitScannedImage(_ image: UIImage) {
         isDocumentScannerPresented = false
-        guard let data = image.jpegData(compressionQuality: 0.92)
+        let encodedData = image.jpegData(compressionQuality: 0.92)
             ?? image.pngData()
-        else {
-            didFailToLoadPhoto = true
-            return
-        }
+        guard let data = inputState.accept(
+            encodedData,
+            failure: .imageEncodingFailed
+        ) else { return }
         onImageSelected(data)
+    }
+
+    private func handleScannerFailure(_ failure: MedicineCaptureInputFailure) {
+        isDocumentScannerPresented = false
+        inputState.reject(failure)
     }
 
     private func loadPhoto(_ item: PhotosPickerItem) {
@@ -234,7 +413,7 @@ struct MedicineCaptureSourceActions: View {
         photoLoadGeneration &+= 1
         let generation = photoLoadGeneration
         isLoadingPhoto = true
-        didFailToLoadPhoto = false
+        inputState.clear()
         photosPickerItem = nil
 
         photoLoadTask = Task { @MainActor in
@@ -248,19 +427,46 @@ struct MedicineCaptureSourceActions: View {
                 let data = try await item.loadTransferable(type: Data.self)
                 try Task.checkCancellation()
                 guard generation == photoLoadGeneration,
-                      let data,
-                      !data.isEmpty
-                else {
-                    didFailToLoadPhoto = true
-                    return
-                }
+                      let data = inputState.accept(
+                          data,
+                          failure: .photoLoadFailed
+                      )
+                else { return }
                 onImageSelected(data)
             } catch is CancellationError {
                 return
             } catch {
                 guard generation == photoLoadGeneration else { return }
-                didFailToLoadPhoto = true
+                inputState.reject(.photoLoadFailed)
             }
+        }
+    }
+
+    private var canOpenSettings: Bool {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else {
+            return false
+        }
+        return UIApplication.shared.canOpenURL(url)
+    }
+
+    private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString),
+              UIApplication.shared.canOpenURL(url)
+        else { return }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+    }
+
+    private func refreshScannerAvailability() {
+        guard inputState.failure == .permissionDenied
+                || inputState.failure == .permissionRestricted
+        else { return }
+        if let failure = MedicineDocumentScanContract.failure(
+            for: AVCaptureDevice.authorizationStatus(for: .video),
+            isScannerSupported: canScanDocuments
+        ) {
+            inputState.reject(failure)
+        } else {
+            inputState.clear()
         }
     }
 }
@@ -275,38 +481,45 @@ struct MedicineCaptureView: View {
     @State private var activePhotoLoadID: UUID?
     @State private var photoLoadTask: Task<Void, Never>?
     @State private var photoLoadGeneration = 0
+    @State private var inputState = MedicineCaptureInputState()
+    @State private var closeGate = MedicineCaptureCloseGate()
     @AccessibilityFocusState private var accessibilityFocus:
-        AccessibilityFocusTarget?
-
-    private enum AccessibilityFocusTarget: Hashable {
-        case status
-    }
+        MedicineCaptureAccessibilityFocusTarget?
 
     private enum StatusAction {
         case openSettings
         case retry
     }
 
-    init(viewModel: MedicineCaptureViewModel) {
+    private let onDismissRequest: (@MainActor () -> Void)?
+
+    init(
+        viewModel: MedicineCaptureViewModel,
+        onDismissRequest: (@MainActor () -> Void)? = nil
+    ) {
         _viewModel = StateObject(wrappedValue: viewModel)
+        self.onDismissRequest = onDismissRequest
     }
 
     var body: some View {
-        captureContent
-            .navigationTitle(MedicineCaptureCopy.medicineCompanionTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(action: closeCapture) {
-                        Label(
-                            MedicineCaptureCopy.close,
-                            systemImage: "xmark"
-                        )
+        NavigationStack {
+            captureContent
+                .navigationTitle(MedicineCaptureCopy.medicineCompanionTitle)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(action: closeCapture) {
+                            Label(
+                                MedicineCaptureCopy.close,
+                                systemImage: "xmark"
+                            )
+                        }
+                        .labelStyle(.iconOnly)
+                        .accessibilityLabel(MedicineCaptureCopy.close)
+                        .accessibilityIdentifier("medicine-capture-close")
                     }
-                    .labelStyle(.iconOnly)
-                    .accessibilityLabel(MedicineCaptureCopy.close)
                 }
-            }
+        }
         .onDisappear {
             photoLoadTask?.cancel()
             photoLoadTask = nil
@@ -330,6 +543,9 @@ struct MedicineCaptureView: View {
         .onChange(of: viewModel.assessmentSubmissionStatus) { _, _ in
             moveAccessibilityFocus(for: viewModel.state)
         }
+        .onChange(of: inputState.failure) { _, _ in
+            moveAccessibilityFocus(for: viewModel.state)
+        }
         .photosPicker(
             isPresented: photosPickerPresentationBinding,
             selection: $photosPickerItem,
@@ -338,7 +554,8 @@ struct MedicineCaptureView: View {
         .fullScreenCover(isPresented: $isDocumentScannerPresented) {
             MedicineDocumentScanner(
                 onComplete: submitScannedImage,
-                onCancel: { isDocumentScannerPresented = false }
+                onCancel: { isDocumentScannerPresented = false },
+                onFailure: handleScannerFailure
             )
             .ignoresSafeArea()
         }
@@ -346,18 +563,22 @@ struct MedicineCaptureView: View {
 
     @ViewBuilder
     private var captureContent: some View {
-        switch viewModel.assessmentSubmissionStatus {
-        case .submitted:
-            progressPage(MedicineCaptureCopy.processingImage)
-        case .failed:
-            statusPage(
-                title: MedicineCaptureCopy.recognitionFailed,
-                systemImage: "exclamationmark.triangle",
-                description: MedicineCaptureCopy.assessmentStartFailed,
-                primaryAction: .retry
-            )
-        case .none:
-            stateContent
+        if let failure = inputState.failure {
+            inputFailurePage(failure)
+        } else {
+            switch viewModel.assessmentSubmissionStatus {
+            case .submitted:
+                progressPage(MedicineCaptureCopy.processingImage)
+            case .failed:
+                statusPage(
+                    title: MedicineCaptureCopy.recognitionFailed,
+                    systemImage: "exclamationmark.triangle",
+                    description: MedicineCaptureCopy.assessmentStartFailed,
+                    primaryAction: .retry
+                )
+            case .none:
+                stateContent
+            }
         }
     }
 
@@ -433,7 +654,7 @@ struct MedicineCaptureView: View {
                         systemImage: "doc.text.viewfinder"
                     )
                 } description: {
-                    Text("对准药品名称所在的一面，使用系统扫描器拍摄。")
+                    Text(MedicineCaptureCopy.captureInstructions)
                 }
                 .accessibilityFocused(
                     $accessibilityFocus,
@@ -454,7 +675,7 @@ struct MedicineCaptureView: View {
                 .controlSize(.large)
                 .frame(minHeight: SlowWalkLayout.minimumTapTarget)
                 .disabled(!canScanDocuments)
-                .accessibilityHint("打开 Apple 系统扫描器。")
+                .accessibilityHint(MedicineCaptureCopy.cameraAccessibilityHint)
                 .slowWalkReadableContent()
 
                 photosPickerButton
@@ -488,6 +709,35 @@ struct MedicineCaptureView: View {
         .controlSize(.large)
         .frame(minHeight: SlowWalkLayout.minimumTapTarget)
         .disabled(!viewModel.canChoosePhoto)
+        .accessibilityHint(MedicineCaptureCopy.photoAccessibilityHint)
+    }
+
+    private func inputFailurePage(
+        _ failure: MedicineCaptureInputFailure
+    ) -> some View {
+        statusPage(
+            title: inputFailureTitle(failure),
+            systemImage: failure.systemImage,
+            description: failure.message,
+            primaryAction: failure.offersSettings && canOpenSettings
+                ? .openSettings
+                : .retry,
+            offersPhotosPicker: true
+        )
+    }
+
+    private func inputFailureTitle(
+        _ failure: MedicineCaptureInputFailure
+    ) -> String {
+        switch failure {
+        case .permissionDenied, .permissionRestricted, .cameraUnavailable:
+            MedicineCaptureCopy.useCamera
+        case .multiplePages:
+            MedicineCaptureCopy.capturePrompt
+        case .scannerFailed, .scannerReturnedNoPage, .imageEncodingFailed,
+             .photoLoadFailed:
+            MedicineCaptureCopy.recognitionFailed
+        }
     }
 
     private func progressPage(_ text: String) -> some View {
@@ -563,6 +813,7 @@ struct MedicineCaptureView: View {
             case .openSettings:
                 openSettings()
             case .retry:
+                inputState.clear()
                 viewModel.reset()
             }
         } label: {
@@ -588,13 +839,20 @@ struct MedicineCaptureView: View {
         _ observations: [RecognizedTextObservation]
     ) -> some View {
         standardList {
-            Section(MedicineCaptureCopy.recognizedText) {
+            Section {
                 ForEach(Array(observations.enumerated()), id: \.offset) {
                     _, observation in
                     Text(observation.text)
                         .fixedSize(horizontal: false, vertical: true)
                         .slowWalkReadableContent()
                 }
+            } header: {
+                Text(MedicineCaptureCopy.recognizedText)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityFocused(
+                        $accessibilityFocus,
+                        equals: .recognizedResult
+                    )
             }
 
             Section {
@@ -627,14 +885,25 @@ struct MedicineCaptureView: View {
 
     private func presentDocumentScanner() {
         guard canScanDocuments else { return }
+        if let failure = MedicineDocumentScanContract.failure(
+            for: AVCaptureDevice.authorizationStatus(for: .video),
+            isScannerSupported: canScanDocuments
+        ) {
+            inputState.reject(failure)
+            return
+        }
+        inputState.clear()
         isDocumentScannerPresented = true
     }
 
     private func submitScannedImage(_ image: UIImage) {
         isDocumentScannerPresented = false
-        guard let data = image.jpegData(compressionQuality: 0.92)
+        let encodedData = image.jpegData(compressionQuality: 0.92)
             ?? image.pngData()
-        else { return }
+        guard let data = inputState.accept(
+            encodedData,
+            failure: .imageEncodingFailed
+        ) else { return }
         viewModel.capture(
             imageData: data,
             orientation: .up,
@@ -642,17 +911,28 @@ struct MedicineCaptureView: View {
         )
     }
 
+    private func handleScannerFailure(_ failure: MedicineCaptureInputFailure) {
+        isDocumentScannerPresented = false
+        inputState.reject(failure)
+    }
+
     private func cancelCurrentOperation() {
         photoLoadTask?.cancel()
         photoLoadTask = nil
         activePhotoLoadID = nil
         photoLoadGeneration &+= 1
+        inputState.clear()
         viewModel.cancel()
     }
 
     private func closeCapture() {
+        guard closeGate.requestDismissal() else { return }
         cancelCurrentOperation()
-        dismiss()
+        if let onDismissRequest {
+            onDismissRequest()
+        } else {
+            dismiss()
+        }
     }
 
     // MARK: - Actions
@@ -671,6 +951,7 @@ struct MedicineCaptureView: View {
 
     private func presentPhotosPicker() {
         guard viewModel.beginPhotosPickerPresentation() else { return }
+        inputState.clear()
         isPhotosPickerPresented = true
     }
 
@@ -704,6 +985,8 @@ struct MedicineCaptureView: View {
                 else { return }
                 guard let data, !data.isEmpty else {
                     viewModel.photoLoadingFailed(loadID: loadID)
+                    viewModel.reset()
+                    inputState.reject(.photoLoadFailed)
                     return
                 }
                 _ = viewModel.submitLoadedPhoto(
@@ -718,6 +1001,8 @@ struct MedicineCaptureView: View {
                       activePhotoLoadID == loadID
                 else { return }
                 viewModel.photoLoadingFailed(loadID: loadID)
+                viewModel.reset()
+                inputState.reject(.photoLoadFailed)
             }
         }
     }
@@ -726,6 +1011,7 @@ struct MedicineCaptureView: View {
         switch phase {
         case .active:
             viewModel.appDidBecomeActive()
+            refreshScannerAvailability()
         case .background:
             photoLoadTask?.cancel()
             photoLoadTask = nil
@@ -757,10 +1043,27 @@ struct MedicineCaptureView: View {
         UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 
+    private func refreshScannerAvailability() {
+        guard inputState.failure == .permissionDenied
+                || inputState.failure == .permissionRestricted
+        else { return }
+        if let failure = MedicineDocumentScanContract.failure(
+            for: AVCaptureDevice.authorizationStatus(for: .video),
+            isScannerSupported: canScanDocuments
+        ) {
+            inputState.reject(failure)
+        } else {
+            inputState.clear()
+        }
+    }
+
     private func moveAccessibilityFocus(for state: MedicineCaptureState) {
         Task { @MainActor in
             await Task.yield()
-            accessibilityFocus = .status
+            accessibilityFocus = MedicineCaptureAccessibilityFocusResolver.target(
+                for: state,
+                submissionStatus: viewModel.assessmentSubmissionStatus
+            )
         }
     }
 }
