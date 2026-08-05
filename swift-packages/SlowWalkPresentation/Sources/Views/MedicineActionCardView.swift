@@ -40,7 +40,7 @@ public struct MedicineActionCardView: View {
         Group {
             if let disclaimer = demoDisclaimer {
                 Section {
-                    disclaimerRow(disclaimer)
+                    MedicineDemoDisclaimerRow(text: disclaimer)
                 }
             }
 
@@ -81,27 +81,6 @@ public struct MedicineActionCardView: View {
                 confirmationSection
             }
         }
-    }
-
-    // MARK: - Demo disclaimer
-
-    /// Rendered only when the caller explicitly supplies a demo disclaimer.
-    /// It stays a standard form row instead of introducing a custom banner.
-    private func disclaimerRow(
-        _ text: String
-    ) -> some View {
-        Label {
-            Text(text)
-                .font(.footnote)
-                .fontWeight(.medium)
-                .fixedSize(horizontal: false, vertical: true)
-        } icon: {
-            Image(systemName: "info.circle")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(text)
     }
 
     // MARK: - Must confirm medicine
@@ -286,6 +265,26 @@ public struct MedicineActionCardView: View {
             .font(.subheadline)
             .fontWeight(.semibold)
             .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Standard form row used wherever a caller supplies demo assessment data.
+struct MedicineDemoDisclaimerRow: View {
+    let text: String
+
+    var body: some View {
+        Label {
+            Text(text)
+                .font(.footnote)
+                .fontWeight(.medium)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(text)
     }
 }
 

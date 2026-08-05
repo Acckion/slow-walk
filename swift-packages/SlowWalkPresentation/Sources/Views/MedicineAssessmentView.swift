@@ -25,8 +25,20 @@ public struct MedicineAssessmentView: View {
 
     public var body: some View {
         Form {
-            recognitionSection
+            demoDisclaimerSection
             content
+            recognitionSection
+        }
+    }
+
+    // MARK: - Demo disclaimer
+
+    @ViewBuilder
+    private var demoDisclaimerSection: some View {
+        if let disclaimer = state.demoDisclaimer {
+            Section {
+                MedicineDemoDisclaimerRow(text: disclaimer)
+            }
         }
     }
 
@@ -59,19 +71,38 @@ public struct MedicineAssessmentView: View {
                     .accessibilityElement(children: .combine)
                 }
 
-                ForEach(
-                    Array(recognition.recognizedTexts.enumerated()),
-                    id: \.offset
-                ) { index, text in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(recognizedTextLabel(at: index))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                if !recognition.recognizedTexts.isEmpty {
+                    DisclosureGroup {
+                        ForEach(
+                            Array(recognition.recognizedTexts.enumerated()),
+                            id: \.offset
+                        ) { index, text in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(recognizedTextLabel(at: index))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
 
-                        Text(text)
-                            .fixedSize(horizontal: false, vertical: true)
+                                Text(text)
+                                    .fixedSize(
+                                        horizontal: false,
+                                        vertical: true
+                                    )
+                            }
+                            .accessibilityElement(children: .combine)
+                        }
+                    } label: {
+                        Label {
+                            Text(
+                                """
+                                \(MedicinePresentationCopy.recognizedTextLabel)（\
+                                \(recognition.recognizedTexts.count) 条）
+                                """
+                            )
+                        } icon: {
+                            Image(systemName: "text.viewfinder")
+                                .accessibilityHidden(true)
+                        }
                     }
-                    .accessibilityElement(children: .combine)
                 }
             } header: {
                 Text(MedicinePresentationCopy.recognitionHeading)
@@ -143,7 +174,6 @@ public struct MedicineAssessmentView: View {
                 actionCard: actionCard,
                 requiresMedicineConfirmation:
                     state.requiresMedicineConfirmation,
-                demoDisclaimer: state.demoDisclaimer,
                 confirmAction: confirmAction
             )
         } else {
