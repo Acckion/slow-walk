@@ -1430,20 +1430,36 @@ struct MedicineAssessmentGateTests {
         #expect(page.displayState.demoDisclaimer == nil)
     }
 
-    /// Hosting the real Companion assessment branch exercises SwiftUI's
-    /// result-only `onAppear`, including same-ID idempotency and replacement.
+    /// The hub must not acknowledge a result that is held behind the medicine
+    /// route. Hosting the real assessment page then exercises its result-only
+    /// `onAppear`, including same-ID idempotency and replacement.
     @Test func hostedResultPageAcknowledgesEachCanonicalRequestOnce() async {
         let (session, store) = await Self.sessionAndStoreAtGate(
             latestUpdate: Self.makeResultUpdate(sequenceNumber: 1)
         )
-        let initialHost = Self.host(CompanionView(session: session))
+        let hubHost = Self.host(CompanionView(session: session))
+
+        #expect(session.assessmentGate?.hasDisplayedCurrentResult == false)
+        #expect(Self.careActionShownCount(in: store) == 0)
+
+        let initialHost = Self.host(
+            CompanionView(session: session).activeMedicineAssessmentPage
+        )
+        await Self.waitForUI {
+            session.assessmentGate?.hasDisplayedCurrentResult == true
+        }
 
         #expect(session.assessmentGate?.hasDisplayedCurrentResult == true)
         #expect(Self.careActionShownCount(in: store) == 1)
 
         // A separate hierarchy produces another `onAppear` for the same
         // request, while A2a remains the final idempotency boundary.
-        let repeatedHost = Self.host(CompanionView(session: session))
+        let repeatedHost = Self.host(
+            CompanionView(session: session).activeMedicineAssessmentPage
+        )
+        await Self.waitForUI {
+            Self.careActionShownCount(in: store) == 1
+        }
         #expect(Self.careActionShownCount(in: store) == 1)
         repeatedHost.window.isHidden = true
 
@@ -1458,7 +1474,13 @@ struct MedicineAssessmentGateTests {
                 state: .result(replacement)
             )
         )
-        let replacementHost = Self.host(CompanionView(session: session))
+        let replacementHost = Self.host(
+            CompanionView(session: session).activeMedicineAssessmentPage
+        )
+        await Self.waitForUI {
+            session.assessmentGate?.displayedResultRequestID
+                == replacement.response.requestID
+        }
 
         #expect(
             session.assessmentGate?.displayedResultRequestID
@@ -1467,6 +1489,7 @@ struct MedicineAssessmentGateTests {
         #expect(Self.careActionShownCount(in: store) == 2)
         replacementHost.window.isHidden = true
         initialHost.window.isHidden = true
+        hubHost.window.isHidden = true
     }
 
     /// A hosted non-result page never enters the result-only acknowledgement
@@ -1840,8 +1863,8 @@ struct MedicineAssessmentGateTests {
         )
     }
 
-    static func host(
-        _ view: CompanionView
+    static func host<Content: View>(
+        _ view: Content
     ) -> (
         window: UIWindow,
         controller: UIHostingController<AnyView>
@@ -1857,6 +1880,15 @@ struct MedicineAssessmentGateTests {
         window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         return (window, controller)
+    }
+
+    static func waitForUI(
+        _ condition: @escaping @MainActor () -> Bool
+    ) async {
+        for _ in 0..<100 {
+            if condition() { return }
+            await Task.yield()
+        }
     }
 
     static func companionViewSource() throws -> String {

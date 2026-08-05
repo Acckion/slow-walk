@@ -330,7 +330,7 @@ struct CompanionView: View {
 
     // MARK: - Medicine assessment
 
-    private var activeMedicineAssessmentPage: some View {
+    var activeMedicineAssessmentPage: some View {
         MedicineAssessmentGateReader(session: session) { gate in
             assessmentPage(
                 gate,
