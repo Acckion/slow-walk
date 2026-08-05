@@ -1443,7 +1443,7 @@ struct MedicineAssessmentGateTests {
         #expect(Self.careActionShownCount(in: store) == 0)
 
         let initialHost = Self.host(
-            CompanionView(session: session).activeMedicineAssessmentPage
+            HostedMedicineAssessmentPage(session: session)
         )
         await Self.waitForUI {
             session.assessmentGate?.hasDisplayedCurrentResult == true
@@ -1455,7 +1455,7 @@ struct MedicineAssessmentGateTests {
         // A separate hierarchy produces another `onAppear` for the same
         // request, while A2a remains the final idempotency boundary.
         let repeatedHost = Self.host(
-            CompanionView(session: session).activeMedicineAssessmentPage
+            HostedMedicineAssessmentPage(session: session)
         )
         await Self.waitForUI {
             Self.careActionShownCount(in: store) == 1
@@ -1475,7 +1475,7 @@ struct MedicineAssessmentGateTests {
             )
         )
         let replacementHost = Self.host(
-            CompanionView(session: session).activeMedicineAssessmentPage
+            HostedMedicineAssessmentPage(session: session)
         )
         await Self.waitForUI {
             session.assessmentGate?.displayedResultRequestID
@@ -1871,7 +1871,12 @@ struct MedicineAssessmentGateTests {
     ) {
         let environment = AppEnvironment.preview()
         let controller = UIHostingController(
-            rootView: AnyView(view.environment(environment))
+            rootView: AnyView(
+                NavigationStack {
+                    view
+                }
+                .environment(environment)
+            )
         )
         let window = UIWindow(
             frame: CGRect(x: 0, y: 0, width: 390, height: 844)
@@ -1888,6 +1893,14 @@ struct MedicineAssessmentGateTests {
         for _ in 0..<100 {
             if condition() { return }
             await Task.yield()
+        }
+    }
+
+    private struct HostedMedicineAssessmentPage: View {
+        let session: CompanionSessionModel
+
+        var body: some View {
+            CompanionView(session: session).activeMedicineAssessmentPage
         }
     }
 
